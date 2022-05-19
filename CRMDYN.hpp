@@ -2,7 +2,7 @@
 #include <cmath>
 #include "CRMMatrixOperations.hpp"
 
-#define NUM_STATES 21   // u[0..2],v[0..2],w[0..2],R[0..9],p[0..2]
+#define NUM_STATES 21   // u[0..2],R[0..9],p[0..2],v[0..2],w[0..2]
 #define NUM_INTEGRATION_STATES 9   // u[0..2],v[0..2],w[0..2]
 #define EQNDIMENSION 9	// domain: u[0..2],v[0..2],w[0..2] range: m_tip[0..2]
 
@@ -153,7 +153,7 @@ void CRMSolverIVP_Return (  adType in_x_N[NUM_STATES], adType out_WrenchResidual
 template <typename adType>
 void CRMIntegrand (	adType s, adType x[NUM_STATES], adType Li, double dlambdainv,
                        double in_K[9], double in_Kinv[9], double in_l[3],
-                       double in_ustar[3],double in_vstar[3],double in_wstar[3],
+                       double in_ustar[3],
                        double in_fcumlambda[NUM_FCUM_LAMBDA+1][3],
                        adType in_ftip[3],
                        adType xdot[NUM_INTEGRATION_STATES]);
@@ -169,7 +169,7 @@ void CRMIntegrand (	adType s, adType x[NUM_STATES], adType Li, double dlambdainv
 //double 	l[3];       	// External moment at current s (world coordinates)
 //double 	fcumlambda[NUM_FCUM_LAMBDA+1][3];	// (NUM_FCUM_LAMBDA+1)x3 array storing cumulative external force (exluding tip force) integrated from \lambda = index * \Delta\lambda to the catheter tip (\lambda=0)
 //double		ftip[3];		// External point force (in spatial coordinates) applied at the tip of the catheter (\lambda = 0)
-
+// Returning xdot-- EQ:(9) Rucker 2010
 // support function to copy location marker positions
 //template <typename adType>
 //void LocMarkerUpdate(double p[3], adType xi[NUM_STATES], adType t);
@@ -181,22 +181,22 @@ double dVal(adType x) { return (x); }
  * Numerical Integration Functions
  */
 //
-////ABM4: 4th order Adams-Bashforth Prediction and Adams-Moulton Correction Numerical Integration
-////    Note: The first three steps are calculated using RK2
-//template <typename adType>
-//void ABM4 (	adType in_x_0[NUM_STATES], adType t_0, int N, double h,
-//               adType Li, double dlambdainv, double in_K[9], double in_Kinv[9], double in_l[3], double in_ustar[3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3], adType in_ftip[3],
-//               bool FinalValueOnly, double	in_LocMarkers[NUM_LOCALIZATION_MARKERS], int *inout_NextLocMarkerIdx,
-//               adType out_x_N[NUM_STATES], double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]	);
-//
-////ABM4_step One step of 4th order Adams-Bashforth Prediction and Adams-Moulton Correction
-//template <typename adType>
-//void ABM4_step(	adType in_x_n[NUM_STATES], adType t_n, double h,
-//                   adType in_xdot_nm1[NUM_INTEGRATION_STATES], adType in_xdot_nm2[NUM_INTEGRATION_STATES], adType in_xdot_nm3[NUM_INTEGRATION_STATES],
-//                   adType in_x_nm1[NUM_STATES], adType in_x_nm2[NUM_STATES], adType in_x_nm3[NUM_STATES],
-//                   adType Li, double dlambdainv, double in_K[9], double in_Kinv[9], double in_l[3], double in_ustar[3], double in_fcumlambda[NUM_FCUM_LAMBDA + 1][3], adType in_ftip[3],
-//                   adType out_x_np1[NUM_STATES], adType out_xdot_n[NUM_INTEGRATION_STATES]);
-//
+//ABM4: 4th order Adams-Bashforth Prediction and Adams-Moulton Correction Numerical Integration
+//    Note: The first three steps are calculated using RK2
+template <typename adType>
+void ABM4 (	adType in_x_0[NUM_STATES], adType t_0, int N, double h,
+               adType Li, double dlambdainv, double in_K[9], double in_Kinv[9], double in_l[3], double in_ustar[3], double in_vstar[3], double in_wstar[3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3], adType in_ftip[3],
+               bool FinalValueOnly, double	in_LocMarkers[NUM_LOCALIZATION_MARKERS], int *inout_NextLocMarkerIdx,
+               adType out_x_N[NUM_STATES], double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]	);
+
+//ABM4_step One step of 4th order Adams-Bashforth Prediction and Adams-Moulton Correction
+template <typename adType>
+void ABM4_step(	adType in_x_n[NUM_STATES], adType t_n, double h,
+                   adType in_xdot_nm1[NUM_INTEGRATION_STATES], adType in_xdot_nm2[NUM_INTEGRATION_STATES], adType in_xdot_nm3[NUM_INTEGRATION_STATES],
+                   adType in_x_nm1[NUM_STATES], adType in_x_nm2[NUM_STATES], adType in_x_nm3[NUM_STATES],
+                   adType Li, double dlambdainv, double in_K[9], double in_Kinv[9], double in_l[3], double in_ustar[3], double in_fcumlambda[NUM_FCUM_LAMBDA + 1][3], adType in_ftip[3],
+                   adType out_x_np1[NUM_STATES], adType out_xdot_n[NUM_INTEGRATION_STATES]);
+
 ////RK2_step One step of 2nd Order Runge-Kutta Integration
 //template <typename adType>
 //void RK2_step(	adType in_x_n[NUM_STATES], adType t_n, double h,
