@@ -15,7 +15,6 @@ void CRMSolverIVP (double in_x_0[NUM_STATES], double in_IntegrationStepSize,
                    double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]
 					) {
 
-
 	CRMIVPCoreParams<adType> CoreParams;
 	adType x_0[NUM_STATES];
 	mCopy_AB<NUM_STATES>(in_x_0, x_0);
@@ -50,46 +49,46 @@ void CRMSolverIVP (double in_x_0[NUM_STATES], double in_IntegrationStepSize,
 }
 
 
-template <typename adType>
-void CRMSolverIVP(	CRMShootingMethodParams<adType> in_Params,
-					adType in_u0[3], adType in_ftip[3],
-					bool in_FinalValueOnly,
-					adType out_x_N[NUM_STATES], adType out_MomentResidual[3], 
-					double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]		) {
-
-	adType x_0[NUM_STATES];
-	for (int i = 0; i < NUM_STATES; i++) {
-		if (i < 3) x_0[i] = in_u0[i];
-		else if (i < 12) x_0[i] = in_Params.R0[i - 3];
-		else x_0[i] = in_Params.p0[i - 12];
-	}
-
-	CRMIVPCoreParams<adType> CoreParams;
-	adType u_0[3], ftip[3];
-
-
-	CRMSolverIVP_Prep(x_0, in_Params.IntegrationStepSize,
-		in_Params.Li, in_Params.dlambdainv,
-		in_Params.SegEndLambdas, in_Params.LocMarkerLambdas,
-		in_Params.K, in_Params.Kinv, in_Params.ustar,
-		in_Params.MagMoment, in_Params.fcumlambda,
-		in_Params.B0,
-		in_FinalValueOnly,
-		CoreParams);
-
-	// copy to local variable
-	for (int i = 0; i < 3; i++) ftip[i] = in_ftip[i];
-
-	// We need to pass u_0 as input argument as the values in CoreParams will be overriden with the values provided in the input arguments - functionality needed for solving Boundary Value Problems (BVP)
-	for (int i = 0; i < 3; i++) u_0[i] = CoreParams.xi[i];
-
-	CRMSolverIVP_Core(CoreParams, u_0, ftip, out_x_N, out_MomentResidual, out_p_atLocMarkers);
-
-	// NO NEED FOR CRMSolverIVP_Return
-
-}
-
-
+//template <typename adType>
+//void CRMSolverIVP(	CRMShootingMethodParams<adType> in_Params,
+//					adType in_u0[3], adType in_ftip[3],
+//					bool in_FinalValueOnly,
+//					adType out_x_N[NUM_STATES], adType out_MomentResidual[3],
+//					double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]		) {
+//
+//	adType x_0[NUM_STATES];
+//	for (int i = 0; i < NUM_STATES; i++) {
+//		if (i < 3) x_0[i] = in_u0[i];
+//		else if (i < 12) x_0[i] = in_Params.R0[i - 3];
+//		else x_0[i] = in_Params.p0[i - 12];
+//	}
+//
+//	CRMIVPCoreParams<adType> CoreParams;
+//	adType u_0[3], ftip[3];
+//
+//
+//	CRMSolverIVP_Prep(x_0, in_Params.IntegrationStepSize,
+//		in_Params.Li, in_Params.dlambdainv,
+//		in_Params.SegEndLambdas, in_Params.LocMarkerLambdas,
+//		in_Params.K, in_Params.Kinv, in_Params.ustar,
+//		in_Params.MagMoment, in_Params.fcumlambda,
+//		in_Params.B0,
+//		in_FinalValueOnly,
+//		CoreParams);
+//
+//	// copy to local variable
+//	for (int i = 0; i < 3; i++) ftip[i] = in_ftip[i];
+//
+//	// We need to pass u_0 as input argument as the values in CoreParams will be overriden with the values provided in the input arguments - functionality needed for solving Boundary Value Problems (BVP)
+//	for (int i = 0; i < 3; i++) u_0[i] = CoreParams.xi[i];
+//
+//	CRMSolverIVP_Core(CoreParams, u_0, ftip, out_x_N, out_MomentResidual, out_p_atLocMarkers);
+//
+//	// NO NEED FOR CRMSolverIVP_Return
+//
+//}
+//
+//
 template <typename adType>
 void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSize,
                          adType in_Li, double in_dlambdainv,
@@ -214,311 +213,311 @@ void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSiz
 }
 
 
-template <typename adType>
-void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
-						 adType in_u[3], adType in_v[3], adType in_w[3], adType in_ftip[3],
-						 adType out_x_N[NUM_STATES], adType out_MomentResidual[6],
-						 double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3] ){
-
-	adType xi[NUM_STATES];  			//  Initial value of the state for the next segment to be integrated
-	adType xf[NUM_STATES];			//  Final value of the state for the last segment integrated
-	double p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3];	// States at markers (ordered proximal to distal)
-
-	bool loopcondition;				//  local variable for calculating a loop condition
-
-//	double l_zero[3]={0.0,0.0,0.0};
-//	double h;						// integration stepsize
-//	adType RigidSegmentLength;		// Length of the rigid segment - intermediate variable
-//	adType muhat[9];
-//	adType RscTB0[3], Tb[3], deltau1[3], K1deltau1[3], K2invResidual[3]; // intermediate variables
-//	adType tempadType;				// intermediate variables
-//	adType Residual[3];				// Residual at the catheter tip -- will be returned
-//	int   fsegno; 					// flexible segment no
-//	int   actno, fsegi, fsegip1;	// actuator no, flexible segment before, flexible segment after
-//	bool  LastSegmentIsRigid=true;	// Flag indicating if the last segment processed is rigid (true) or not (false)
+//template <typename adType>
+//void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
+//						 adType in_u[3], adType in_v[3], adType in_w[3], adType in_ftip[3],
+//						 adType out_x_N[NUM_STATES], adType out_MomentResidual[6],
+//						 double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3] ){
 //
-//	// we need to copy xi from in_params to the local variable and update it with u[0..2] specified in in_u
-//	for (int i=0; i<NUM_STATES; i++) xi[i]=in_params.xi[i];
-//	for (int i=0; i<3; i++) {
-//		xi[i]=in_u[i];
+//	adType xi[NUM_STATES];  			//  Initial value of the state for the next segment to be integrated
+//	adType xf[NUM_STATES];			//  Final value of the state for the last segment integrated
+//	double p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3];	// States at markers (ordered proximal to distal)
+//
+//	bool loopcondition;				//  local variable for calculating a loop condition
+//
+////	double l_zero[3]={0.0,0.0,0.0};
+////	double h;						// integration stepsize
+////	adType RigidSegmentLength;		// Length of the rigid segment - intermediate variable
+////	adType muhat[9];
+////	adType RscTB0[3], Tb[3], deltau1[3], K1deltau1[3], K2invResidual[3]; // intermediate variables
+////	adType tempadType;				// intermediate variables
+////	adType Residual[3];				// Residual at the catheter tip -- will be returned
+////	int   fsegno; 					// flexible segment no
+////	int   actno, fsegi, fsegip1;	// actuator no, flexible segment before, flexible segment after
+////	bool  LastSegmentIsRigid=true;	// Flag indicating if the last segment processed is rigid (true) or not (false)
+////
+////	// we need to copy xi from in_params to the local variable and update it with u[0..2] specified in in_u
+////	for (int i=0; i<NUM_STATES; i++) xi[i]=in_params.xi[i];
+////	for (int i=0; i<3; i++) {
+////		xi[i]=in_u[i];
+////	}
+////	// we need to copy in_ftip to local variable
+////	adType ftip[3];
+////	mCopy_AB<3,adType>(in_ftip, ftip);
+////	// we will copy anything we will access more than once (or write to) to local variables
+////	int   StartSegmentIndex=in_params.StartSegmentIndex;
+////	int	  NextLocMarker=in_params.NextLocMarker;
+////	int	  InitialLocMarker=NextLocMarker;
+////	// for others, we will create aliases
+////	auto & SegBounds = in_params.SegBounds;
+////	auto & SegSteps = in_params.SegSteps;
+////	auto & InsertedLength = in_params.InsertedLength;
+////	auto & dlambdainv = in_params.dlambdainv;
+////	auto & K = in_params.K;
+////	auto & Kinv = in_params.Kinv;
+////	auto & ustar = in_params.ustar;
+////	auto & fcumlambda = in_params.fcumlambda;
+////	auto & FinalValueOnly = in_params.FinalValueOnly;
+////	auto & LocMarkers = in_params.LocMarkers;
+////	auto & B0 = in_params.B0;
+////	auto & MagMoment = in_params.MagMoment;
+////	// we will also copy the already filled entries of p_atLocMarkers from params
+////	for (int i=0; i<InitialLocMarker; i++) {
+////		for (int j=0; j<3; j++) {
+////			p_atLocMarkers[i][j]=in_params.p_atLocMarkers[i][j];
+////		}
+////	}
+////
+////	// IMPORTANT NOTE: most proximal segment is assumed to be always flexible
+////	//    and the flexible and rigid segments are assumed to be alternating
+////	//    most distal segment can be flexible or rigid
+////
+////	// Integrate each of the segments
+////	// If the starting segment is a rigid segment, then we will need to move initial conditions to the start of the next flexible segment and change the StartingSegment to that segment
+////	if ( StartSegmentIndex % 2 == 1 ) {
+////		RigidSegmentLength	=	SegBounds[StartSegmentIndex+1]-SegBounds[StartSegmentIndex];	// how far we need to move along the length of the rigid segment to reach the next flexible segment
+////		for (int i=0; i<3; i++) { 										// u[0..2] and R[0..8] remain the same
+////			xi[i+9+3] = xi[i+9+3] + RigidSegmentLength * xi[3+i*3+2];	// p[0..2] will translate along the z direction of the R matrix (3rd column)
+////			Residual[i]=0.0;											// Residual is initialized to the 0 vector, just in case the rigid segment is the only segment (it is both the start and the end segment),
+////		}																//     In this case, the main integration loop will not execute, so, we need to have valid return values
+////		mCopy_AB<NUM_STATES>(xi,xf);									//     for both xf and Residual
+////		StartSegmentIndex++;  // move the start segment to the next segment
+////		if (!FinalValueOnly) {
+////			// are there any localization markers?  If so, calculate their positions
+////			loopcondition = ((NextLocMarker<NUM_LOCALIZATION_MARKERS) && (LocMarkers[NextLocMarker]<=SegBounds[StartSegmentIndex]));
+////			while ( loopcondition ) {  // remember StartSegmentIndex has already been incremented
+////				tempadType =LocMarkers[NextLocMarker]-SegBounds[StartSegmentIndex];  	// this would be a negative number
+////				LocMarkerUpdate(p_atLocMarkers[NextLocMarker], xi, tempadType);			//	xi has already been updated
+////				NextLocMarker++;
+////				loopcondition = ((NextLocMarker<NUM_LOCALIZATION_MARKERS) && (LocMarkers[NextLocMarker]<=SegBounds[StartSegmentIndex]));			}
+////		}
+////	}
+////
+////
+////	for (int i=StartSegmentIndex; i<NUM_SEGMENTS; i++){
+////		if ( i%2 == 0 ) {  // Flexible Segment
+////			LastSegmentIsRigid=false;
+////			// Prepare the CRMIntegrand Parameters
+////			fsegno=i>>1; // i/2, flexible segment no
+////
+////			// Calculate the actual stepsize, based on the number of steps
+////			h=dVal((SegBounds[i+1]-SegBounds[i]))/(SegSteps[fsegno]*1.0);
+////
+////			// Integrate
+////			ABM4( 	xi, SegBounds[i], SegSteps[fsegno], h,
+////					InsertedLength, dlambdainv, K[fsegno], Kinv[fsegno], l_zero, ustar[fsegno], fcumlambda, ftip,
+////					FinalValueOnly, LocMarkers, &NextLocMarker,
+////					xf, p_atLocMarkers	);
+////
+////		}
+////		else {  // Need to do actuation/rigid segment calculations to transfer Initial Conditions to next flexible segment
+////			LastSegmentIsRigid=true;
+////			RigidSegmentLength=(SegBounds[i+1]-SegBounds[i]);
+////			// R
+////			for (int j=0; j<9; j++) {
+////				xi[3+j]=xf[3+j];
+////			}
+////			// p
+////			for (int j=0; j<3; j++) {
+////				xi[3+9+j]=xf[3+9+j]+xf[3+j*3+2]*RigidSegmentLength;
+////			}
+////			// u
+////			actno=(i-1)>>1;		// actuator no
+////			fsegi=actno;
+////			fsegip1=actno+1;
+////			// Tb=\mu_c \cross R_sc^T B0,s
+////			wHat(MagMoment[actno],muhat);
+////			mMult_ATB<3,3,1>(&(xf[3]),B0,RscTB0);
+////			mMult_AB<3,3,1>(muhat,RscTB0,Tb);
+////			// u2=u2star + ( K2inv K1 (u1 - u1star ) - K2inv Tb )
+////			mSub_AB<3,1>( &(xi[0]) , ustar[fsegi], deltau1);
+////			mMult_AB<3,3,1>( K[fsegi], deltau1, K1deltau1 );
+////			mSub_AB<3,1>( K1deltau1 , Tb, Residual);
+////			if (i < (NUM_SEGMENTS-1)) {	// we want to make sure that we are not at the last segment
+////				mMult_AB<3,3,1>( Kinv[fsegip1], Residual, K2invResidual );
+////				mAdd_AB<3,1>( ustar[fsegip1], K2invResidual, &(xi[0]) );
+////			}
+////			else {	// otherwise, we are at the last segment, and we need to copy the R and p values calculated for xi to xf so that they can be returned
+////				for (int j=0; j<NUM_STATES; j++) {
+////					if (j<3) xf[j]=0.0;  // u[0..2] are assigned to zero
+////					else xf[j]=xi[j];
+////				}
+////
+////			}
+////			if (!FinalValueOnly) {
+////				// are there any localization markers?  If so, calculate their positions
+////				loopcondition = ((NextLocMarker<NUM_LOCALIZATION_MARKERS) && (LocMarkers[NextLocMarker]<=SegBounds[i+1]));
+////				while ( loopcondition ) {
+////					tempadType =LocMarkers[NextLocMarker]-SegBounds[i+1];				// this would be a negative value
+////					LocMarkerUpdate(p_atLocMarkers[NextLocMarker], xi, tempadType);		//  xi has already been updated, it is the end point position
+////					NextLocMarker++;
+////					loopcondition = ((NextLocMarker<NUM_LOCALIZATION_MARKERS) && (LocMarkers[NextLocMarker]<=SegBounds[i+1]));
+////				}
+////			}
+////
+////		}
+////
+////	}
+////
+////	// Copy marker locations to the output
+////	if (!FinalValueOnly) {
+////		for (int i=0; i<NUM_LOCALIZATION_MARKERS; i++) {
+////			for (int j=0; j<3; j++) {
+////				out_p_atLocMarkers[i][j]=p_atLocMarkers[(NUM_LOCALIZATION_MARKERS-1)-i][j];
+////			}
+////		}
+////	}
+////
+////	// Copy the final values of the state x_f to the output
+////	mCopy_AB<NUM_STATES>(xf,out_x_N);
+////
+////	// Calculate the Boundary Value Residual if last segment is flexible
+////	adType deltau[3];
+////	if (!LastSegmentIsRigid) {
+////		// residual = K (u1 - u1star)
+////		mSub_AB<3,1>( &(xf[0]) , ustar[NUM_FLEX_SEG-1], deltau);
+////		mMult_AB<3,3,1>( K[NUM_FLEX_SEG-1], deltau, Residual);
+////	}   // else residual = K1 (u1 - u1star ) - Tb  ; already calculated above
+////
+////	// Copy the residual to the output
+////	mCopy_AB<3>(Residual,out_MomentResidual);
+//
+//}
+//
+//
+//template <typename adType>
+//void CRMSolverIVP_Return (  adType in_x_N[NUM_STATES], adType in_WrenchResidual[6],
+//							double in_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3],
+//							double out_x_N[NUM_STATES], double out_WrenchResidual[6],
+//							double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]) {
+//
+//	// Copy local variables to the output variables
+//	for (int i = 0; i < NUM_STATES; i++) out_x_N[i] = dVal(in_x_N[i]);
+//	for (int i = 0; i < 3; i++) out_WrenchResidual[i] = dVal(in_WrenchResidual[i]);
+//	mCopy_AB<NUM_LOCALIZATION_MARKERS,3>(in_p_atLocMarkers,out_p_atLocMarkers);
+//
+//}
+//
+//
+//template <typename adType>
+//void LocMarkerUpdate(double p[3], adType xi[NUM_STATES], adType t) {
+//	p[0] = xi[12] + t * xi[5];
+//	p[1] = xi[13] + t * xi[8];
+//	p[2] = xi[14] + t * xi[11];
+//}
+//
+//
+//template <typename adType>
+//void CRMIntegrand (	adType s, adType x[NUM_STATES],
+//					adType Li, double dlambdainv,
+//					double in_K[9], double in_Kinv[9], double in_l[3], double in_ustar[3], double in_vstar[3], double in_wstar[3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3],
+//					adType in_ftip[3],
+//					adType xdot[NUM_INTEGRATION_STATES]) {
+//
+//	adType Length;
+//	double deltalambdainv;
+//	adType u[3], v[3], w[3], R[9]; 	// p[3];   				we will not need this for analytical calculation
+//	adType udot[3]; 		// Rdot[9], pdot[3];	we will not need this for analytical calculation
+//	adType K[9], Kinv[9], l[3], fcum[3], ustar[3], ustardot[3], vstar[3], wstardot[3], wstar[3], wstardot[3];  //  We are assuming Kdot=0.0 (K=const)
+//
+//	// copy inputs and parameters to local variables
+//	for (int i=0; i<NUM_STATES; i++) {
+//		if (i<3) { 			// 0 <= i < 3
+//			u[i]=x[i];
+//		}
+//		else if (i<12) { 	// 3 <= i < 12
+//			R[i-3]=x[i];
+//		}
+//		// we will not need this for analytical calculation
+//		//else { 				// 12 <= i < 15
+//		//	p[i-12]=x[i];
+//		//}
 //	}
-//	// we need to copy in_ftip to local variable
-//	adType ftip[3];
-//	mCopy_AB<3,adType>(in_ftip, ftip);
-//	// we will copy anything we will access more than once (or write to) to local variables
-//	int   StartSegmentIndex=in_params.StartSegmentIndex;
-//	int	  NextLocMarker=in_params.NextLocMarker;
-//	int	  InitialLocMarker=NextLocMarker;
-//	// for others, we will create aliases
-//	auto & SegBounds = in_params.SegBounds;
-//	auto & SegSteps = in_params.SegSteps;
-//	auto & InsertedLength = in_params.InsertedLength;
-//	auto & dlambdainv = in_params.dlambdainv;
-//	auto & K = in_params.K;
-//	auto & Kinv = in_params.Kinv;
-//	auto & ustar = in_params.ustar;
-//	auto & fcumlambda = in_params.fcumlambda;
-//	auto & FinalValueOnly = in_params.FinalValueOnly;
-//	auto & LocMarkers = in_params.LocMarkers;
-//	auto & B0 = in_params.B0;
-//	auto & MagMoment = in_params.MagMoment;
-//	// we will also copy the already filled entries of p_atLocMarkers from params
-//	for (int i=0; i<InitialLocMarker; i++) {
+//	Length=Li;
+//	deltalambdainv=dlambdainv;
+//	for (int i=0; i<3; i++) {
 //		for (int j=0; j<3; j++) {
-//			p_atLocMarkers[i][j]=in_params.p_atLocMarkers[i][j];
+//			K[i*3+j]		=	in_K[i*3+j];
+//			Kinv[i*3+j]		=	in_Kinv[i*3+j];
 //		}
+//		l[i]			=	in_l[i];
+//		ustar[i]		=	in_ustar[i];
+//		ustardot[i]		=	0.0; //in_ustardot[i]; // we assume ustardot=0.0 since our rest shape model is piecewise constant curvature
 //	}
 //
-//	// IMPORTANT NOTE: most proximal segment is assumed to be always flexible
-//	//    and the flexible and rigid segments are assumed to be alternating
-//	//    most distal segment can be flexible or rigid
-//
-//	// Integrate each of the segments
-//	// If the starting segment is a rigid segment, then we will need to move initial conditions to the start of the next flexible segment and change the StartingSegment to that segment
-//	if ( StartSegmentIndex % 2 == 1 ) {
-//		RigidSegmentLength	=	SegBounds[StartSegmentIndex+1]-SegBounds[StartSegmentIndex];	// how far we need to move along the length of the rigid segment to reach the next flexible segment
-//		for (int i=0; i<3; i++) { 										// u[0..2] and R[0..8] remain the same
-//			xi[i+9+3] = xi[i+9+3] + RigidSegmentLength * xi[3+i*3+2];	// p[0..2] will translate along the z direction of the R matrix (3rd column)
-//			Residual[i]=0.0;											// Residual is initialized to the 0 vector, just in case the rigid segment is the only segment (it is both the start and the end segment),
-//		}																//     In this case, the main integration loop will not execute, so, we need to have valid return values
-//		mCopy_AB<NUM_STATES>(xi,xf);									//     for both xf and Residual
-//		StartSegmentIndex++;  // move the start segment to the next segment
-//		if (!FinalValueOnly) {
-//			// are there any localization markers?  If so, calculate their positions
-//			loopcondition = ((NextLocMarker<NUM_LOCALIZATION_MARKERS) && (LocMarkers[NextLocMarker]<=SegBounds[StartSegmentIndex]));
-//			while ( loopcondition ) {  // remember StartSegmentIndex has already been incremented
-//				tempadType =LocMarkers[NextLocMarker]-SegBounds[StartSegmentIndex];  	// this would be a negative number
-//				LocMarkerUpdate(p_atLocMarkers[NextLocMarker], xi, tempadType);			//	xi has already been updated
-//				NextLocMarker++;
-//				loopcondition = ((NextLocMarker<NUM_LOCALIZATION_MARKERS) && (LocMarkers[NextLocMarker]<=SegBounds[StartSegmentIndex]));			}
-//		}
-//	}
-//
-//
-//	for (int i=StartSegmentIndex; i<NUM_SEGMENTS; i++){
-//		if ( i%2 == 0 ) {  // Flexible Segment
-//			LastSegmentIsRigid=false;
-//			// Prepare the CRMIntegrand Parameters
-//			fsegno=i>>1; // i/2, flexible segment no
-//
-//			// Calculate the actual stepsize, based on the number of steps
-//			h=dVal((SegBounds[i+1]-SegBounds[i]))/(SegSteps[fsegno]*1.0);
-//
-//			// Integrate
-//			ABM4( 	xi, SegBounds[i], SegSteps[fsegno], h,
-//					InsertedLength, dlambdainv, K[fsegno], Kinv[fsegno], l_zero, ustar[fsegno], fcumlambda, ftip,
-//					FinalValueOnly, LocMarkers, &NextLocMarker,
-//					xf, p_atLocMarkers	);
-//
-//		}
-//		else {  // Need to do actuation/rigid segment calculations to transfer Initial Conditions to next flexible segment
-//			LastSegmentIsRigid=true;
-//			RigidSegmentLength=(SegBounds[i+1]-SegBounds[i]);
-//			// R
-//			for (int j=0; j<9; j++) {
-//				xi[3+j]=xf[3+j];
-//			}
-//			// p
-//			for (int j=0; j<3; j++) {
-//				xi[3+9+j]=xf[3+9+j]+xf[3+j*3+2]*RigidSegmentLength;
-//			}
-//			// u
-//			actno=(i-1)>>1;		// actuator no
-//			fsegi=actno;
-//			fsegip1=actno+1;
-//			// Tb=\mu_c \cross R_sc^T B0,s
-//			wHat(MagMoment[actno],muhat);
-//			mMult_ATB<3,3,1>(&(xf[3]),B0,RscTB0);
-//			mMult_AB<3,3,1>(muhat,RscTB0,Tb);
-//			// u2=u2star + ( K2inv K1 (u1 - u1star ) - K2inv Tb )
-//			mSub_AB<3,1>( &(xi[0]) , ustar[fsegi], deltau1);
-//			mMult_AB<3,3,1>( K[fsegi], deltau1, K1deltau1 );
-//			mSub_AB<3,1>( K1deltau1 , Tb, Residual);
-//			if (i < (NUM_SEGMENTS-1)) {	// we want to make sure that we are not at the last segment
-//				mMult_AB<3,3,1>( Kinv[fsegip1], Residual, K2invResidual );
-//				mAdd_AB<3,1>( ustar[fsegip1], K2invResidual, &(xi[0]) );
-//			}
-//			else {	// otherwise, we are at the last segment, and we need to copy the R and p values calculated for xi to xf so that they can be returned
-//				for (int j=0; j<NUM_STATES; j++) {
-//					if (j<3) xf[j]=0.0;  // u[0..2] are assigned to zero
-//					else xf[j]=xi[j];
-//				}
-//
-//			}
-//			if (!FinalValueOnly) {
-//				// are there any localization markers?  If so, calculate their positions
-//				loopcondition = ((NextLocMarker<NUM_LOCALIZATION_MARKERS) && (LocMarkers[NextLocMarker]<=SegBounds[i+1]));
-//				while ( loopcondition ) {
-//					tempadType =LocMarkers[NextLocMarker]-SegBounds[i+1];				// this would be a negative value
-//					LocMarkerUpdate(p_atLocMarkers[NextLocMarker], xi, tempadType);		//  xi has already been updated, it is the end point position
-//					NextLocMarker++;
-//					loopcondition = ((NextLocMarker<NUM_LOCALIZATION_MARKERS) && (LocMarkers[NextLocMarker]<=SegBounds[i+1]));
-//				}
-//			}
-//
-//		}
-//
-//	}
-//
-//	// Copy marker locations to the output
-//	if (!FinalValueOnly) {
-//		for (int i=0; i<NUM_LOCALIZATION_MARKERS; i++) {
-//			for (int j=0; j<3; j++) {
-//				out_p_atLocMarkers[i][j]=p_atLocMarkers[(NUM_LOCALIZATION_MARKERS-1)-i][j];
-//			}
-//		}
-//	}
-//
-//	// Copy the final values of the state x_f to the output
-//	mCopy_AB<NUM_STATES>(xf,out_x_N);
-//
-//	// Calculate the Boundary Value Residual if last segment is flexible
-//	adType deltau[3];
-//	if (!LastSegmentIsRigid) {
-//		// residual = K (u1 - u1star)
-//		mSub_AB<3,1>( &(xf[0]) , ustar[NUM_FLEX_SEG-1], deltau);
-//		mMult_AB<3,3,1>( K[NUM_FLEX_SEG-1], deltau, Residual);
-//	}   // else residual = K1 (u1 - u1star ) - Tb  ; already calculated above
-//
-//	// Copy the residual to the output
-//	mCopy_AB<3>(Residual,out_MomentResidual);
-
-}
-
-
-template <typename adType>
-void CRMSolverIVP_Return (  adType in_x_N[NUM_STATES], adType in_WrenchResidual[6],
-							double in_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3],
-							double out_x_N[NUM_STATES], double out_WrenchResidual[6],
-							double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]) {
-
-	// Copy local variables to the output variables
-	for (int i = 0; i < NUM_STATES; i++) out_x_N[i] = dVal(in_x_N[i]);
-	for (int i = 0; i < 3; i++) out_WrenchResidual[i] = dVal(in_WrenchResidual[i]);
-	mCopy_AB<NUM_LOCALIZATION_MARKERS,3>(in_p_atLocMarkers,out_p_atLocMarkers);
-
-}
-
-
-template <typename adType>
-void LocMarkerUpdate(double p[3], adType xi[NUM_STATES], adType t) {
-	p[0] = xi[12] + t * xi[5];
-	p[1] = xi[13] + t * xi[8];
-	p[2] = xi[14] + t * xi[11];
-}
-
-
-template <typename adType>
-void CRMIntegrand (	adType s, adType x[NUM_STATES],
-					adType Li, double dlambdainv,
-					double in_K[9], double in_Kinv[9], double in_l[3], double in_ustar[3], double in_vstar[3], double in_wstar[3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3],
-					adType in_ftip[3],
-					adType xdot[NUM_INTEGRATION_STATES]) {
-
-	adType Length;
-	double deltalambdainv;
-	adType u[3], v[3], w[3], R[9]; 	// p[3];   				we will not need this for analytical calculation
-	adType udot[3]; 		// Rdot[9], pdot[3];	we will not need this for analytical calculation
-	adType K[9], Kinv[9], l[3], fcum[3], ustar[3], ustardot[3], vstar[3], wstardot[3], wstar[3], wstardot[3];  //  We are assuming Kdot=0.0 (K=const)
-
-	// copy inputs and parameters to local variables
-	for (int i=0; i<NUM_STATES; i++) {
-		if (i<3) { 			// 0 <= i < 3
-			u[i]=x[i];
-		}
-		else if (i<12) { 	// 3 <= i < 12
-			R[i-3]=x[i];
-		}
-		// we will not need this for analytical calculation
-		//else { 				// 12 <= i < 15
-		//	p[i-12]=x[i];
-		//}
-	}
-	Length=Li;
-	deltalambdainv=dlambdainv;
-	for (int i=0; i<3; i++) {
-		for (int j=0; j<3; j++) {
-			K[i*3+j]		=	in_K[i*3+j];
-			Kinv[i*3+j]		=	in_Kinv[i*3+j];
-		}
-		l[i]			=	in_l[i];
-		ustar[i]		=	in_ustar[i];
-		ustardot[i]		=	0.0; //in_ustardot[i]; // we assume ustardot=0.0 since our rest shape model is piecewise constant curvature
-	}
-
-	// calculate interpolated value of fcum
-	adType lambda=Length-s;
-	adType ix=lambda*deltalambdainv;
-	double ird_f=floor(dVal(ix)); // index for round down  -- doubleing point
-	if (ird_f<0) ird_f=0;
-	int ird=(int) ird_f;	//    integer index
-	double iru_f=ceil(dVal(ix)); 	// index for round up  -- doubleing point
-	if (iru_f>NUM_FCUM_LAMBDA) iru_f=NUM_FCUM_LAMBDA;
-	int iru=(int) iru_f;	//    integer index
-	adType ixmird=ix-ird;    // weight for interpolation
-	adType irumix=iru-ix;	// weight for interpolation
-	for (int i=0; i<3; i++) {
-		fcum[i]		=	in_fcumlambda[iru][i] * ixmird + in_fcumlambda[ird][i] * irumix;
-	}
-
-	// add the tip force to fcum
-	for (int i = 0; i < 3; i++) {
-		fcum[i]		+=	in_ftip[i];
-	}
-
-	// calculate u_hat
-	adType u_hat[9];
-	wHat(u,u_hat);
-
-	// udot = ustardot - Kinv*((um*K+Kdot)*(u-ustar_s) + e3m*R'*intf + R'*l); % udot
-	//
-	//   e3hat*R' = [ -r12 -r22 -r32; r11 r21 r31; 0 0 0];
-	adType e3hatRT[9];
-	e3hatRT[0]=-R[1]; 	e3hatRT[1]=-R[4]; 	e3hatRT[2]=-R[7];
-	e3hatRT[3]=R[0];	e3hatRT[4]=R[3];	e3hatRT[5]=R[6];
-	e3hatRT[6]=0.0;	e3hatRT[7]=0.0;	e3hatRT[8]=0.0;
-	adType e3hatRTfcum[3];
-	mMult_AB<3,3,1>(e3hatRT, fcum, e3hatRTfcum);			//  e3m*R'*intf
-	adType RTl[3];
-	mMult_ATB<3,3,1>(R,l,RTl);								// R'*l
-	adType umustar[3];
-	mSub_AB<3,1>(u,ustar,umustar);							// (u-ustar_s)
-	adType Kumustar[3], uhatKumustar[3];
-	mMult_AB<3,3,1>(K,umustar,Kumustar);
-	mMult_AB<3,3,1>(u_hat,Kumustar,uhatKumustar); 		 	//(um*K+Kdot)*(u-ustar_s)  assuming Kdot=0
-	adType sumterm[3];
-	mAdd_ABC<3,1>(uhatKumustar,e3hatRTfcum,RTl,sumterm);	// ((um*K+Kdot)*(u-ustar_s) + e3m*R'*intf + R'*l)
-	adType KinvSum[3];
-	mMult_AB<3,3,1>(Kinv,sumterm,KinvSum);					// Kinv*((um*K+Kdot)*(u-ustar_s) + e3m*R'*intf + R'*l)
-	mSub_AB<3,1>(ustardot,KinvSum,udot);					// udot = ustardot - Kinv*((um*K+Kdot)*(u-ustar_s) + e3m*R'*intf + R'*l);
-
-	// we will not need these for analytical calculation
-	// Rdot = R*u_hat
-//	mMult_AB<3,3,3>(R,u_hat,Rdot);
-	// pdot = R*e3,
+//	// calculate interpolated value of fcum
+//	adType lambda=Length-s;
+//	adType ix=lambda*deltalambdainv;
+//	double ird_f=floor(dVal(ix)); // index for round down  -- doubleing point
+//	if (ird_f<0) ird_f=0;
+//	int ird=(int) ird_f;	//    integer index
+//	double iru_f=ceil(dVal(ix)); 	// index for round up  -- doubleing point
+//	if (iru_f>NUM_FCUM_LAMBDA) iru_f=NUM_FCUM_LAMBDA;
+//	int iru=(int) iru_f;	//    integer index
+//	adType ixmird=ix-ird;    // weight for interpolation
+//	adType irumix=iru-ix;	// weight for interpolation
 //	for (int i=0; i<3; i++) {
-//		pdot[i]=R[i*3+2];
+//		fcum[i]		=	in_fcumlambda[iru][i] * ixmird + in_fcumlambda[ird][i] * irumix;
 //	}
-
-	//xdot(1:3) = ustardot - Kinv*((um*K+Kdot)*(u-ustar_s) + e3m*R'*intf + R'*l); % udot
-	//xdot(4:12) = reshape(R*um,9,1); % Rdot   --- Note that matlab code reshapes in column major order while we are saving in row major order
-	//xdot(13:15) = R*e3;             % pdot
-	//  note: the sample code has matlab indexing starting from 1 to 15
-	for (int i=0; i<NUM_INTEGRATION_STATES; i++) {
 //
-// we will not need these for analytical calculation
-//		if (i<3) { // 0 <= i < 3
-			xdot[i]=udot[i];
-//		}
-//		else if (i<12) { // 3 <= i < 12
-//			xdot[i]=Rdot[i-3];
-//		}
-//		else { // 12 <= i < 15
-//			xdot[i]=pdot[i-12];
-//		}
-	}
-
-}
+//	// add the tip force to fcum
+//	for (int i = 0; i < 3; i++) {
+//		fcum[i]		+=	in_ftip[i];
+//	}
+//
+//	// calculate u_hat
+//	adType u_hat[9];
+//	wHat(u,u_hat);
+//
+//	// udot = ustardot - Kinv*((um*K+Kdot)*(u-ustar_s) + e3m*R'*intf + R'*l); % udot
+//	//
+//	//   e3hat*R' = [ -r12 -r22 -r32; r11 r21 r31; 0 0 0];
+//	adType e3hatRT[9];
+//	e3hatRT[0]=-R[1]; 	e3hatRT[1]=-R[4]; 	e3hatRT[2]=-R[7];
+//	e3hatRT[3]=R[0];	e3hatRT[4]=R[3];	e3hatRT[5]=R[6];
+//	e3hatRT[6]=0.0;	e3hatRT[7]=0.0;	e3hatRT[8]=0.0;
+//	adType e3hatRTfcum[3];
+//	mMult_AB<3,3,1>(e3hatRT, fcum, e3hatRTfcum);			//  e3m*R'*intf
+//	adType RTl[3];
+//	mMult_ATB<3,3,1>(R,l,RTl);								// R'*l
+//	adType umustar[3];
+//	mSub_AB<3,1>(u,ustar,umustar);							// (u-ustar_s)
+//	adType Kumustar[3], uhatKumustar[3];
+//	mMult_AB<3,3,1>(K,umustar,Kumustar);
+//	mMult_AB<3,3,1>(u_hat,Kumustar,uhatKumustar); 		 	//(um*K+Kdot)*(u-ustar_s)  assuming Kdot=0
+//	adType sumterm[3];
+//	mAdd_ABC<3,1>(uhatKumustar,e3hatRTfcum,RTl,sumterm);	// ((um*K+Kdot)*(u-ustar_s) + e3m*R'*intf + R'*l)
+//	adType KinvSum[3];
+//	mMult_AB<3,3,1>(Kinv,sumterm,KinvSum);					// Kinv*((um*K+Kdot)*(u-ustar_s) + e3m*R'*intf + R'*l)
+//	mSub_AB<3,1>(ustardot,KinvSum,udot);					// udot = ustardot - Kinv*((um*K+Kdot)*(u-ustar_s) + e3m*R'*intf + R'*l);
+//
+//	// we will not need these for analytical calculation
+//	// Rdot = R*u_hat
+////	mMult_AB<3,3,3>(R,u_hat,Rdot);
+//	// pdot = R*e3,
+////	for (int i=0; i<3; i++) {
+////		pdot[i]=R[i*3+2];
+////	}
+//
+//	//xdot(1:3) = ustardot - Kinv*((um*K+Kdot)*(u-ustar_s) + e3m*R'*intf + R'*l); % udot
+//	//xdot(4:12) = reshape(R*um,9,1); % Rdot   --- Note that matlab code reshapes in column major order while we are saving in row major order
+//	//xdot(13:15) = R*e3;             % pdot
+//	//  note: the sample code has matlab indexing starting from 1 to 15
+//	for (int i=0; i<NUM_INTEGRATION_STATES; i++) {
+////
+//// we will not need these for analytical calculation
+////		if (i<3) { // 0 <= i < 3
+//			xdot[i]=udot[i];
+////		}
+////		else if (i<12) { // 3 <= i < 12
+////			xdot[i]=Rdot[i-3];
+////		}
+////		else { // 12 <= i < 15
+////			xdot[i]=pdot[i-12];
+////		}
+//	}
+//
+//}
 
 
 //
