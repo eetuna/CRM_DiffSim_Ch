@@ -189,13 +189,13 @@ template <typename adType>
 void ABM4_step(	adType in_x_n[NUM_STATES], adType t_n, double h,
                    adType in_xdot_nm1[NUM_INTEGRATION_STATES], adType in_xdot_nm2[NUM_INTEGRATION_STATES], adType in_xdot_nm3[NUM_INTEGRATION_STATES],
                    adType in_x_nm1[NUM_STATES], adType in_x_nm2[NUM_STATES], adType in_x_nm3[NUM_STATES],
-                   adType Li, double dlambdainv, double in_K[9], double in_Kinv[9], double in_l[3], double in_ustar[3], double in_fcumlambda[NUM_FCUM_LAMBDA + 1][3], adType in_ftip[3],
+                   adType Li, double dlambdainv, double in_K[9], double in_Kinv[9], double in_l[3], double in_ustar[3],  double u_pre[3], double in_fcumlambda[NUM_FCUM_LAMBDA + 1][3], adType in_ftip[3],
                    adType out_x_np1[NUM_STATES], adType out_xdot_n[NUM_INTEGRATION_STATES]);
 
 //RK2_step One step of 2nd Order Runge-Kutta Integration
 template <typename adType>
 void RK2_step(	adType in_x_n[NUM_STATES], adType t_n, double h,
-                  adType Li, double dlambdainv, double in_K[9], double in_Kinv[9], double in_l[3], double in_ustar[3], double u_pre[3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3], adType in_ftip[3],
+                  adType Li, double dlambdainv, double in_K[9], double in_Kinv[9], double in_l[3], double in_ustar[3], double u_pre[3],  double in_fcumlambda[NUM_FCUM_LAMBDA+1][3], adType in_ftip[3],
                   adType out_x_np1[NUM_STATES], adType out_xdot_n[NUM_INTEGRATION_STATES] );
 
 
