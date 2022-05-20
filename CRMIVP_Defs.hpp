@@ -213,6 +213,7 @@ void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSiz
 template <typename adType>
 void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 						 adType in_u[3], adType in_v[3], adType in_w[3], adType in_ftip[3],
+                         adType v_L_pre[3], adType w_L_pre[3], adType actMass[3][3], adType actInertia[3][3],
 						 adType out_x_N[NUM_STATES], adType out_MomentResidual[6],
 						 double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3] ){
 
@@ -380,15 +381,33 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 	// Copy the final values of the state x_f to the output
 	mCopy_AB<NUM_STATES>(xf,out_x_N);
 
-	// Calculate the Boundary Value Residual if last segment is flexible
-	adType deltau[3];
-	if (!LastSegmentIsRigid) {
-		// residual = K (u1 - u1star)
-		mSub_AB<3,1>( &(xf[0]) , ustar[NUM_FLEX_SEG-1], deltau);
-		mMult_AB<3,3,1>( K[NUM_FLEX_SEG-1], deltau, Residual);
-	}   // else residual = K1 (u1 - u1star ) - Tb  ; already calculated above
+//	 Calculate the Boundary Value Residual if last segment is flexible
+//	adType deltau[3];
+//	if (!LastSegmentIsRigid) {
+//		// residual = K (u1 - u1star)
+//		mSub_AB<3,1>( &(xf[0]) , ustar[NUM_FLEX_SEG-1], deltau);
+//		mMult_AB<3,3,1>( K[NUM_FLEX_SEG-1], deltau, Residual);
+//	}   // else residual = K1 (u1 - u1star ) - Tb  ; already calculated above
 
-	// Copy the residual to the output
+    //Dynamic boundary value problem
+    adType v_L[3], w_L[3], deltav[3], deltaw[3], tau_bending[3];
+    adType Mdeltav[3], MvL[3], wMvL[3];
+    for (int i = 0; i < 3; ++i) {
+        v_L[i] = xf[i+3+9+3];
+        w_L[i] = xf[i+3+9+6];
+    }
+    mSub_AB<3,1>(v_L, v_L_pre, deltav);
+    mMult_AB<3,3,1>(actMass, deltav, Mdeltav);
+    mMult_AB<3,3,1>(actMass, v_L, MvL);
+
+    adType w_hat[9];
+    wHat(w, w_hat);
+    mMult_AB<3,3,1>(w_hat, MvL, wMvL);
+
+
+
+
+    // Copy the residual to the output
 	mCopy_AB<3>(Residual,out_MomentResidual);
 
 }

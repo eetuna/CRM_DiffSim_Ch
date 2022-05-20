@@ -16,6 +16,7 @@
 #define RESIDUAL_SCALE_M	1.0 //(10.0)			// the residual for tip moment coming out of the IVP will be multiplied with this scale to return to the Nonlinear Solver
 #define RESIDUAL_SCALE_P	100.0 //(10.0)			// the residual for tip position error coming out of the IVP will be multiplied with this scale to return to the Nonlinear Solver
 
+#define G 9.8         // gravitational coefficient
 #define DELTA_T 0.02
 #define TRUSTREGION							// Trust Region Method with the numerical jacobian (Default)
 
@@ -35,7 +36,7 @@ struct CRMDynamicsModelParams {
     double 	CoilTurnAreaMat[NUM_ACT_SET][9]; 		// Coil Turn Area matrices; NUM_ACT_SET*9 long array, NUM_ACT_SET 3x3 matrices stored in row major order
     double 	rho[NUM_SEGMENTS];						// Length density (mass per unit length) of the flexible catheter substrate (tubing); (NUM_SEGMENTS) long array
     double 	ActMass[NUM_ACT_SET];					// Actuator segment masses, does not include the flexible substrate; (NUM_ACT_SET) long array
-    double delta_t
+    double  ActInertia[NUM_ACT_SET][9];             // Inertia matrix of the coils
 };
 
 // Structure for defining catheter configuration parameters
