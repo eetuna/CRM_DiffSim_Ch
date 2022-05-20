@@ -5,6 +5,7 @@
 #define NUM_STATES 21   // u[0..2],R[0..9],p[0..2],v[0..2],w[0..2]
 #define NUM_INTEGRATION_STATES 9   // u[0..2],v[0..2],w[0..2]
 #define EQNDIMENSION 9	// domain: u[0..2],v[0..2],w[0..2] range: m_tip[0..2]
+#define DELTA_T
 
 #define NUM_ACT_SET 1								// Number of actuator sets
 #define NUM_FLEX_SEG 2								// Number of flexible segments
@@ -15,6 +16,7 @@
 #define RESIDUAL_SCALE_M	1.0 //(10.0)			// the residual for tip moment coming out of the IVP will be multiplied with this scale to return to the Nonlinear Solver
 #define RESIDUAL_SCALE_P	100.0 //(10.0)			// the residual for tip position error coming out of the IVP will be multiplied with this scale to return to the Nonlinear Solver
 
+#define DELTA_T 0.02
 #define TRUSTREGION							// Trust Region Method with the numerical jacobian (Default)
 
 
@@ -28,13 +30,12 @@ struct CRMDynamicsModelParams {
     double	YoungsModulus[NUM_FLEX_SEG];			// Youngs Moduli of the flexible catheter segments
     double	ShearModulus[NUM_FLEX_SEG];				// Shear Moduli of the flexible catheter segments
     double 	ustar[NUM_FLEX_SEG][3];					// Local curvature in unloaded configuration for each of the flexible segments; (NUM_FLEX_SEG)*3 long array, (NUM_FLEX_SEG) 3x1 vectors
-    double 	vstar[NUM_FLEX_SEG][3];                 // linear velocity of the flexible catheter segments
-    double 	wstar[NUM_FLEX_SEG][3];                 // angular velocity of the flexible catheter segments
     //		Actuator segments are assumed to be straight
     double 	CoilAlignmentAngles[NUM_ACT_SET][2];	// Coil Alignment Angles; NUM_ACT_SET*2 long array, for each actuator set, the angle for the first coil is relative to x axis, and the angle for the second coil is relative to y axis
     double 	CoilTurnAreaMat[NUM_ACT_SET][9]; 		// Coil Turn Area matrices; NUM_ACT_SET*9 long array, NUM_ACT_SET 3x3 matrices stored in row major order
     double 	rho[NUM_SEGMENTS];						// Length density (mass per unit length) of the flexible catheter substrate (tubing); (NUM_SEGMENTS) long array
     double 	ActMass[NUM_ACT_SET];					// Actuator segment masses, does not include the flexible substrate; (NUM_ACT_SET) long array
+    double delta_t
 };
 
 // Structure for defining catheter configuration parameters
@@ -57,8 +58,6 @@ struct CRMDYNShootingMethodParams {
     double 	K[NUM_FLEX_SEG][9];
     double 	Kinv[NUM_FLEX_SEG][9];
     double 	ustar[NUM_FLEX_SEG][3];
-    double 	vstar[NUM_FLEX_SEG][3];
-    double 	wstar[NUM_FLEX_SEG][3];
     adType 	MagMoment[NUM_ACT_SET][3];
     double 	fcumlambda[NUM_FCUM_LAMBDA + 1][3];
     double 	B0[3];
@@ -88,8 +87,6 @@ struct CRMIVPCoreParams {
     double K[NUM_FLEX_SEG][9]; 							// Catheter Rigidity Matrices;
     double Kinv[NUM_FLEX_SEG][9];						// Inverses of K Matrices
     double ustar[NUM_FLEX_SEG][3];						// Local curvature in unloaded configuration for each of the flexible segments
-    double vstar[NUM_FLEX_SEG][3];						// Local curvature in unloaded configuration for each of the flexible segments
-    double wstar[NUM_FLEX_SEG][3];						// Local curvature in unloaded configuration for each of the flexible segments
     double fcumlambda[NUM_FCUM_LAMBDA+1][3];			// 3*(NUM_FCUM_LAMBDA+1) by 1 array (grouped by 3 doubles) storing cumulative external force (excluding tip force) integrated from \lambda = index * \Delta\lambda to the catheter tip (\lambda=0) - in spatial (catheter base frame) coordinates
     bool   FinalValueOnly;								// Flag used to indicate if only final value (xf) is returned (true) or if Marker Locations are returned as well (false)
     double LocMarkers[NUM_LOCALIZATION_MARKERS];		// The s values of each of the localization markers (markers not yet inserted into the catheter would have a negative s value
@@ -100,6 +97,7 @@ struct CRMIVPCoreParams {
     int   StartSegmentIndex;							// Index of the segment where the integration to solve IVP will start -- the segment located at the entry point; note that segment indices start at 0
     int	  NextLocMarker;								// Next Localization Marker to be computed
     double p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]; // positions of markers (ordered proximal to distal)
+    double u_history[NUM_FLEX_SEG][SegSteps[NUM_FLEX_SEG]][3]; //History of u
     //   only the entries 0..NextLocMarker-1 are filled
 };
 
@@ -151,17 +149,14 @@ void CRMSolverIVP_Return (  adType in_x_N[NUM_STATES], adType out_WrenchResidual
 
 // Cosserat Dynamics Model Integrand
 template <typename adType>
-void CRMIntegrand (	adType s, adType x[NUM_STATES], adType Li, double dlambdainv,
-                       double in_K[9], double in_Kinv[9], double in_l[3],
-                       double in_ustar[3],
-                       double in_fcumlambda[NUM_FCUM_LAMBDA+1][3],
-                       adType in_ftip[3],
+void CRMIntegrand (	adType s, adType x[NUM_STATES],
+                       adType Li, double dlambdainv,
+                       double in_K[9], double in_Kinv[9], double in_l[3], double in_ustar[3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3],
+                       adType in_ftip[3], double u_pre[3],
                        adType xdot[NUM_INTEGRATION_STATES]);
 //double 	Li;				// Inserted length of the catheter (from s=0 to the tip)
 //double 	dlambdainv;		// Reciprocal of \Delta \lambda (= \Delta s) used in discretizing fcum  ( dlambdainv = 1 / (Lf/NUM_FCUM_LAMBDA) = NUM_FCUM_LAMBDA/Lf ), Lf: functional (full) length of the catheter
 //double 	ustar[3];		// Local curvature in unloaded configuration at current s (3x1 array)
-//double 	vstar[3];		// Local linear velocity in unloaded configuration at current s (3x1 array)
-//double 	wstar[3];		// Local angular velocity in unloaded configuration at current s (3x1 array)
 // -UNUSED- double ustardot[3];	// Derivative of local curvature in unloaded configuration at current s; we assume ustardot=0.0 since our rest shape model is piecewise constant curvature
 //double 	K[9];	  		// Catheter Rigidity Matrix at current s (3x3 matrix stored in row major order)
 //double 	Kinv[9];  		// Inverse of K at current s (3x3 matrix stored in row major order)
@@ -169,7 +164,7 @@ void CRMIntegrand (	adType s, adType x[NUM_STATES], adType Li, double dlambdainv
 //double 	l[3];       	// External moment at current s (world coordinates)
 //double 	fcumlambda[NUM_FCUM_LAMBDA+1][3];	// (NUM_FCUM_LAMBDA+1)x3 array storing cumulative external force (exluding tip force) integrated from \lambda = index * \Delta\lambda to the catheter tip (\lambda=0)
 //double		ftip[3];		// External point force (in spatial coordinates) applied at the tip of the catheter (\lambda = 0)
-// Returning xdot-- EQ:(9) Rucker 2010
+// Returning xdot-- EQ:(9) Rucker 2010, u_pre_: updated u as previous time value
 // support function to copy location marker positions
 //template <typename adType>
 //void LocMarkerUpdate(double p[3], adType xi[NUM_STATES], adType t);
@@ -185,7 +180,7 @@ double dVal(adType x) { return (x); }
 //    Note: The first three steps are calculated using RK2
 template <typename adType>
 void ABM4 (	adType in_x_0[NUM_STATES], adType t_0, int N, double h,
-               adType Li, double dlambdainv, double in_K[9], double in_Kinv[9], double in_l[3], double in_ustar[3], double in_vstar[3], double in_wstar[3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3], adType in_ftip[3],
+               adType Li, double dlambdainv, double in_K[9], double in_Kinv[9], double in_l[3], double in_ustar[3], double u_history[N][3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3], adType in_ftip[3],
                bool FinalValueOnly, double	in_LocMarkers[NUM_LOCALIZATION_MARKERS], int *inout_NextLocMarkerIdx,
                adType out_x_N[NUM_STATES], double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]	);
 
@@ -197,12 +192,12 @@ void ABM4_step(	adType in_x_n[NUM_STATES], adType t_n, double h,
                    adType Li, double dlambdainv, double in_K[9], double in_Kinv[9], double in_l[3], double in_ustar[3], double in_fcumlambda[NUM_FCUM_LAMBDA + 1][3], adType in_ftip[3],
                    adType out_x_np1[NUM_STATES], adType out_xdot_n[NUM_INTEGRATION_STATES]);
 
-////RK2_step One step of 2nd Order Runge-Kutta Integration
-//template <typename adType>
-//void RK2_step(	adType in_x_n[NUM_STATES], adType t_n, double h,
-//                  adType Li, double dlambdainv, double in_K[9], double in_Kinv[9], double in_l[3], double in_ustar[3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3], adType in_ftip[3],
-//                  adType out_x_np1[NUM_STATES], adType out_xdot_n[NUM_INTEGRATION_STATES] );
-//
+//RK2_step One step of 2nd Order Runge-Kutta Integration
+template <typename adType>
+void RK2_step(	adType in_x_n[NUM_STATES], adType t_n, double h,
+                  adType Li, double dlambdainv, double in_K[9], double in_Kinv[9], double in_l[3], double in_ustar[3], double u_pre[3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3], adType in_ftip[3],
+                  adType out_x_np1[NUM_STATES], adType out_xdot_n[NUM_INTEGRATION_STATES] );
+
 
 //
 // Robotic Kinematics Related Functions

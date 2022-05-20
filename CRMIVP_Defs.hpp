@@ -196,9 +196,6 @@ void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSiz
 		}
 		for (int j=0; j<3; j++) {
 			ustar[(NUM_FLEX_SEG-1)-i][j]	=	in_ustar[i][j];
-            vstar[(NUM_FLEX_SEG-1)-i][j]	=	in_vstar[i][j];
-            wstar[(NUM_FLEX_SEG-1)-i][j]	=	in_wstar[i][j];
-
         }
 	}
 	for (int i=0; i<NUM_ACT_SET; i++) {
@@ -240,6 +237,8 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 	for (int i=0; i<NUM_STATES; i++) xi[i]=in_params.xi[i];
 	for (int i=0; i<3; i++) {
 		xi[i]=in_u[i];
+        xi[i+3+9+3]=in_v[i];
+        xi[i+3+9+6]=in_w[i];
 	}
 	// we need to copy in_ftip to local variable
 	adType ftip[3];
@@ -256,8 +255,6 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 	auto & K = in_params.K;
 	auto & Kinv = in_params.Kinv;
 	auto & ustar = in_params.ustar;
-    auto & vstar = in_params.vstar;
-    auto & wstar = in_params.wstar;
 	auto & fcumlambda = in_params.fcumlambda;
 	auto & FinalValueOnly = in_params.FinalValueOnly;
 	auto & LocMarkers = in_params.LocMarkers;
@@ -269,6 +266,8 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 			p_atLocMarkers[i][j]=in_params.p_atLocMarkers[i][j];
 		}
 	}
+
+	auto & u_history = in_params.u_history;
 
 	// IMPORTANT NOTE: most proximal segment is assumed to be always flexible
 	//    and the flexible and rigid segments are assumed to be alternating
@@ -296,6 +295,7 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 	}
 
 
+
 	for (int i=StartSegmentIndex; i<NUM_SEGMENTS; i++){
 		if ( i%2 == 0 ) {  // Flexible Segment
 			LastSegmentIsRigid=false;
@@ -305,9 +305,16 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 			// Calculate the actual stepsize, based on the number of steps
 			h=dVal((SegBounds[i+1]-SegBounds[i]))/(SegSteps[fsegno]*1.0);
 
+			int N_ = SegSteps[fsegno];
+            adType segu_history[N_][3];
+            for (int j = 0; j < N_; ++j) {
+                segu_history[i][0] = u_history[i][j][0];
+                segu_history[i][1] = u_history[i][j][1];
+                segu_history[i][2] = u_history[i][j][2];
+            }
 			// Integrate
 			ABM4( 	xi, SegBounds[i], SegSteps[fsegno], h,
-					InsertedLength, dlambdainv, K[fsegno], Kinv[fsegno], l_zero, ustar[fsegno], fcumlambda, ftip,
+					InsertedLength, dlambdainv, K[fsegno], Kinv[fsegno], l_zero, ustar[fsegno], u_history[N_][3], fcumlambda, ftip,
 					FinalValueOnly, LocMarkers, &NextLocMarker,
 					xf, p_atLocMarkers	);
 
@@ -413,14 +420,14 @@ template <typename adType>
 void CRMIntegrand (	adType s, adType x[NUM_STATES],
 					adType Li, double dlambdainv,
 					double in_K[9], double in_Kinv[9], double in_l[3], double in_ustar[3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3],
-					adType in_ftip[3],
+					adType in_ftip[3], double u_pre[3],
 					adType xdot[NUM_INTEGRATION_STATES]) {
 
 	adType Length;
 	double deltalambdainv;
 	adType u[3], v[3], w[3], R[9]; 	// p[3];   				we will not need this for analytical calculation
 	adType udot[3], vdot[3], wdot[3]; 		// Rdot[9], pdot[3];	we will not need this for analytical calculation
-	adType K[9], Kinv[9], l[3], fcum[3], ustar[3], ustardot[3], vstar[3], wstardot[3], wstar[3], wstardot[3];  //  We are assuming Kdot=0.0 (K=const)
+	adType K[9], Kinv[9], l[3], fcum[3], ustar[3], ustardot[3];  //  We are assuming Kdot=0.0 (K=const)
 
 	// copy inputs and parameters to local variables
 	for (int i=0; i<NUM_STATES; i++) {
@@ -511,10 +518,11 @@ void CRMIntegrand (	adType s, adType x[NUM_STATES],
     //calculate w_s
     adType uhat_w[3];
     mMult_AB<3,3,1>(u_hat, w, uhat_w);
-    mSub_AB<3,1>(qs_whate, uhat_w, vdot);
+    adType u_diff_[3], u_diff[3];
 
-
-
+    mSub_AB<3,1>(u, u_pre, u_diff_);
+    u_diff[0] = u_diff_[0]/DELTA_T; u_diff[1] = u_diff_[1]/DELTA_T; u_diff[2] = u_diff_[2]/DELTA_T;
+    mSub_AB<3,1>(u_diff, uhat_w, wdot);
 
     // we will not need these for analytical calculation
 	// Rdot = R*u_hat
@@ -529,17 +537,9 @@ void CRMIntegrand (	adType s, adType x[NUM_STATES],
 	//xdot(13:15) = R*e3;             % pdot
 	//  note: the sample code has matlab indexing starting from 1 to 15
 	for (int i=0; i<NUM_INTEGRATION_STATES; i++) {
-//
-// we will not need these for analytical calculation
-//		if (i<3) { // 0 <= i < 3
-			xdot[i]=udot[i];
-//		}
-//		else if (i<12) { // 3 <= i < 12
-//			xdot[i]=Rdot[i-3];
-//		}
-//		else { // 12 <= i < 15
-//			xdot[i]=pdot[i-12];
-//		}
+        xdot[i] = udot[i];
+        xdot[i+3] = vdot[i];
+        xdot[i+6] = wdot[i];
 	}
 
 }
@@ -555,9 +555,9 @@ void CRMIntegrand (	adType s, adType x[NUM_STATES],
 //function [x_1toN] = ABM4(x_0, t_0, N, h, Integrand, initmethod)
 template <typename adType>
 void ABM4 (	adType in_x_0[NUM_STATES], adType t_0, int N, double h,
-			adType Li, double dlambdainv, double in_K[9], double in_Kinv[9], double in_l[3], double in_ustar[3], double in_vstar[3], double in_wstar[3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3], adType in_ftip[3],
+			adType Li, double dlambdainv, double in_K[9], double in_Kinv[9], double in_l[3], double in_ustar[3], adType u_history[N][3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3], adType in_ftip[3],
 			bool FinalValueOnly, double	in_LocMarkers[NUM_LOCALIZATION_MARKERS], int *inout_NextLocMarkerIdx,
-			adType out_x_N[NUM_STATES], double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]	) {
+			adType out_x_N[NUM_STATES], double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3], adType u_history_update[N][3] 	) {
 
 	adType x_nm3[NUM_STATES];
 	adType x_nm2[NUM_STATES];
@@ -589,16 +589,19 @@ void ABM4 (	adType in_x_0[NUM_STATES], adType t_0, int N, double h,
 //		xdot_nm3[i]=0.0;
 //	}
 
+
 	for (int idx=0; idx<N; idx++) {
 
+	    double u_pre[3];
+	    u_pre[0] = u_history[idx][0];u_pre[1] = u_history[idx][1];u_pre[2] = u_history[idx][2];
 		if (idx<3) {  // RK2 initialization steps
-			RK2_step(x_n, t_n, h, Li, dlambdainv, in_K, in_Kinv, in_l, in_ustar, in_fcumlambda, in_ftip, x_np1, xdot_n);
+			RK2_step(x_n, t_n, h, Li, dlambdainv, in_K, in_Kinv, in_l, in_ustar, u_pre, in_fcumlambda, in_ftip, x_np1, xdot_n);
 		}
 		else { 		 // ABM4 steps
 			ABM4_step(x_n, t_n, h, xdot_nm1, xdot_nm2, xdot_nm3, x_nm1, x_nm2, x_nm3, Li, dlambdainv, in_K, in_Kinv, in_l, in_ustar, in_fcumlambda, in_ftip, x_np1, xdot_n);
 		}
 
-		// increment "time"
+		// increment length
 		t_n=t_n+h;
 
 		if (!FinalValueOnly) {
@@ -629,7 +632,12 @@ void ABM4 (	adType in_x_0[NUM_STATES], adType t_0, int N, double h,
 			xdot_nm1[i]=xdot_n[i];
 		}
 
+        //update u_history
+        u_history_update[idx][0] =  x_n[0];
+        u_history_update[idx][1] =  x_n[1];
+        u_history_update[idx][2] =  x_n[2];
 	}
+
 
 	// Copy final value
 	for (int i=0; i<NUM_STATES; i++) {
@@ -709,8 +717,8 @@ void ABM4 (	adType in_x_0[NUM_STATES], adType t_0, int N, double h,
 //[x_np1, xdot_n] = RK2_step(x_n, t_n, h, Integrand)
 template <typename adType>
 void RK2_step(	adType in_x_n[NUM_STATES], adType t_n, double h,
-				adType Li, double dlambdainv, double in_K[9], double in_Kinv[9], double in_l[3], double in_ustar[3], double in_vstar[3], double in_wstar[3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3], adType in_ftip[3],
-				adType out_x_np1[NUM_STATES], adType out_xdot_n[NUM_INTEGRATION_STATES] ) {
+				adType Li, double dlambdainv, double in_K[9], double in_Kinv[9], double in_l[3], double in_ustar[3], double u_pre[3],  double in_fcumlambda[NUM_FCUM_LAMBDA+1][3], adType in_ftip[3],
+				adType u_pre[3], adType out_x_np1[NUM_STATES], adType out_xdot_n[NUM_INTEGRATION_STATES], adType u_pre_update[3] ) {
 
 	adType x_n[NUM_STATES];       // from input
 	adType k1[NUM_STATES];
@@ -730,32 +738,41 @@ void RK2_step(	adType in_x_n[NUM_STATES], adType t_n, double h,
 
 
 	//RK2_STEP_STEP1:
-	CRMIntegrand(t_n, x_n, Li, dlambdainv, in_K, in_Kinv, in_l, in_ustar, in_fcumlambda, in_ftip, xdot_n);
-	for (int i=0; i<NUM_INTEGRATION_STATES; i++) {
+	CRMIntegrand(t_n, x_n, Li, dlambdainv, in_K, in_Kinv, in_l, in_ustar, in_fcumlambda, in_ftip, u_pre, xdot_n);
+	for (int i=0; i<3; i++) {
 		k1[i] 			= h * xdot_n[i];
 		x_n_p_k1o2[i] 	= x_n[i] + k1[i] * 0.5;
 	}
+
+    for (int i = 3+9+3; i < NUM_STATES; i++) { //twists
+        k1[i] 			= h * xdot_n[i];
+        x_n_p_k1o2[i] 	= x_n[i] + k1[i] * 0.5;
+    }
 	// we will calculate R_np1half and p_np1half analytically, without numerical integration
 	adType R_np1half[9], p_np1half[3];
 	SE3_Analytical_Step(R_n, p_n, u_n, h * 0.5, R_np1half, p_np1half);
 	// copy these to x_n_p_k1o2
-	for (int i = NUM_INTEGRATION_STATES; i < NUM_STATES; i++) {
+	for (int i = 3; i < 3+9+3; i++) {
 		if (i < (9 + 3))
 			x_n_p_k1o2[i] = R_np1half[i - 3];	//R
 		else
 			x_n_p_k1o2[i] = p_np1half[i - 12];	//p
 	}
 
+
 	//RK2_STEP_STEP2:
-	CRMIntegrand(t_n + h * 0.5, x_n_p_k1o2, Li, dlambdainv, in_K, in_Kinv, in_l, in_ustar, in_fcumlambda, in_ftip, k2oh);
-	for (int i = 0; i < NUM_INTEGRATION_STATES; i++) {
+	CRMIntegrand(t_n + h * 0.5, x_n_p_k1o2, Li, dlambdainv, in_K, in_Kinv, in_l, in_ustar, in_fcumlambda, in_ftip, u_pre, k2oh);
+	for (int i = 0; i < 3; i++) {
 		out_x_np1[i] = x_n[i] + h * k2oh[i];
 	}
+    for ((int i = 3+9+3; i < NUM_STATES; i++) { //twists
+        out_x_np1[i] = x_n[i] + h * k2oh[i];
+    }
 	// we will calculate R_np1 and p_np1 analytically, without numerical integration
 	adType R_np1[9], p_np1[3];
 	SE3_Analytical_Step(R_n, p_n, x_n_p_k1o2/*u_np1half*/, h, R_np1, p_np1);
 	// copy these to the output state
-	for (int i = NUM_INTEGRATION_STATES; i < NUM_STATES; i++) {
+	for (int i = 3; i < 3+9+3; i++) {
 		if (i < (9 + 3))
 			out_x_np1[i] = R_np1[i - 3];	//R
 		else
