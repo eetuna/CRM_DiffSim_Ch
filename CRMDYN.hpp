@@ -105,7 +105,12 @@ struct CRMIVPCoreParams {
     int   StartSegmentIndex;							// Index of the segment where the integration to solve IVP will start -- the segment located at the entry point; note that segment indices start at 0
     int	  NextLocMarker;								// Next Localization Marker to be computed
     double p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]; // positions of markers (ordered proximal to distal)
-    double u_history[][3][NUM_FLEX_SEG]; //History of u
+
+    struct u_history
+            {
+                int length;
+                double *data_;
+            };
     //   only the entries 0..NextLocMarker-1 are filled
 };
 
@@ -174,8 +179,9 @@ void CRMIntegrand (	adType s, adType x[NUM_STATES],
 //double		ftip[3];		// External point force (in spatial coordinates) applied at the tip of the catheter (\lambda = 0)
 // Returning xdot-- EQ:(9) Rucker 2010, u_pre_: updated u as previous time value
 // support function to copy location marker positions
-//template <typename adType>
-//void LocMarkerUpdate(double p[3], adType xi[NUM_STATES], adType t);
+
+template <typename adType>
+void LocMarkerUpdate(double p[3], adType xi[NUM_STATES], adType t);
 
 template <typename adType>
 double dVal(adType x) { return (x); }

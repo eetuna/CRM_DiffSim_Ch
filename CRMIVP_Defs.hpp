@@ -136,8 +136,6 @@ void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSiz
 
     auto & g = out_CoreParams.g;
 
-	auto & u_history = out_CoreParams.u_history;
-
 	// local variables
 	double IntegrationStepSize=in_IntegrationStepSize;
 	double DeltaSInv=1.0/IntegrationStepSize;
@@ -211,14 +209,15 @@ void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSiz
 
 	mCopy_AB<(NUM_FCUM_LAMBDA+1),3>(in_fcumlambda,fcumlambda);
 
-    for (int i = 0; i < NUM_FLEX_SEG; ++i) {
-        u_history[i][0][0] = in_ustar[0];
-        u_history[i][0][1] = in_ustar[1];
-        u_history[i][0][2] = in_ustar[2];
-        for (int j = 1; j < SegSteps[i]; ++j) {
-            u_history[i][j] = {0.0, 0.0, 0.0};
-        }
-    }
+//    double u_history[NUM_FLEX_SEG][SegSteps[i]][3];
+//    for (int i = 0; i < NUM_FLEX_SEG; ++i) {
+//        u_history[i][0][0] = in_ustar[i][0];
+//        u_history[i][0][1] = in_ustar[i][1];
+//        u_history[i][0][2] = in_ustar[i][2];
+//        for (int j = 1; j < SegSteps[i]; ++j) {
+//            u_history[i][j][i] = 0.0; u_history[j][1][i] = 0.0; u_history[j][2][i] = 0.0;
+//        }
+//    }
 	//mCopy_AB<3>(in_ftip, ftip);
 
 }
@@ -323,9 +322,9 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 			int N_ = SegSteps[fsegno];
             adType segu_history[N_][3];
             for (int j = 0; j < N_; ++j) {
-                segu_history[i][0] = u_history[i][j][0];
-                segu_history[i][1] = u_history[i][j][1];
-                segu_history[i][2] = u_history[i][j][2];
+                segu_history[i][0] = u_history[j][0][i];
+                segu_history[i][1] = u_history[j][1][i];
+                segu_history[i][2] = u_history[j][2][i];
             }
 			// Integrate
 			ABM4( 	xi, SegBounds[i], SegSteps[fsegno], h,
