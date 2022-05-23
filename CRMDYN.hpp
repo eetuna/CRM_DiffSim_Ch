@@ -93,12 +93,13 @@ struct CRMIVPCoreParams {
     double LocMarkers[NUM_LOCALIZATION_MARKERS];		// The s values of each of the localization markers (markers not yet inserted into the catheter would have a negative s value
 
     double B0[3];										// B0 field vector of the MRI scanner (in spatial coordinates)
+    double 	g[3];		                                //  Gravity vector (in spatial coordinates)
     adType MagMoment[NUM_ACT_SET][3]; 					// Actuator magnetization moments in body coordinates; Na*3 long array, Na 3x1 vectors; MagMoment = CoilAlignMat * CoilTurnAreaMat * ActuationCurrentVector
 
     int   StartSegmentIndex;							// Index of the segment where the integration to solve IVP will start -- the segment located at the entry point; note that segment indices start at 0
     int	  NextLocMarker;								// Next Localization Marker to be computed
     double p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]; // positions of markers (ordered proximal to distal)
-    double u_history[NUM_FLEX_SEG][SegSteps[NUM_FLEX_SEG]][3]; //History of u
+    double u_history[NUM_FLEX_SEG][][]; //History of u
     //   only the entries 0..NextLocMarker-1 are filled
 };
 
@@ -108,26 +109,25 @@ void CRMSolverIVP (	double in_x_0[NUM_STATES], double in_IntegrationStepSize,
                        double in_Li, double in_dlambdainv,
                        double in_SegEndLambdas[NUM_SEGMENTS], double	in_LocMarkerLambdas[NUM_LOCALIZATION_MARKERS],
                        double in_K[NUM_FLEX_SEG][9], double in_Kinv[NUM_FLEX_SEG][9],
-                       double in_ustar[NUM_FLEX_SEG][3], double in_vstar[NUM_FLEX_SEG][3],double in_wstar[NUM_FLEX_SEG][3],
+                       double in_ustar[NUM_FLEX_SEG][3],
                        double in_MagMoment[NUM_ACT_SET][3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3], double in_ftp[3],
-                       double in_B0[3],
+                       double in_B0[3], double in_g[3],
                        bool in_FinalValueOnly,
                        double out_x_N[NUM_STATES], double out_WrenchResidual[6],
                        double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]
 );
 
-
 // Preparation of CRMIVPCoreParams for subsequent call to CRMSolverIVP_Core
 template <typename adType>
 void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSize,
-                         adType in_Li, double in_dlambdainv,
-                         double in_SegEndLambdas[NUM_SEGMENTS], double in_LocMarkerLambdas[NUM_LOCALIZATION_MARKERS],
-                         double in_K[NUM_FLEX_SEG][9], double in_Kinv[NUM_FLEX_SEG][9],
-                         double in_ustar[NUM_FLEX_SEG][3],double in_vstar[NUM_FLEX_SEG][3],double in_wstar[NUM_FLEX_SEG][3],
-                         adType in_MagMoment[NUM_ACT_SET][3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3],
-                         double in_B0[3],
-                         bool in_FinalValueOnly,
-                         CRMIVPCoreParams<adType> &out_CoreParams	);
+                          adType in_Li, double in_dlambdainv,
+                          double in_SegEndLambdas[NUM_SEGMENTS], double in_LocMarkerLambdas[NUM_LOCALIZATION_MARKERS],
+                          double in_K[NUM_FLEX_SEG][9], double in_Kinv[NUM_FLEX_SEG][9],
+                          double in_ustar[NUM_FLEX_SEG][3],
+                          adType in_MagMoment[NUM_ACT_SET][3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3],
+                          double in_B0[3], double in_g[3],
+                          bool in_FinalValueOnly,
+                          CRMIVPCoreParams<adType> &out_CoreParams);
 
 
 // Core Computations used in CRMSolverIVP - Integrator for Solving the Initial Value Problem
@@ -137,8 +137,9 @@ void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSiz
 template <typename adType>
 void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
                          adType in_u[3], adType in_v[3], adType in_w[3], adType in_ftip[3],
-                         adType out_x_N[NUM_STATES], adType out_WrenchResidual[6],
-                         double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3] );
+                         adType v_L_pre[3], adType w_L_pre[3], adType actMass, adType actInertia[9],
+                         adType out_x_N[NUM_STATES], adType out_MomentResidual[6],
+                         double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]);
 
 
 // Function for copying data in device memory to global memory --- used for dataflow pipelining

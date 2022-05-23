@@ -1,5 +1,6 @@
 #pragma once
 #include <cmath>
+#include "CRMDYN.hpp"
 
 
 template <typename adType>
@@ -7,9 +8,9 @@ void CRMSolverIVP (double in_x_0[NUM_STATES], double in_IntegrationStepSize,
                    double in_Li, double in_dlambdainv,
                    double in_SegEndLambdas[NUM_SEGMENTS], double	in_LocMarkerLambdas[NUM_LOCALIZATION_MARKERS],
                    double in_K[NUM_FLEX_SEG][9], double in_Kinv[NUM_FLEX_SEG][9],
-                   double in_ustar[NUM_FLEX_SEG][3], double in_vstar[NUM_FLEX_SEG][3],double in_wstar[NUM_FLEX_SEG][3],
+                   double in_ustar[NUM_FLEX_SEG][3],
                    double in_MagMoment[NUM_ACT_SET][3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3], double in_ftp[3],
-                   double in_B0[3],
+                   double in_B0[3], double in_g[3],
                    bool in_FinalValueOnly,
                    double out_x_N[NUM_STATES], double out_WrenchResidual[6],
                    double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]
@@ -28,9 +29,10 @@ void CRMSolverIVP (double in_x_0[NUM_STATES], double in_IntegrationStepSize,
 	mCopy_AB<NUM_ACT_SET * 3>(&(in_MagMoment[0][0]), &(MagMoment[0][0]));
 	adType Li = in_Li;
 
+	////////
 	CRMSolverIVP_Prep ( x_0, in_IntegrationStepSize, Li, in_dlambdainv,
 						in_SegEndLambdas, in_LocMarkerLambdas, in_K, in_Kinv,
-						in_ustar, in_vstar, in_wstar, MagMoment, in_fcumlambda,
+						in_ustar, MagMoment, in_fcumlambda,
 						in_B0, in_FinalValueOnly,
 						CoreParams	);
 	// copy to local variable
@@ -94,11 +96,11 @@ void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSiz
                          adType in_Li, double in_dlambdainv,
                          double in_SegEndLambdas[NUM_SEGMENTS], double in_LocMarkerLambdas[NUM_LOCALIZATION_MARKERS],
                          double in_K[NUM_FLEX_SEG][9], double in_Kinv[NUM_FLEX_SEG][9],
-                         double in_ustar[NUM_FLEX_SEG][3],double in_vstar[NUM_FLEX_SEG][3],double in_wstar[NUM_FLEX_SEG][3],
+                         double in_ustar[NUM_FLEX_SEG][3],
                          adType in_MagMoment[NUM_ACT_SET][3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3],
-                         double in_B0[3],
+                         double in_B0[3], double in_g[3],
                          bool in_FinalValueOnly,
-                         CRMIVPCoreParams<adType> &out_CoreParams	) {
+                         CRMIVPCoreParams<adType> &out_CoreParams) {
 	// Process the incoming parameters (including changing from distal-proximal order to proximal-distal order)
 	//   and package them to be passed to CRMSolverIVP_Core
 	// Everything is copied to local variables (inside out_CoreParams), therefore, this function
@@ -120,20 +122,21 @@ void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSiz
 	auto & dlambdainv = out_CoreParams.dlambdainv;
 	auto & K = out_CoreParams.K;
 	auto & Kinv = out_CoreParams.Kinv;
-	auto & ustar = out_CoreParams.ustar;
-    auto & vstar = out_CoreParams.vstar;
-    auto & wstar = out_CoreParams.wstar;
+    auto & in_ustar = out_CoreParams.ustar;
 	auto & fcumlambda = out_CoreParams.fcumlambda;
 //	auto & ftip = out_CoreParams.ftip;
 	auto & FinalValueOnly = out_CoreParams.FinalValueOnly;
 	auto & LocMarkers = out_CoreParams.LocMarkers;
-
 	auto & B0 = out_CoreParams.B0;
 	auto & MagMoment = out_CoreParams.MagMoment;
 
 	auto & StartSegmentIndex = out_CoreParams.StartSegmentIndex;
 	auto & NextLocMarker = out_CoreParams.NextLocMarker;
 	auto & p_atLocMarkers = out_CoreParams.p_atLocMarkers;
+
+    auto & g = out_CoreParams.g;
+
+	auto & u_history = out_CoreParams.u_history;
 
 	// local variables
 	double IntegrationStepSize=in_IntegrationStepSize;
@@ -144,6 +147,8 @@ void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSiz
 	mCopy_AB<NUM_STATES>(in_x_0,xi);		// Initial value of the state for the next segment to be integrated
 											//  States are packed u[0..2],R[0..8],p[0..2]  (R: 3x3 matrix stored in row major order R11 R12 R13 R21 R22 R23 R31 R32 R33)
 	mCopy_AB<3>(in_B0,B0);				//  B0 field vector of the MRI scanner (in spatial coordinates)
+
+	mCopy_AB<3>(in_g, g);               // gravitational vector
 
 	dlambdainv=in_dlambdainv;				// reciprocal of dlambda (lambda stepsize used in discretizing fcumlambda)
 	FinalValueOnly=in_FinalValueOnly;		// Flag used to indicate if only final value (xf) is returned (true) or if Marker Locations are returned as well (false)
@@ -205,6 +210,15 @@ void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSiz
 	}
 
 	mCopy_AB<(NUM_FCUM_LAMBDA+1),3>(in_fcumlambda,fcumlambda);
+
+    for (int i = 0; i < NUM_FLEX_SEG; ++i) {
+        u_history[i][0][0] = in_ustar[0];
+        u_history[i][0][1] = in_ustar[1];
+        u_history[i][0][2] = in_ustar[2];
+        for (int j = 1; j < SegSteps[i]; ++j) {
+            u_history[i][j] = {0.0, 0.0, 0.0};
+        }
+    }
 	//mCopy_AB<3>(in_ftip, ftip);
 
 }
@@ -213,7 +227,7 @@ void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSiz
 template <typename adType>
 void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 						 adType in_u[3], adType in_v[3], adType in_w[3], adType in_ftip[3],
-                         adType v_L_pre[3], adType w_L_pre[3], adType actMass[3][3], adType actInertia[3][3],
+                         adType v_L_pre[3], adType w_L_pre[3], adType actMass, adType actInertia[9],
 						 adType out_x_N[NUM_STATES], adType out_MomentResidual[6],
 						 double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3] ){
 
@@ -227,9 +241,9 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 	double h;						// integration stepsize
 	adType RigidSegmentLength;		// Length of the rigid segment - intermediate variable
 	adType muhat[9];
-	adType RscTB0[3], Tb[3], deltau1[3], K1deltau1[3], K2invResidual[3]; // intermediate variables
+	adType RscTB0[3], Tb[3], deltau1[3], K1deltau1[3], K2invResidual[3], tauDiff[3]; // intermediate variables
 	adType tempadType;				// intermediate variables
-	adType Residual[3];				// Residual at the catheter tip -- will be returned
+	adType Residual[6];				// Residual at the catheter tip -- will be returned
 	int   fsegno; 					// flexible segment no
 	int   actno, fsegi, fsegip1;	// actuator no, flexible segment before, flexible segment after
 	bool  LastSegmentIsRigid=true;	// Flag indicating if the last segment processed is rigid (true) or not (false)
@@ -260,6 +274,7 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 	auto & FinalValueOnly = in_params.FinalValueOnly;
 	auto & LocMarkers = in_params.LocMarkers;
 	auto & B0 = in_params.B0;
+	auto & g = in_params.g;
 	auto & MagMoment = in_params.MagMoment;
 	// we will also copy the already filled entries of p_atLocMarkers from params
 	for (int i=0; i<InitialLocMarker; i++) {
@@ -267,7 +282,6 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 			p_atLocMarkers[i][j]=in_params.p_atLocMarkers[i][j];
 		}
 	}
-
 	auto & u_history = in_params.u_history;
 
 	// IMPORTANT NOTE: most proximal segment is assumed to be always flexible
@@ -280,7 +294,7 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 		RigidSegmentLength	=	SegBounds[StartSegmentIndex+1]-SegBounds[StartSegmentIndex];	// how far we need to move along the length of the rigid segment to reach the next flexible segment
 		for (int i=0; i<3; i++) { 										// u[0..2] and R[0..8] remain the same
 			xi[i+9+3] = xi[i+9+3] + RigidSegmentLength * xi[3+i*3+2];	// p[0..2] will translate along the z direction of the R matrix (3rd column)
-			Residual[i]=0.0;											// Residual is initialized to the 0 vector, just in case the rigid segment is the only segment (it is both the start and the end segment),
+            Residual[i]=0.0;											// Residual is initialized to the 0 vector, just in case the rigid segment is the only segment (it is both the start and the end segment),
 		}																//     In this case, the main integration loop will not execute, so, we need to have valid return values
 		mCopy_AB<NUM_STATES>(xi,xf);									//     for both xf and Residual
 		StartSegmentIndex++;  // move the start segment to the next segment
@@ -315,7 +329,7 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
             }
 			// Integrate
 			ABM4( 	xi, SegBounds[i], SegSteps[fsegno], h,
-					InsertedLength, dlambdainv, K[fsegno], Kinv[fsegno], l_zero, ustar[fsegno], u_history[N_][3], fcumlambda, ftip,
+					InsertedLength, dlambdainv, K[fsegno], Kinv[fsegno], l_zero, ustar[fsegno], segu_history[N_][3], fcumlambda, ftip,
 					FinalValueOnly, LocMarkers, &NextLocMarker,
 					xf, p_atLocMarkers	);
 
@@ -331,6 +345,12 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 			for (int j=0; j<3; j++) {
 				xi[3+9+j]=xf[3+9+j]+xf[3+j*3+2]*RigidSegmentLength;
 			}
+			//v and w
+            for (int j = 0; j < 3; ++j) {
+                xi[3+9+3+j] = xf[3+9+3+j];
+                xi[3+9+6+j] = xf[3+9+6+j];
+            }
+
 			// u
 			actno=(i-1)>>1;		// actuator no
 			fsegi=actno;
@@ -338,15 +358,53 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 			// Tb=\mu_c \cross R_sc^T B0,s
 			wHat(MagMoment[actno],muhat);
 			mMult_ATB<3,3,1>(&(xf[3]),B0,RscTB0);
-			mMult_AB<3,3,1>(muhat,RscTB0,Tb);
+			mMult_AB<3,3,1>(muhat,RscTB0,Tb);  //Tb is in body frame
 			// u2=u2star + ( K2inv K1 (u1 - u1star ) - K2inv Tb )
 			mSub_AB<3,1>( &(xi[0]) , ustar[fsegi], deltau1);
 			mMult_AB<3,3,1>( K[fsegi], deltau1, K1deltau1 );
-			mSub_AB<3,1>( K1deltau1 , Tb, Residual);
-			if (i < (NUM_SEGMENTS-1)) {	// we want to make sure that we are not at the last segment
-				mMult_AB<3,3,1>( Kinv[fsegip1], Residual, K2invResidual );
-				mAdd_AB<3,1>( ustar[fsegip1], K2invResidual, &(xi[0]) );
-			}
+
+			mSub_AB<3,1>( K1deltau1 , Tb, tauDiff);
+
+            if (i < (NUM_SEGMENTS-1)) {	// we want to make sure that we are not at the last segment
+                mMult_AB<3,3,1>( Kinv[fsegip1], tauDiff, K2invResidual );
+                mAdd_AB<3,1>( ustar[fsegip1], K2invResidual, &(xi[0]) );
+            }
+
+            //Dynamic boundary value problem
+            adType v_L[3], w_L[3], deltav[3], deltaw[3];
+            adType wvL[3], Ideltaw, IwL, gravity_force[3];
+            for (int i = 0; i < 3; ++i) {
+                v_L[i] = xf[i+3+9+3];
+                w_L[i] = xf[i+3+9+6];
+            }
+            mSub_AB<3,1>(v_L, v_L_pre, deltav);
+
+            adType w_hat[9];
+            wHat(w, w_hat);
+            mMult_AB<3,3,1>(w_hat, v_L, wvL);
+
+            adType R[9];
+            for (int i = 0; i < 9; ++i) {
+                R[i] = xf[i+3];
+            }
+            mMult_ATB<3,3,1>(R, g, gravity_force);
+            for (int j = 0; j < 3; ++j) { //Residual force
+                Residual[j] = actMass * (deltav / DELTA_T + wvL - gravity_force[j]);
+            }
+
+            // Residual moment
+            mSub_AB<3,1>(w_L, w_L_pre, deltaw);
+
+            mMult_AB<3,3,1>(actInertia, deltaw, Ideltaw);
+
+            mMult_AB<3,3,1>(actInertia, w_L, IwL);
+
+            mMult_AB<3,3,1>(w_hat, IwL, wIwL);
+
+            for (int j = 0; j < 3; ++j) {
+                Residual[j+3] = Ideltaw[j] /DELTA_T + wIwL[j] +tauDiff[j];
+            }
+
 			else {	// otherwise, we are at the last segment, and we need to copy the R and p values calculated for xi to xf so that they can be returned
 				for (int j=0; j<NUM_STATES; j++) {
 					if (j<3) xf[j]=0.0;  // u[0..2] are assigned to zero
@@ -388,23 +446,6 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 //		mSub_AB<3,1>( &(xf[0]) , ustar[NUM_FLEX_SEG-1], deltau);
 //		mMult_AB<3,3,1>( K[NUM_FLEX_SEG-1], deltau, Residual);
 //	}   // else residual = K1 (u1 - u1star ) - Tb  ; already calculated above
-
-    //Dynamic boundary value problem
-    adType v_L[3], w_L[3], deltav[3], deltaw[3], tau_bending[3];
-    adType Mdeltav[3], MvL[3], wMvL[3];
-    for (int i = 0; i < 3; ++i) {
-        v_L[i] = xf[i+3+9+3];
-        w_L[i] = xf[i+3+9+6];
-    }
-    mSub_AB<3,1>(v_L, v_L_pre, deltav);
-    mMult_AB<3,3,1>(actMass, deltav, Mdeltav);
-    mMult_AB<3,3,1>(actMass, v_L, MvL);
-
-    adType w_hat[9];
-    wHat(w, w_hat);
-    mMult_AB<3,3,1>(w_hat, MvL, wMvL);
-
-
 
 
     // Copy the residual to the output
