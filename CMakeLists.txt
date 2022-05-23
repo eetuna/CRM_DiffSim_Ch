@@ -17,20 +17,20 @@ set(CMAKE_MODULE_PATH
 
 include_directories(SYSTEM ${PYTHON_INCLUDE_DIRS})
 
-#add_library(matrixOperation
-#        matrixOperation/matrixOperation.cpp
-#        )
+add_library(CRMDYN INTERFACE)
 
+
+target_include_directories(CRMDYN INTERFACE CRMDYN.hpp)
 
 
 #install ILQR as a lib
 #add_library(ILQR ILQR/ILQR.cpp)
 
-#add_executable(planning_main planning_main.cpp)
+add_executable(CRMDYN_test CRMDYN_test.cpp)
 
 #target_link_libraries(ILQR ${PYTHON_LIBRARIES} CRM_Model::CRM Load_LAA_model::Load_LAA_model)
 
-target_link_libraries(planning_main )
+target_link_libraries(CRMDYN_test CRMDYN )
 
 #target_include_directories(ILQR
 #        INTERFACE

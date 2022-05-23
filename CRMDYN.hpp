@@ -12,11 +12,17 @@
 #define NUM_SEGMENTS (NUM_ACT_SET+NUM_FLEX_SEG)		// Total number of segments
 #define NUM_LOCALIZATION_MARKERS 10					// Total number of localization markers
 
+#define NUM_FCUM_LAMBDA 104  	//  Number of steps used in calculating fcumlambda (cumulative forces); number of entries in fcumlambda is (NUM_FCUM+1)
+
+// Regularization scales used for Nonlinear Solver
 #define IVALUE_SCALE_U	1.0 //(0.01)			// the variable used in Nonlinear Solver is multiplied with this scale to calculate u (curvature) that will be used in IVP
+#define IVALUE_SCALE_F	(0.01)			// the variable used in Nonlinear Solver is multiplied with this scale to calculate ftip (tip force) that will be used in IVP
 #define RESIDUAL_SCALE_M	1.0 //(10.0)			// the residual for tip moment coming out of the IVP will be multiplied with this scale to return to the Nonlinear Solver
 #define RESIDUAL_SCALE_P	100.0 //(10.0)			// the residual for tip position error coming out of the IVP will be multiplied with this scale to return to the Nonlinear Solver
 
-#define G 9.8         // gravitational coefficient
+// NL Solver method selection
+#define TRUSTREGION							// Trust Region Method with the numerical jacobian (Default)
+
 #define DELTA_T 0.02
 #define TRUSTREGION							// Trust Region Method with the numerical jacobian (Default)
 
@@ -99,7 +105,7 @@ struct CRMIVPCoreParams {
     int   StartSegmentIndex;							// Index of the segment where the integration to solve IVP will start -- the segment located at the entry point; note that segment indices start at 0
     int	  NextLocMarker;								// Next Localization Marker to be computed
     double p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]; // positions of markers (ordered proximal to distal)
-    double u_history[NUM_FLEX_SEG][][]; //History of u
+    double u_history[][3][NUM_FLEX_SEG]; //History of u
     //   only the entries 0..NextLocMarker-1 are filled
 };
 
@@ -111,7 +117,7 @@ void CRMSolverIVP (	double in_x_0[NUM_STATES], double in_IntegrationStepSize,
                        double in_K[NUM_FLEX_SEG][9], double in_Kinv[NUM_FLEX_SEG][9],
                        double in_ustar[NUM_FLEX_SEG][3],
                        double in_MagMoment[NUM_ACT_SET][3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3], double in_ftp[3],
-                       double in_B0[3], double in_g[3],
+                       double in_B0[3], double in_g[3], double in_ftip[3],
                        bool in_FinalValueOnly,
                        double out_x_N[NUM_STATES], double out_WrenchResidual[6],
                        double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]
@@ -144,7 +150,7 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 
 // Function for copying data in device memory to global memory --- used for dataflow pipelining
 template <typename adType>
-void CRMSolverIVP_Return (  adType in_x_N[NUM_STATES], adType out_WrenchResidual[6],
+void CRMSolverIVP_Return (  adType in_x_N[NUM_STATES], adType in_WrenchResidual[6],
                             double in_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3],
                             double out_x_N[NUM_STATES], double out_WrenchResidual[6],
                             double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]);
@@ -182,9 +188,9 @@ double dVal(adType x) { return (x); }
 //    Note: The first three steps are calculated using RK2
 template <typename adType>
 void ABM4 (	adType in_x_0[NUM_STATES], adType t_0, int N, double h,
-               adType Li, double dlambdainv, double in_K[9], double in_Kinv[9], double in_l[3], double in_ustar[3], double u_history[N][3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3], adType in_ftip[3],
+               adType Li, double dlambdainv, double in_K[9], double in_Kinv[9], double in_l[3], double in_ustar[3], adType u_history[][3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3], adType in_ftip[3],
                bool FinalValueOnly, double	in_LocMarkers[NUM_LOCALIZATION_MARKERS], int *inout_NextLocMarkerIdx,
-               adType out_x_N[NUM_STATES], double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]	);
+               adType out_x_N[NUM_STATES], double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3], adType u_history_update[][3]	);
 
 //ABM4_step One step of 4th order Adams-Bashforth Prediction and Adams-Moulton Correction
 template <typename adType>
@@ -223,6 +229,8 @@ void RodriguesExpanded (adType in_w[3], adType in_theta, adType out_R[9]);
 //   g = [R p; 0 0 0 1];
 template <typename adType>
 void SE3_Analytical_Step(adType in_R_n[9], adType in_p_n[3], adType in_u_n[3], double h, adType out_R_np1[9], adType out_p_np1[3]);
+
+#include "CRMIVP_Defs.hpp"
 
 
 #define MAX(a,b) 	( ((b)>(a))?(b):(a) )

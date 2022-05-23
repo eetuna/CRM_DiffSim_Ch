@@ -1,6 +1,6 @@
 #pragma once
 #include <cmath>
-#include "CRMDYN.hpp"
+//#include "CRMDYN.hpp"
 
 
 template <typename adType>
@@ -10,7 +10,7 @@ void CRMSolverIVP (double in_x_0[NUM_STATES], double in_IntegrationStepSize,
                    double in_K[NUM_FLEX_SEG][9], double in_Kinv[NUM_FLEX_SEG][9],
                    double in_ustar[NUM_FLEX_SEG][3],
                    double in_MagMoment[NUM_ACT_SET][3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3], double in_ftp[3],
-                   double in_B0[3], double in_g[3],
+                   double in_B0[3], double in_g[3], double in_ftip[3],
                    bool in_FinalValueOnly,
                    double out_x_N[NUM_STATES], double out_WrenchResidual[6],
                    double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]
@@ -122,7 +122,7 @@ void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSiz
 	auto & dlambdainv = out_CoreParams.dlambdainv;
 	auto & K = out_CoreParams.K;
 	auto & Kinv = out_CoreParams.Kinv;
-    auto & in_ustar = out_CoreParams.ustar;
+    auto & ustar = out_CoreParams.ustar;
 	auto & fcumlambda = out_CoreParams.fcumlambda;
 //	auto & ftip = out_CoreParams.ftip;
 	auto & FinalValueOnly = out_CoreParams.FinalValueOnly;
@@ -365,23 +365,20 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 
 			mSub_AB<3,1>( K1deltau1 , Tb, tauDiff);
 
-            if (i < (NUM_SEGMENTS-1)) {	// we want to make sure that we are not at the last segment
-                mMult_AB<3,3,1>( Kinv[fsegip1], tauDiff, K2invResidual );
-                mAdd_AB<3,1>( ustar[fsegip1], K2invResidual, &(xi[0]) );
-            }
+
 
             //Dynamic boundary value problem
             adType v_L[3], w_L[3], deltav[3], deltaw[3];
-            adType wvL[3], Ideltaw, IwL, gravity_force[3];
+            adType wvL[3], Ideltaw[3], IwL[3], wIwL[3], gravity_force[3];
             for (int i = 0; i < 3; ++i) {
                 v_L[i] = xf[i+3+9+3];
                 w_L[i] = xf[i+3+9+6];
             }
             mSub_AB<3,1>(v_L, v_L_pre, deltav);
 
-            adType w_hat[9];
-            wHat(w, w_hat);
-            mMult_AB<3,3,1>(w_hat, v_L, wvL);
+            adType w_L_hat[9];
+            wHat(w_L, w_L_hat);
+            mMult_AB<3,3,1>(w_L_hat, v_L, wvL);
 
             adType R[9];
             for (int i = 0; i < 9; ++i) {
@@ -399,12 +396,17 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 
             mMult_AB<3,3,1>(actInertia, w_L, IwL);
 
-            mMult_AB<3,3,1>(w_hat, IwL, wIwL);
+            mMult_AB<3,3,1>(w_L_hat, IwL, wIwL);
 
             for (int j = 0; j < 3; ++j) {
                 Residual[j+3] = Ideltaw[j] /DELTA_T + wIwL[j] +tauDiff[j];
             }
 
+
+            if (i < (NUM_SEGMENTS-1)) {	// we want to make sure that we are not at the last segment
+                mMult_AB<3,3,1>( Kinv[fsegip1], tauDiff, K2invResidual );
+                mAdd_AB<3,1>( ustar[fsegip1], K2invResidual, &(xi[0]) );
+            }
 			else {	// otherwise, we are at the last segment, and we need to copy the R and p values calculated for xi to xf so that they can be returned
 				for (int j=0; j<NUM_STATES; j++) {
 					if (j<3) xf[j]=0.0;  // u[0..2] are assigned to zero
@@ -615,9 +617,9 @@ void CRMIntegrand (	adType s, adType x[NUM_STATES],
 //function [x_1toN] = ABM4(x_0, t_0, N, h, Integrand, initmethod)
 template <typename adType>
 void ABM4 (	adType in_x_0[NUM_STATES], adType t_0, int N, double h,
-			adType Li, double dlambdainv, double in_K[9], double in_Kinv[9], double in_l[3], double in_ustar[3], adType u_history[N][3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3], adType in_ftip[3],
+			adType Li, double dlambdainv, double in_K[9], double in_Kinv[9], double in_l[3], double in_ustar[3], adType u_history[][3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3], adType in_ftip[3],
 			bool FinalValueOnly, double	in_LocMarkers[NUM_LOCALIZATION_MARKERS], int *inout_NextLocMarkerIdx,
-			adType out_x_N[NUM_STATES], double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3], adType u_history_update[N][3] 	) {
+			adType out_x_N[NUM_STATES], double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3], adType u_history_update[][3] 	) {
 
 	adType x_nm3[NUM_STATES];
 	adType x_nm2[NUM_STATES];
@@ -831,7 +833,7 @@ void RK2_step(	adType in_x_n[NUM_STATES], adType t_n, double h,
 	for (int i = 0; i < 3; i++) {
 		out_x_np1[i] = x_n[i] + h * k2oh[i];
 	}
-    for ((int i = 3; i < NUM_INTEGRATION_STATES; i++) { //twists
+    for (int i = 3; i < NUM_INTEGRATION_STATES; i++) { //twists
         out_x_np1[i+9+3] = x_n[i+9+3] + h * k2oh[i];
     }
 	// we will calculate R_np1 and p_np1 analytically, without numerical integration
