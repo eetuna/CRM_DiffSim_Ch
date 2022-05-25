@@ -124,7 +124,6 @@ void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSiz
 	auto & Kinv = out_CoreParams.Kinv;
     auto & ustar = out_CoreParams.ustar;
 	auto & fcumlambda = out_CoreParams.fcumlambda;
-//	auto & ftip = out_CoreParams.ftip;
 	auto & FinalValueOnly = out_CoreParams.FinalValueOnly;
 	auto & LocMarkers = out_CoreParams.LocMarkers;
 	auto & B0 = out_CoreParams.B0;
@@ -209,16 +208,21 @@ void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSiz
 
 	mCopy_AB<(NUM_FCUM_LAMBDA+1),3>(in_fcumlambda,fcumlambda);
 
-//    double u_history[NUM_FLEX_SEG][SegSteps[i]][3];
-//    for (int i = 0; i < NUM_FLEX_SEG; ++i) {
-//        u_history[i][0][0] = in_ustar[i][0];
-//        u_history[i][0][1] = in_ustar[i][1];
-//        u_history[i][0][2] = in_ustar[i][2];
-//        for (int j = 1; j < SegSteps[i]; ++j) {
-//            u_history[i][j][i] = 0.0; u_history[j][1][i] = 0.0; u_history[j][2][i] = 0.0;
-//        }
-//    }
-	//mCopy_AB<3>(in_ftip, ftip);
+	auto & u_history = out_CoreParams.u_history; // initializing curvature along the catheter at time sample t0
+
+    for (int i = 0; i < NUM_FLEX_SEG; ++i) {
+        int length = SegSteps[i]*3;
+        u_history[i].length = length;
+        u_history[i].data = new double[length];
+        u_history[i].data[0] = in_ustar[NUM_FLEX_SEG][0];
+        u_history[i].data[1] = in_ustar[NUM_FLEX_SEG][1];
+        u_history[i].data[2] = in_ustar[NUM_FLEX_SEG][2];
+        for (int j = 1; j < SegSteps[i]; ++j) {
+            u_history[i].data[j*3] = 0.0;
+            u_history[i].data[j*3+1] = 0.0;
+            u_history[i].data[j*3+2] = 0.0;
+        }
+    }
 
 }
 

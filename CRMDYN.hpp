@@ -1,11 +1,11 @@
 #pragma once
 #include <cmath>
+#include <iostream>
 #include "CRMMatrixOperations.hpp"
 
 #define NUM_STATES 21   // u[0..2],R[0..9],p[0..2],v[0..2],w[0..2]
 #define NUM_INTEGRATION_STATES 9   // u[0..2],v[0..2],w[0..2]
 #define EQNDIMENSION 9	// domain: u[0..2],v[0..2],w[0..2] range: m_tip[0..2]
-#define DELTA_T
 
 #define NUM_ACT_SET 1								// Number of actuator sets
 #define NUM_FLEX_SEG 2								// Number of flexible segments
@@ -106,11 +106,13 @@ struct CRMIVPCoreParams {
     int	  NextLocMarker;								// Next Localization Marker to be computed
     double p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]; // positions of markers (ordered proximal to distal)
 
-    struct u_history
+    struct UHistory
             {
                 int length;
-                double *data_;
+                double* data;
             };
+
+    UHistory u_history[NUM_FLEX_SEG];
     //   only the entries 0..NextLocMarker-1 are filled
 };
 
@@ -130,15 +132,15 @@ void CRMSolverIVP (	double in_x_0[NUM_STATES], double in_IntegrationStepSize,
 
 // Preparation of CRMIVPCoreParams for subsequent call to CRMSolverIVP_Core
 template <typename adType>
-void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSize,
-                          adType in_Li, double in_dlambdainv,
-                          double in_SegEndLambdas[NUM_SEGMENTS], double in_LocMarkerLambdas[NUM_LOCALIZATION_MARKERS],
-                          double in_K[NUM_FLEX_SEG][9], double in_Kinv[NUM_FLEX_SEG][9],
-                          double in_ustar[NUM_FLEX_SEG][3],
-                          adType in_MagMoment[NUM_ACT_SET][3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3],
-                          double in_B0[3], double in_g[3],
-                          bool in_FinalValueOnly,
-                          CRMIVPCoreParams<adType> &out_CoreParams);
+void CRMSolverIVP_Prep (adType in_x_0[NUM_STATES], double in_IntegrationStepSize,
+                        adType in_Li, double in_dlambdainv,
+                        double in_SegEndLambdas[NUM_SEGMENTS], double in_LocMarkerLambdas[NUM_LOCALIZATION_MARKERS],
+                        double in_K[NUM_FLEX_SEG][9], double in_Kinv[NUM_FLEX_SEG][9],
+                        double in_ustar[NUM_FLEX_SEG][3],
+                        adType in_MagMoment[NUM_ACT_SET][3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3],
+                        double in_B0[3], double in_g[3],
+                        bool in_FinalValueOnly,
+                        CRMIVPCoreParams<adType> &out_CoreParams);
 
 
 // Core Computations used in CRMSolverIVP - Integrator for Solving the Initial Value Problem

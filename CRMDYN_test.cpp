@@ -1,5 +1,7 @@
 #include "CRMDYN.hpp"
 
+#include <fstream>
+
 void ivp_test(){
     // *** Physical Description of the Catheter
     // IMPORTANT NOTE: For now, most proximal segment is assumed to be always flexible
@@ -140,6 +142,15 @@ void ivp_test(){
             in_MagMoment, in_fcumlambda,
             B0, g,
             true, testParams);
+
+    for (int i = 0; i < NUM_FLEX_SEG; ++i) {
+        int size_ = testParams.u_history[i].length;
+        std::cout << "size_: " << size_ << std::endl;
+        for (int j = 0; j < size_; ++j) {
+            std::cout << "data: " <<  testParams.u_history[i].data[j] << std::endl;
+        }
+        std::cout << "next round ----- " << std::endl;
+    }
 
 }
 int main(int argc, char** argv){
