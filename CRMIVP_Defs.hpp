@@ -3,12 +3,14 @@
 //#include "CRMDYN.hpp"
 
 
+
 template <typename adType>
 void CRMSolverIVP (double in_x_0[NUM_STATES], double in_IntegrationStepSize,
                    double in_Li, double in_dlambdainv,
                    double in_SegEndLambdas[NUM_SEGMENTS], double	in_LocMarkerLambdas[NUM_LOCALIZATION_MARKERS],
                    double in_K[NUM_FLEX_SEG][9], double in_Kinv[NUM_FLEX_SEG][9],
-                   double in_ustar[NUM_FLEX_SEG][3],
+                   double in_ustar[NUM_FLEX_SEG][3], double v_L_pre[3], double w_L_pre[3],
+                   double actMass[NUM_ACT_SET], double actInertia[NUM_ACT_SET][9],
                    double in_MagMoment[NUM_ACT_SET][3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3], double in_ftp[3],
                    double in_B0[3], double in_g[3], double in_ftip[3],
                    bool in_FinalValueOnly,
@@ -29,11 +31,10 @@ void CRMSolverIVP (double in_x_0[NUM_STATES], double in_IntegrationStepSize,
 	mCopy_AB<NUM_ACT_SET * 3>(&(in_MagMoment[0][0]), &(MagMoment[0][0]));
 	adType Li = in_Li;
 
-	////////
 	CRMSolverIVP_Prep ( x_0, in_IntegrationStepSize, Li, in_dlambdainv,
 						in_SegEndLambdas, in_LocMarkerLambdas, in_K, in_Kinv,
 						in_ustar, MagMoment, in_fcumlambda,
-						in_B0, in_FinalValueOnly,
+						in_B0, in_g, in_FinalValueOnly,
 						CoreParams	);
 	// copy to local variable
 	for (int i=0; i<3; i++) ftip[i]=in_ftip[i];
@@ -44,53 +45,63 @@ void CRMSolverIVP (double in_x_0[NUM_STATES], double in_IntegrationStepSize,
         v_0[i] = CoreParams.xi[i+3+9+3];
         w_0[i] = CoreParams.xi[i+3+9+6];
 	}
-	CRMSolverIVP_Core ( CoreParams, u_0, v_0, w_0, ftip, x_N, WrenchResidual, p_atLocMarkers );
+
+	CRMSolverIVP_Core ( CoreParams, u_0, v_0, w_0, ftip, v_L_pre, w_L_pre, actMass, actInertia, x_N, WrenchResidual, p_atLocMarkers );
 
 	CRMSolverIVP_Return( x_N, WrenchResidual, p_atLocMarkers, out_x_N, out_WrenchResidual, out_p_atLocMarkers);
 
 }
 
 
-//template <typename adType>
-//void CRMSolverIVP(	CRMShootingMethodParams<adType> in_Params,
-//					adType in_u0[3], adType in_ftip[3],
-//					bool in_FinalValueOnly,
-//					adType out_x_N[NUM_STATES], adType out_MomentResidual[3],
-//					double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]		) {
-//
-//	adType x_0[NUM_STATES];
-//	for (int i = 0; i < NUM_STATES; i++) {
-//		if (i < 3) x_0[i] = in_u0[i];
-//		else if (i < 12) x_0[i] = in_Params.R0[i - 3];
-//		else x_0[i] = in_Params.p0[i - 12];
-//	}
-//
-//	CRMIVPCoreParams<adType> CoreParams;
-//	adType u_0[3], ftip[3];
-//
-//
-//	CRMSolverIVP_Prep(x_0, in_Params.IntegrationStepSize,
-//		in_Params.Li, in_Params.dlambdainv,
-//		in_Params.SegEndLambdas, in_Params.LocMarkerLambdas,
-//		in_Params.K, in_Params.Kinv, in_Params.ustar,
-//		in_Params.MagMoment, in_Params.fcumlambda,
-//		in_Params.B0,
-//		in_FinalValueOnly,
-//		CoreParams);
-//
-//	// copy to local variable
-//	for (int i = 0; i < 3; i++) ftip[i] = in_ftip[i];
-//
-//	// We need to pass u_0 as input argument as the values in CoreParams will be overriden with the values provided in the input arguments - functionality needed for solving Boundary Value Problems (BVP)
-//	for (int i = 0; i < 3; i++) u_0[i] = CoreParams.xi[i];
-//
+template <typename adType>
+void CRMSolverIVP(	CRMShootingMethodParams<adType> in_Params,
+					adType in_u0[3], adType in_ftip[3], adType v_L_pre[3], adType w_L_pre[3],
+					bool in_FinalValueOnly,
+					adType out_x_N[NUM_STATES], adType out_WrenchResidual[6],
+					double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]	) {
+
+	adType x_0[NUM_STATES];
+	for (int i = 0; i < NUM_STATES; i++) {
+		if (i < 3) x_0[i] = in_u0[i];
+		else if (i < 12) x_0[i] = in_Params.R0[i - 3];
+		else x_0[i] = in_Params.p0[i - 12];
+	}
+
+	CRMIVPCoreParams<adType> CoreParams;
+	adType u_0[3],v_0[3], w_0[3],  ftip[3];
+
+
+	CRMSolverIVP_Prep(x_0, in_Params.IntegrationStepSize,
+		in_Params.Li, in_Params.dlambdainv,
+		in_Params.SegEndLambdas, in_Params.LocMarkerLambdas,
+		in_Params.K, in_Params.Kinv, in_Params.ustar,
+		in_Params.MagMoment, in_Params.fcumlambda,
+		in_Params.B0, in_Params.g,
+		in_FinalValueOnly,
+		CoreParams);
+
+	// copy to local variable
+	for (int i = 0; i < 3; i++) ftip[i] = in_ftip[i];
+
+	// We need to pass u_0 as input argument as the values in CoreParams will be overriden with the values provided in the input arguments - functionality needed for solving Boundary Value Problems (BVP)
+	for (int i = 0; i < 3; i++)
+    {
+        u_0[i] = CoreParams.xi[i];
+        v_0[i] = CoreParams.xi[i+3+9+3];
+        w_0[i] = CoreParams.xi[i+3+9+6];
+    }
+
+
+
 //	CRMSolverIVP_Core(CoreParams, u_0, ftip, out_x_N, out_MomentResidual, out_p_atLocMarkers);
-//
-//	// NO NEED FOR CRMSolverIVP_Return
-//
-//}
-//
-//
+    CRMSolverIVP_Core ( CoreParams, u_0, v_0, w_0, ftip, v_L_pre, w_L_pre, in_Params.actMass, in_Params.actInertia, out_x_N, out_WrenchResidual, out_p_atLocMarkers );
+
+
+    // NO NEED FOR CRMSolverIVP_Return
+
+}
+
+
 template <typename adType>
 void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSize,
                          adType in_Li, double in_dlambdainv,
@@ -230,9 +241,10 @@ void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSiz
 template <typename adType>
 void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 						 adType in_u[3], adType in_v[3], adType in_w[3], adType in_ftip[3],
-                         adType v_L_pre[3], adType w_L_pre[3], adType actMass, adType actInertia[9],
+                         adType v_L_pre[3], adType w_L_pre[3], adType actMass[NUM_ACT_SET], adType actInertia[NUM_ACT_SET][9],
 						 adType out_x_N[NUM_STATES], adType out_MomentResidual[6],
-						 double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3] ){
+						 double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3] )
+{
 
 	adType xi[NUM_STATES];  			//  Initial value of the state for the next segment to be integrated
 	adType xf[NUM_STATES];			//  Final value of the state for the last segment integrated
@@ -324,17 +336,20 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 			h=dVal((SegBounds[i+1]-SegBounds[i]))/(SegSteps[fsegno]*1.0);
 
 			int N_ = SegSteps[fsegno];
+
             adType segu_history[N_][3];
+            adType u_history_update[N_][3];
             for (int j = 0; j < N_; ++j) {
-                segu_history[i][0] = u_history[j][0][i];
-                segu_history[i][1] = u_history[j][1][i];
-                segu_history[i][2] = u_history[j][2][i];
+                segu_history[j][0] = u_history[i].data[j*3];
+                segu_history[j][1] = u_history[i].data[j*3+1];
+                segu_history[j][2] = u_history[i].data[j*3+2];
             }
+
 			// Integrate
 			ABM4( 	xi, SegBounds[i], SegSteps[fsegno], h,
-					InsertedLength, dlambdainv, K[fsegno], Kinv[fsegno], l_zero, ustar[fsegno], segu_history[N_][3], fcumlambda, ftip,
+					InsertedLength, dlambdainv, K[fsegno], Kinv[fsegno], l_zero, ustar[fsegno], segu_history, fcumlambda, ftip,
 					FinalValueOnly, LocMarkers, &NextLocMarker,
-					xf, p_atLocMarkers	);
+					xf, p_atLocMarkers, u_history_update);
 
 		}
 		else {  // Need to do actuation/rigid segment calculations to transfer Initial Conditions to next flexible segment
@@ -368,8 +383,6 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 
 			mSub_AB<3,1>( K1deltau1 , Tb, tauDiff);
 
-
-
             //Dynamic boundary value problem
             adType v_L[3], w_L[3], deltav[3], deltaw[3];
             adType wvL[3], Ideltaw[3], IwL[3], wIwL[3], gravity_force[3];
@@ -389,15 +402,14 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
             }
             mMult_ATB<3,3,1>(R, g, gravity_force);
             for (int j = 0; j < 3; ++j) { //Residual force
-                Residual[j] = actMass * (deltav / DELTA_T + wvL - gravity_force[j]);
+                Residual[j] = actMass[actno] * (deltav / DELTA_T + wvL - gravity_force[j]);
             }
 
             // Residual moment
             mSub_AB<3,1>(w_L, w_L_pre, deltaw);
 
-            mMult_AB<3,3,1>(actInertia, deltaw, Ideltaw);
-
-            mMult_AB<3,3,1>(actInertia, w_L, IwL);
+            mMult_AB<3,3,1>(actInertia[actno], deltaw, Ideltaw);
+            mMult_AB<3,3,1>(actInertia[actno], w_L, IwL);
 
             mMult_AB<3,3,1>(w_L_hat, IwL, wIwL);
 
@@ -622,7 +634,7 @@ template <typename adType>
 void ABM4 (	adType in_x_0[NUM_STATES], adType t_0, int N, double h,
 			adType Li, double dlambdainv, double in_K[9], double in_Kinv[9], double in_l[3], double in_ustar[3], adType u_history[][3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3], adType in_ftip[3],
 			bool FinalValueOnly, double	in_LocMarkers[NUM_LOCALIZATION_MARKERS], int *inout_NextLocMarkerIdx,
-			adType out_x_N[NUM_STATES], double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3], adType u_history_update[][3] 	) {
+			adType out_x_N[NUM_STATES], double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3], adType u_history_update[][3] ) {
 
 	adType x_nm3[NUM_STATES];
 	adType x_nm2[NUM_STATES];

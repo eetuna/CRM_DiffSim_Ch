@@ -27,6 +27,9 @@
 #define TRUSTREGION							// Trust Region Method with the numerical jacobian (Default)
 
 
+enum class ContactModeType { FREE_TIP, FIXED_TIP };
+
+
 // Structure for defining dynamics model parameters
 struct CRMDynamicsModelParams {
     //	For all parameters below, segments and actuator units are numbered/ordered from the tip of the catheter towards the base (distal to proximal)
@@ -72,6 +75,52 @@ struct CRMDYNShootingMethodParams {
     double	R0[9];
     double	p0[3];
 };
+
+
+// Container for parameter data to be sent to Forward Kinematics
+struct CRMForwardKinematicsData {
+    CRMDynamicsModelParams* CathParams;
+    CatheterConfiguration*	CathConfig;
+    ContactModeType ContactMode;
+    double	TipConstraintPoint[3];
+    double	TipForce[3];
+    double	IntegrationStepSize;
+    bool	FinalValueOnly;				// Flag used to indicate if only final value is returned (true) or if Marker Locations are returned as well (false)
+    double	(*ReportedMarkerPos)[NUM_LOCALIZATION_MARKERS][3];  // output
+    double t_;                          /*time stamp*/
+};
+
+// Structure for passing parameters to the CRM Shooting Method Boundary Value Problem Solver CRMShootingMethodBVP
+template <typename adType>
+struct CRMShootingMethodParams {
+    //	For all parameters below, segments and actuator units are numbered/ordered from the tip of the catheter towards the base
+    //  DISTAL TO PROXIMAL ORDERING
+    adType 	Li;
+    double 	dlambdainv;
+    double 	SegEndLambdas[NUM_SEGMENTS];
+    double	LocMarkerLambdas[NUM_LOCALIZATION_MARKERS];
+    double 	K[NUM_FLEX_SEG][9];
+    double 	Kinv[NUM_FLEX_SEG][9];
+    double 	ustar[NUM_FLEX_SEG][3];
+    adType 	MagMoment[NUM_ACT_SET][3];
+    double 	fcumlambda[NUM_FCUM_LAMBDA + 1][3];
+    double 	B0[3];
+    double	IntegrationStepSize;
+    double	R0[9];
+    double	p0[3];
+    ContactModeType ContactMode;
+    double	TipConstraintPoint[3];
+    double	TipForce[3];
+};
+
+// Construct Shooting Method Parameter Set from Catheter Model and Configuration Parameters
+template <typename adType>
+void CRMConstructShootingMethodParamSet	(	CRMDynamicsModelParams CathParams, CatheterConfiguration CathConfig,
+                                                adType InsertionLength, adType ActuationCurrents[NUM_ACT_SET][3],
+                                                ContactModeType ContactMode,
+                                                double TipConstraintPoint[3], double TipForce[3],
+                                                double IntegrationStepSize,
+                                                CRMShootingMethodParams<adType> &ShootingParams);
 
 //
 // ---------------------------------------------------------
@@ -122,13 +171,21 @@ void CRMSolverIVP (	double in_x_0[NUM_STATES], double in_IntegrationStepSize,
                        double in_Li, double in_dlambdainv,
                        double in_SegEndLambdas[NUM_SEGMENTS], double	in_LocMarkerLambdas[NUM_LOCALIZATION_MARKERS],
                        double in_K[NUM_FLEX_SEG][9], double in_Kinv[NUM_FLEX_SEG][9],
-                       double in_ustar[NUM_FLEX_SEG][3],
+                       double in_ustar[NUM_FLEX_SEG][3], double v_L_pre[3], double w_L_pre[3],
+                       double actMass[NUM_ACT_SET], double actInertia[NUM_ACT_SET][9],
                        double in_MagMoment[NUM_ACT_SET][3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3], double in_ftp[3],
                        double in_B0[3], double in_g[3], double in_ftip[3],
                        bool in_FinalValueOnly,
                        double out_x_N[NUM_STATES], double out_WrenchResidual[6],
                        double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]
 );
+
+template <typename adType>
+void CRMSolverIVP(	CRMShootingMethodParams<adType> in_Params,
+                      adType in_u0[3], adType in_ftip[3], adType v_L_pre[3], adType w_L_pre[3],
+                      bool in_FinalValueOnly,
+                      adType out_x_N[NUM_STATES], adType out_WrenchResidual[6],
+                      double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]	);
 
 // Preparation of CRMIVPCoreParams for subsequent call to CRMSolverIVP_Core
 template <typename adType>
@@ -150,7 +207,7 @@ void CRMSolverIVP_Prep (adType in_x_0[NUM_STATES], double in_IntegrationStepSize
 template <typename adType>
 void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
                          adType in_u[3], adType in_v[3], adType in_w[3], adType in_ftip[3],
-                         adType v_L_pre[3], adType w_L_pre[3], adType actMass, adType actInertia[9],
+                         adType v_L_pre[3], adType w_L_pre[3], adType actMass[NUM_ACT_SET], adType actInertia[NUM_ACT_SET][9],
                          adType out_x_N[NUM_STATES], adType out_MomentResidual[6],
                          double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]);
 
@@ -188,9 +245,87 @@ void LocMarkerUpdate(double p[3], adType xi[NUM_STATES], adType t);
 template <typename adType>
 double dVal(adType x) { return (x); }
 
+
+//
+// ---------------------------------------------------------
+//        Cosserat Rod Model - Boundary Value Problem Solver
+// ---------------------------------------------------------
+//
+
+
+//// Cosserat Rod Model forward kinematics
+////		This is a wrapper for a sequence of CRMShootingMethodBVP + CRMSolverIVP calls
+//template <typename adType>
+//void CRM_ForwardKinematics(
+//        double in_x[],		// array of length (3 x NUM_ACT_SET + 1)  -- the +1 is for the inserted length of the catheter
+//        // Actuation currents for each of the actuation coil currents [NUM_ACT_SET][3] stored in row-major order
+//        //    followed by the Inserted Length (length of the catheter from the entry point to the tip)
+//        //    actuator units are numbered/ordered from the tip of the catheter towards the base (distal to proximal)
+//        double out_y[],		// output vector
+//        //    (3+9+3)x1 vector if ContactMode == ContactModeType::FREE_TIP
+//        //    (3+9+3+3)x1 vector if ContactMode == ContactModeType::FIXED_TIP
+//        //    outputs are packed p[0..2],R[0..8],u0[0..2](,ftip[0..2])
+//        //		p:		tip position in spatial coordinates
+//        //      R:		tip orientation matrix --- 3x3 matrix stored in row major order (R11 R12 R13 R21 R22 R23 R31 R32 R33)
+//        //		u0:		curvature at the base of the catheter
+//        //		ftip:	tip force in spatial coordinates
+//        CRMForwardKinematicsData Params);
+//
+//
+//// CRMShootingMethodBVP API which exposes all of the individual parameters
+//template <typename adType>
+//void CRMShootingMethodBVP(
+//        ContactModeType in_ContactMode,					// Enumerated type defining catheter contact mode.  in_ContactMode == FREE_TIP if the catheter is not in contact with a surface, FIXED_TIP if catheter tip is constrained to be at TipContraintPoint
+//        double 	in_u0_initialguess[3],					// Initial guess for the local curvature vector at the entry point
+//        double 	in_ftip_initialguess[3],				// Initial guess for the tip force (\lambda=0), used when in_ContactMode == FIXED_TIP
+//        double	in_InsertedLength, 						// Inserted Length (length of the catheter from the entry point to the tip)
+//        double 	in_ActuationCurrents[NUM_ACT_SET][3], 	// Actuation current for each of the actuation coils
+//        //    actuator units are numbered/ordered from the tip of the catheter towards the base (distal to proximal)
+//        double	in_TipConstraintPoint[3],				// The spatial coordinates of the point where the catheter tip is constrained to be (used if in_ContactMode == FIXED_TIP)
+//        double	in_TipForce[3],							// External point force (in spatial coordinates) applied at the tip of the catheter (\lambda = 0) - this value will not be used if in_ContactMode == FIXED_TIP
+//        double	in_IntegrationStepSize,					// Stepsize used in numerical integration along the length of the catheter
+//        // Catheter Configuration Parameters
+//        double 	in_B0[3],								// B0 field vector of the MRI scanner (in spatial coordinates)
+//        double 	in_g[3],								// Gravity vector (in spatial coordinates)
+//        double 	in_p0[3],								// Catheter entry port position (in spatial coordinates)
+//        double 	in_R0[9],								// Catheter orientation at the entry port (relative to the spatial frame); 3x3 matrix stored in row major order
+//        // Catheter Model Parameters
+//        //	For all parameters below, segments and actuator units are numbered/ordered from the tip of the catheter towards the base (distal to proximal)
+//        double 	in_SegLengths[NUM_SEGMENTS],			// Array of segment lengths; NUM_SEGMENTS long array
+//        double	in_LocMarkers[NUM_LOCALIZATION_MARKERS],// Array of localization marker locations (in lambda coordinates); NUM_LOCALIZATION_MARKERS long array
+//        double	in_InnerRadius[NUM_FLEX_SEG],			// Inner radii of the flexible catheter segments
+//        double	in_OuterRadius[NUM_FLEX_SEG],			// Outer radii of the flexible catheter segments
+//        double	in_YoungsModulus[NUM_FLEX_SEG],			// Youngs Moduli of the flexible catheter segments
+//        double	in_ShearModulus[NUM_FLEX_SEG],			// Shear Moduli of the flexible catheter segments
+//        double 	in_ustar[NUM_FLEX_SEG][3],				// Local curvature in unloaded configuration for each of the flexible segments; (NUM_FLEX_SEG)*3 long array, (NUM_FLEX_SEG) 3x1 vectors
+//        //		Actuator segments are assumed to be straight
+//        double 	in_CoilAlignmentAngles[NUM_ACT_SET][2],	// Coil Alignment Angles; NUM_ACT_SET*2 long array, for each actuator set, the angle for the first coil is relative to x axis, and the angle for the second coil is relative to y axis
+//        double 	in_CoilTurnAreaMat[NUM_ACT_SET][9], 	// Coil Turn Area matrices; NUM_ACT_SET*9 long array, NUM_ACT_SET 3x3 matrices stored in row major order
+//        double 	in_rho[NUM_SEGMENTS],					// Length density (mass per unit length) of the flexible catheter substrate (tubing); (NUM_SEGMENTS) long array
+//        double 	in_ActMass[NUM_ACT_SET],				// Actuator segment masses, does not include the flexible substrate; (NUM_ACT_SET) long array
+//        // Outputs
+//        double 	out_u0[3], 								// Local curvature vector at the entry point calculated through the solution of BVP
+//        double 	out_ftip[3],							// Tip force calculated through the solution of BVP (\lambda=0) --- used when in_ContactMode == FIXED_TIP
+//        int& out_localmin								// out_localmin!=0 if algorithms is stuck at a local minimum, or cannot make further progress
+//);
+//
+//// Preparation of NLEqnParams for subsequent call to Nonlinear Equation Solvers
+//void CRMShootingMethodBVP_Prep(
+//        double in_B0[3], double in_g[3], double in_p0[3], double in_R0[9],
+//        double in_SegLengths[NUM_SEGMENTS], double in_LocMarkers[NUM_LOCALIZATION_MARKERS],
+//        double in_InnerRadius[NUM_FLEX_SEG], double in_OuterRadius[NUM_FLEX_SEG],
+//        double in_YoungsModulus[NUM_FLEX_SEG], double in_ShearModulus[NUM_FLEX_SEG],
+//        double in_ustar[NUM_FLEX_SEG][3],
+//        double in_CoilAlignmentAngles[NUM_ACT_SET][2], double in_CoilTurnAreaMat[NUM_ACT_SET][9],
+//        double in_rho[NUM_SEGMENTS], double in_ActMass[NUM_ACT_SET],
+//        CRMDynamicsModelParams& CathParams, CatheterConfiguration& CathConfig);
+//
+//
+
 /*
  * Numerical Integration Functions
  */
+
 //
 //ABM4: 4th order Adams-Bashforth Prediction and Adams-Moulton Correction Numerical Integration
 //    Note: The first three steps are calculated using RK2
