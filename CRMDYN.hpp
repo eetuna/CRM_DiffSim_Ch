@@ -165,27 +165,27 @@ struct CRMIVPCoreParams {
     //   only the entries 0..NextLocMarker-1 are filled
 };
 
+
 // CRMSolverIVP API which exposes all of the individual parameters
 template <typename adType>
-void CRMSolverIVP (	double in_x_0[NUM_STATES], double in_IntegrationStepSize,
+void CRMSolverIVP (	adType in_x_0[NUM_STATES], double in_IntegrationStepSize,
                        double in_Li, double in_dlambdainv,
                        double in_SegEndLambdas[NUM_SEGMENTS], double	in_LocMarkerLambdas[NUM_LOCALIZATION_MARKERS],
                        double in_K[NUM_FLEX_SEG][9], double in_Kinv[NUM_FLEX_SEG][9],
-                       double in_ustar[NUM_FLEX_SEG][3], double v_L_pre[3], double w_L_pre[3],
-                       double actMass[NUM_ACT_SET], double actInertia[NUM_ACT_SET][9],
-                       double in_MagMoment[NUM_ACT_SET][3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3], double in_ftp[3],
-                       double in_B0[3], double in_g[3], double in_ftip[3],
+                       adType in_ustar[NUM_FLEX_SEG][3], adType v_L_pre[3], adType w_L_pre[3],
+                       double actMass[NUM_ACT_SET], adType actInertia[NUM_ACT_SET][9],
+                       double in_MagMoment[NUM_ACT_SET][3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3], double in_ftip[3],
+                       double in_B0[3], double in_g[3],
                        bool in_FinalValueOnly,
-                       double out_x_N[NUM_STATES], double out_WrenchResidual[6],
-                       double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]
-);
+                       adType out_x_N[NUM_STATES], adType out_WrenchResidual[6],
+                       adType out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]);
 
-template <typename adType>
-void CRMSolverIVP(	CRMShootingMethodParams<adType> in_Params,
-                      adType in_u0[3], adType in_ftip[3], adType v_L_pre[3], adType w_L_pre[3],
-                      bool in_FinalValueOnly,
-                      adType out_x_N[NUM_STATES], adType out_WrenchResidual[6],
-                      double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]	);
+//template <typename adType>
+//void CRMSolverIVP(	CRMShootingMethodParams<adType> in_Params,
+//                      adType in_u0[3], adType in_ftip[3], adType v_L_pre[3], adType w_L_pre[3],
+//                      bool in_FinalValueOnly,
+//                      adType out_x_N[NUM_STATES], adType out_WrenchResidual[6],
+//                      double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]	);
 
 // Preparation of CRMIVPCoreParams for subsequent call to CRMSolverIVP_Core
 template <typename adType>
