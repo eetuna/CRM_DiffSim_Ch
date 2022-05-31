@@ -3,7 +3,6 @@
 //#include "CRMDYN.hpp"
 
 
-
 template <typename adType>
 void CRMSolverIVP (adType in_x_0[NUM_STATES], double in_IntegrationStepSize,
                    double in_Li, double in_dlambdainv,
@@ -48,7 +47,7 @@ void CRMSolverIVP (adType in_x_0[NUM_STATES], double in_IntegrationStepSize,
 
 	CRMSolverIVP_Core ( CoreParams, u_0, v_0, w_0, ftip, v_L_pre, w_L_pre, actMass, actInertia, x_N, WrenchResidual, p_atLocMarkers );
 
-//	CRMSolverIVP_Return( x_N, WrenchResidual, p_atLocMarkers, out_x_N, out_WrenchResidual, out_p_atLocMarkers);
+	CRMSolverIVP_Return( x_N, WrenchResidual, p_atLocMarkers, out_x_N, out_WrenchResidual, out_p_atLocMarkers);
 
 }
 
@@ -225,9 +224,9 @@ void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSiz
         int length = SegSteps[i]*3;
         u_history[i].length = length;
         u_history[i].data = new double[length];
-        u_history[i].data[0] = in_ustar[NUM_FLEX_SEG][0];
-        u_history[i].data[1] = in_ustar[NUM_FLEX_SEG][1];
-        u_history[i].data[2] = in_ustar[NUM_FLEX_SEG][2];
+        u_history[i].data[0] = in_ustar[i][0];
+        u_history[i].data[1] = in_ustar[i][1];
+        u_history[i].data[2] = in_ustar[i][2];
         for (int j = 1; j < SegSteps[i]; ++j) {
             u_history[i].data[j*3] = 0.0;
             u_history[i].data[j*3+1] = 0.0;
@@ -327,7 +326,7 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 
 
     std::cout << StartSegmentIndex << " StartSegmentIndex " << std::endl;
-	for (int i=StartSegmentIndex; i<NUM_SEGMENTS-1; i++){
+	for (int i=StartSegmentIndex; i<1; i++){
 		if ( i%2 == 0 ) {  // Flexible Segment
 			LastSegmentIsRigid=false;
 			// Prepare the CRMIntegrand Parameters
@@ -345,7 +344,9 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
                 segu_history[j][2] = u_history[fsegno].data[j*3+2];
             }
 
-			// Integrate
+
+
+            // Integrate
 			ABM4( 	xi, SegBounds[i], SegSteps[fsegno], h,
 					InsertedLength, dlambdainv, K[fsegno], Kinv[fsegno], l_zero, ustar[fsegno], segu_history, fcumlambda, ftip,
 					FinalValueOnly, LocMarkers, &NextLocMarker,
@@ -445,17 +446,16 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 //
 	}
 //
-//	// Copy marker locations to the output
-//	if (!FinalValueOnly) {
-//		for (int i=0; i<NUM_LOCALIZATION_MARKERS; i++) {
-//			for (int j=0; j<3; j++) {
-//				out_p_atLocMarkers[i][j]=p_atLocMarkers[(NUM_LOCALIZATION_MARKERS-1)-i][j];
-//			}
-//		}
-//	}
-//
+	// Copy marker locations to the output
+	if (!FinalValueOnly) {
+		for (int i=0; i<NUM_LOCALIZATION_MARKERS; i++) {
+			for (int j=0; j<3; j++) {
+				out_p_atLocMarkers[i][j]=p_atLocMarkers[(NUM_LOCALIZATION_MARKERS-1)-i][j];
+			}
+		}
+	}
 //	// Copy the final values of the state x_f to the output
-//	mCopy_AB<NUM_STATES>(xf,out_x_N);
+	mCopy_AB<NUM_STATES>(xf,out_x_N);
 //
 ////	 Calculate the Boundary Value Residual if last segment is flexible
 ////	adType deltau[3];
@@ -493,142 +493,12 @@ void LocMarkerUpdate(double p[3], adType xi[NUM_STATES], adType t) {
 	p[2] = xi[14] + t * xi[11];
 }
 
-
-template <typename adType>
-void CRMIntegrand (	adType s, adType x[NUM_STATES],
-					adType Li, double dlambdainv,
-					double in_K[9], double in_Kinv[9], double in_l[3], double in_ustar[3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3],
-					adType in_ftip[3], double u_pre[3],
-					adType xdot[NUM_INTEGRATION_STATES]) {
-
-	adType Length;
-	double deltalambdainv;
-	adType u[3], v[3], w[3], R[9]; 	// p[3];   				we will not need this for analytical calculation
-	adType udot[3], vdot[3], wdot[3]; 		// Rdot[9], pdot[3];	we will not need this for analytical calculation
-	adType K[9], Kinv[9], l[3], fcum[3], ustar[3], ustardot[3];  //  We are assuming Kdot=0.0 (K=const)
-
-	// copy inputs and parameters to local variables
-	for (int i=0; i<NUM_STATES; i++) {
-		if (i<3) { 			// 0 <= i < 3
-			u[i]=x[i];
-		}
-		else if (i<12) { 	// 3 <= i < 12
-			R[i-3]=x[i];
-		}
-		// we will not need this for analytical calculation
-		//else { 				// 12 <= i < 15
-		//	p[i-12]=x[i];
-		//}
-	}
-	Length=Li;
-	deltalambdainv=dlambdainv;
-	for (int i=0; i<3; i++) {
-		for (int j=0; j<3; j++) {
-			K[i*3+j]		=	in_K[i*3+j];
-			Kinv[i*3+j]		=	in_Kinv[i*3+j];
-		}
-		l[i]			=	in_l[i];
-		ustar[i]		=	in_ustar[i];
-		ustardot[i]		=	0.0; //in_ustardot[i]; // we assume ustardot=0.0 since our rest shape model is piecewise constant curvature
-	}
-
-	// calculate interpolated value of fcum
-	adType lambda=Length-s;
-	adType ix=lambda*deltalambdainv;
-	double ird_f=floor(dVal(ix)); // index for round down  -- doubleing point
-	if (ird_f<0) ird_f=0;
-	int ird=(int) ird_f;	//    integer index
-	double iru_f=ceil(dVal(ix)); 	// index for round up  -- doubleing point
-	if (iru_f>NUM_FCUM_LAMBDA) iru_f=NUM_FCUM_LAMBDA;
-	int iru=(int) iru_f;	//    integer index
-	adType ixmird=ix-ird;    // weight for interpolation
-	adType irumix=iru-ix;	// weight for interpolation
-	for (int i=0; i<3; i++) {
-		fcum[i]		=	in_fcumlambda[iru][i] * ixmird + in_fcumlambda[ird][i] * irumix;
-	}
-
-	// add the tip force to fcum
-	for (int i = 0; i < 3; i++) {
-		fcum[i]		+=	in_ftip[i];
-	}
-
-	// calculate u_hat
-	adType u_hat[9];
-	wHat(u,u_hat);
-
-	// udot = ustardot - Kinv*((um*K+Kdot)*(u-ustar_s) + e3m*R'*intf + R'*l); % udot
-	//
-	//   e3hat*R' = [ -r12 -r22 -r32; r11 r21 r31; 0 0 0];
-	adType e3hatRT[9];
-	e3hatRT[0]=-R[1]; 	e3hatRT[1]=-R[4]; 	e3hatRT[2]=-R[7];
-	e3hatRT[3]=R[0];	e3hatRT[4]=R[3];	e3hatRT[5]=R[6];
-	e3hatRT[6]=0.0;	e3hatRT[7]=0.0;	e3hatRT[8]=0.0;
-	adType e3hatRTfcum[3];
-	mMult_AB<3,3,1>(e3hatRT, fcum, e3hatRTfcum);			//  e3m*R'*intf
-	adType RTl[3];
-	mMult_ATB<3,3,1>(R,l,RTl);								// R'*l
-	adType umustar[3];
-	mSub_AB<3,1>(u,ustar,umustar);							// (u-ustar_s)
-	adType Kumustar[3], uhatKumustar[3];
-	mMult_AB<3,3,1>(K,umustar,Kumustar);
-	mMult_AB<3,3,1>(u_hat,Kumustar,uhatKumustar); 		 	//(um*K+Kdot)*(u-ustar_s)  assuming Kdot=0
-	adType sumterm[3];
-	mAdd_ABC<3,1>(uhatKumustar,e3hatRTfcum,RTl,sumterm);	// ((um*K+Kdot)*(u-ustar_s) + e3m*R'*intf + R'*l)
-	adType KinvSum[3];
-	mMult_AB<3,3,1>(Kinv,sumterm,KinvSum);					// Kinv*((um*K+Kdot)*(u-ustar_s) + e3m*R'*intf + R'*l)
-	mSub_AB<3,1>(ustardot,KinvSum,udot);					// udot = ustardot - Kinv*((um*K+Kdot)*(u-ustar_s) + e3m*R'*intf + R'*l);
-
-
-    /*
-     * Twist
-     * */
-    //copy the input variables first
-    adType qs_uhatq[3], qs_whate[3];
-    for (int i = 0; i < 3; ++i) {
-        v[i] = x[i+3+9+3];
-        w[i] = x[i+3+9+3+3];
-    }
-    // calculate v_s
-    qs_whate[0] = w[1]; qs_whate[1] = -w[0]; qs_whate[2] = 0;
-    mMult_AB<3,3,1>(u_hat, v, qs_uhatq);
-    mSub_AB<3,1>(qs_whate, qs_uhatq, vdot);
-
-    //calculate w_s
-    adType uhat_w[3];
-    mMult_AB<3,3,1>(u_hat, w, uhat_w);
-    adType u_diff_[3], u_diff[3];
-
-    mSub_AB<3,1>(u, u_pre, u_diff_);
-    u_diff[0] = u_diff_[0]/DELTA_T; u_diff[1] = u_diff_[1]/DELTA_T; u_diff[2] = u_diff_[2]/DELTA_T;
-    mSub_AB<3,1>(u_diff, uhat_w, wdot);
-
-    // we will not need these for analytical calculation
-	// Rdot = R*u_hat
-//	mMult_AB<3,3,3>(R,u_hat,Rdot);
-	// pdot = R*e3,
-//	for (int i=0; i<3; i++) {
-//		pdot[i]=R[i*3+2];
-//	}
-
-	//xdot(1:3) = ustardot - Kinv*((um*K+Kdot)*(u-ustar_s) + e3m*R'*intf + R'*l); % udot
-	//xdot(4:12) = reshape(R*um,9,1); % Rdot   --- Note that matlab code reshapes in column major order while we are saving in row major order
-	//xdot(13:15) = R*e3;             % pdot
-	//  note: the sample code has matlab indexing starting from 1 to 15
-	for (int i=0; i<NUM_INTEGRATION_STATES; i++) {
-        xdot[i] = udot[i];
-        xdot[i+3] = vdot[i];
-        xdot[i+6] = wdot[i];
-	}
-
-}
-
-
-
 //
 //
 //	NUMERICAL INTEGRATION FUNCTIONS
 //
 //
+
 
 //function [x_1toN] = ABM4(x_0, t_0, N, h, Integrand, initmethod)
 template <typename adType>
@@ -667,15 +537,15 @@ void ABM4 (	adType in_x_0[NUM_STATES], adType t_0, int N, double h,
 //		xdot_nm3[i]=0.0;
 //	}
 
-    for (int i = 0; i < NUM_STATES; ++i) {
-        std::cout << "x_n " << x_n[i] << std::endl;
-    }
+//    for (int i = 0; i < NUM_STATES; ++i) {
+//        std::cout << "x_n " << x_n[i] << std::endl;
+//    }
 
     double u_pre[3];
 	for (int idx=0; idx<N; idx++) {
 
 	    u_pre[0] = u_history[idx][0];u_pre[1] = u_history[idx][1];u_pre[2] = u_history[idx][2];
-
+//        std::cout << "IN abm in_ustar: " << in_ustar[0] << " " << in_ustar[1] << " " << in_ustar[2] << std::endl;
 		if (idx<3) {  // RK2 initialization steps
 			RK2_step(x_n, t_n, h, Li, dlambdainv, in_K, in_Kinv, in_l, in_ustar, u_pre, in_fcumlambda, in_ftip, x_np1, xdot_n);
 		}
@@ -725,9 +595,170 @@ void ABM4 (	adType in_x_0[NUM_STATES], adType t_0, int N, double h,
 	for (int i=0; i<NUM_STATES; i++) {
 		out_x_N[i]=x_n[i];
 	}
+
+    for (int i = 0; i < NUM_STATES; ++i) {
+        std::cout <<  "Updated x_n " << x_n[i] << std::endl;
+    }
+    std::cout << "----------------------- " << std::endl;
+
+//    for (int i = 0; i < 3; ++i) {
+//        std::cout << " curvature U: " << out_x_N[i] << std::endl;
+//    }
+//    for (int i = 0; i < 3; ++i) {
+//        std::cout << " V: " << out_x_N[i+3+9+3] << std::endl;
+//    }
+//    for (int i = 0; i < 3; ++i) {
+//        std::cout << " W: " << out_x_N[i+3+9+6] << std::endl;
+//    }
+//    for (int i = 3; i < 12; ++i) {
+//        std::cout << " R: " << out_x_N[i] << std::endl;
+//    }
 	*inout_NextLocMarkerIdx=NextLocMarkerIdx;
 
 }
+
+
+
+template <typename adType>
+void CRMIntegrand (	adType s, adType x[NUM_STATES],
+                       adType Li, double dlambdainv,
+                       double in_K[9], double in_Kinv[9], double in_l[3], double in_ustar[3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3],
+                       adType in_ftip[3], double u_pre[3],
+                       adType xdot[NUM_INTEGRATION_STATES]) {
+
+    adType Length;
+    double deltalambdainv;
+    adType u[3], v[3], w[3], R[9]; 	// p[3];   				we will not need this for analytical calculation
+    adType udot[3], vdot[3], wdot[3]; 		//] Rdot[9], pdot[3];	we will not need this for analytical calculation
+    adType K[9], Kinv[9], l[3], fcum[3], ustar[3], ustardot[3];  //  We are assuming Kdot=0.0 (K=const)
+
+    // copy inputs and parameters to local variables
+    for (int i=0; i<NUM_STATES; i++) {
+        if (i<3) { 			// 0 <= i < 3
+            u[i]=x[i];
+        }
+        else if (i<12) { 	// 3 <= i < 12
+            R[i-3]=x[i];
+        }
+        // we will not need this for analytical calculation
+        //else { 				// 12 <= i < 15
+        //	p[i-12]=x[i];
+        //}
+    }
+    Length=Li;
+    deltalambdainv=dlambdainv;
+    for (int i=0; i<3; i++) {
+        for (int j=0; j<3; j++) {
+            K[i*3+j]		=	in_K[i*3+j];
+            Kinv[i*3+j]		=	in_Kinv[i*3+j];
+        }
+        l[i]			=	in_l[i];
+        ustar[i]		=	in_ustar[i];
+        ustardot[i]		=	0.0; //in_ustardot[i]; // we assume ustardot=0.0 since our rest shape model is piecewise constant curvature
+    }
+
+    // calculate interpolated value of fcum
+    adType lambda=Length-s;
+    adType ix=lambda*deltalambdainv;
+    double ird_f=floor(dVal(ix)); // index for round down  -- doubleing point
+    if (ird_f<0) ird_f=0;
+    int ird=(int) ird_f;	//    integer index
+    double iru_f=ceil(dVal(ix)); 	// index for round up  -- doubleing point
+    if (iru_f>NUM_FCUM_LAMBDA) iru_f=NUM_FCUM_LAMBDA;
+    int iru=(int) iru_f;	//    integer index
+    adType ixmird=ix-ird;    // weight for interpolation
+    adType irumix=iru-ix;	// weight for interpolation
+    for (int i=0; i<3; i++) {
+        fcum[i]		=	in_fcumlambda[iru][i] * ixmird + in_fcumlambda[ird][i] * irumix;
+    }
+
+    // add the tip force to fcum
+    for (int i = 0; i < 3; i++) {
+        fcum[i]		+=	in_ftip[i];
+    }
+
+    // calculate u_hat
+    adType u_hat[9];
+    wHat(u,u_hat);
+
+    // udot = ustardot - Kinv*((um*K+Kdot)*(u-ustar_s) + e3m*R'*intf + R'*l); % udot
+    //
+    //   e3hat*R' = [ -r12 -r22 -r32; r11 r21 r31; 0 0 0];
+    adType e3hatRT[9];
+    e3hatRT[0]=-R[1]; 	e3hatRT[1]=-R[4]; 	e3hatRT[2]=-R[7];
+    e3hatRT[3]=R[0];	e3hatRT[4]=R[3];	e3hatRT[5]=R[6];
+    e3hatRT[6]=0.0;	e3hatRT[7]=0.0;	e3hatRT[8]=0.0;
+    adType e3hatRTfcum[3];
+    mMult_AB<3,3,1>(e3hatRT, fcum, e3hatRTfcum);			//  e3m*R'*intf
+    adType RTl[3];
+    mMult_ATB<3,3,1>(R,l,RTl);								// R'*l
+    adType umustar[3];
+    mSub_AB<3,1>(u,ustar,umustar);							// (u-ustar_s)
+    adType Kumustar[3], uhatKumustar[3];
+    mMult_AB<3,3,1>(K,umustar,Kumustar);
+    mMult_AB<3,3,1>(u_hat,Kumustar,uhatKumustar); 		 	//(um*K+Kdot)*(u-ustar_s)  assuming Kdot=0
+    adType sumterm[3];
+    mAdd_ABC<3,1>(uhatKumustar,e3hatRTfcum,RTl,sumterm);	// ((um*K+Kdot)*(u-ustar_s) + e3m*R'*intf + R'*l)
+    adType KinvSum[3];
+    mMult_AB<3,3,1>(Kinv,sumterm,KinvSum);					// Kinv*((um*K+Kdot)*(u-ustar_s) + e3m*R'*intf + R'*l)
+    mSub_AB<3,1>(ustardot,KinvSum,udot);					// udot = ustardot - Kinv*((um*K+Kdot)*(u-ustar_s) + e3m*R'*intf + R'*l);
+
+
+    /*
+     * Twist
+     * */
+    //copy the input variables first
+    adType qs_uhatq[3], qs_whate[3];
+    for (int i = 0; i < 3; ++i) {
+        v[i] = x[i+3+9+3];
+        w[i] = x[i+3+9+3+3];
+    }
+    // calculate v_s
+    qs_whate[0] = w[1]; qs_whate[1] = -w[0]; qs_whate[2] = 0;
+//    std::cout << "v: " << v[0] << " " << v[1] << " " << v[2] << std::endl;
+//    std::cout << "qs_whate: " << qs_whate[0] << " " << qs_whate[1] << " " << qs_whate[2] << std::endl;
+
+
+//    for (int i = 0; i < 9; ++i) {
+//        std::cout << "u_hat: " << u_hat[0] << std::endl;
+//    }
+
+    mMult_AB<3,3,1>(u_hat, v, qs_uhatq);
+    mSub_AB<3,1>(qs_whate, qs_uhatq, vdot);
+
+    //calculate w_s
+    adType uhat_w[3];
+    mMult_AB<3,3,1>(u_hat, w, uhat_w);
+    adType u_diff_[3], u_diff[3];
+
+//    std::cout << "w: " << w[0] << " " << w[1] << " " << w[2] << std::endl;
+//    std::cout << "u_pre: " << u_pre[0] << " " << u_pre[1] << " " << u_pre[2] << std::endl;
+    mSub_AB<3,1>(u, u_pre, u_diff_);
+    u_diff[0] = u_diff_[0]/DELTA_T; u_diff[1] = u_diff_[1]/DELTA_T; u_diff[2] = u_diff_[2]/DELTA_T;
+    mSub_AB<3,1>(u_diff, uhat_w, wdot);
+
+//    std::cout << "u_diff: " << u_diff[0] << " " << u_diff[1] << " " << u_diff[2] << std::endl;
+//    std::cout << "uhat_w: " << uhat_w[0] << " " << uhat_w[1] << " " << uhat_w[2] << std::endl;
+/***********************************/
+
+    //xdot(1:3) = ustardot - Kinv*((um*K+Kdot)*(u-ustar_s) + e3m*R'*intf + R'*l); % udot
+    //xdot(4:12) = reshape(R*um,9,1); % Rdot   --- Note that matlab code reshapes in column major order while we are saving in row major order
+    //xdot(13:15) = R*e3;             % pdot
+    //  note: the sample code has matlab indexing starting from 1 to 15
+    for (int i=0; i<3; i++) {
+        xdot[i] = udot[i];
+        xdot[i+3] = vdot[i];
+        xdot[i+6] = wdot[i];
+    }
+//    std::cout << "CRMIntegrad----------------------- " << std::endl;
+//    for (int i = 0; i < NUM_INTEGRATION_STATES; ++i) {
+//        std::cout <<  " xdot " << xdot[i] << std::endl;
+//    }
+
+
+}
+
+
 
 
 // [x_np1, xdot_n, xdot_nm1, xdot_nm2] = ABM4_step(x_n, t_n, xdot_nm1, xdot_nm2, xdot_nm3, h, Integrand)
@@ -754,11 +785,12 @@ void ABM4_step(	adType in_x_n[NUM_STATES], adType t_n, double h,
 
 	for (int i = 0; i < NUM_STATES; i++) {
 		if (i<3)
-			u_n[i]    = x_n[i] = in_x_n[i];
+			u_n[i]    =  in_x_n[i];
 		else if (i<(9+3))
-			R_n[i-3]  = x_n[i] = in_x_n[i];
-		else
-			p_n[i-12] = x_n[i] = in_x_n[i];
+			R_n[i-3]  =  in_x_n[i];
+		else if (i<(3+9+3))
+			p_n[i-12] =  in_x_n[i];
+        x_n[i] = in_x_n[i];
 		x_nm1[i] = in_x_nm1[i];
 		x_nm2[i] = in_x_nm2[i];
 		x_nm3[i] = in_x_nm3[i];
@@ -817,16 +849,22 @@ void RK2_step(	adType in_x_n[NUM_STATES], adType t_n, double h,
 	adType u_n[3], R_n[9], p_n[3];				// variables used in analytical calculation
 	for (int i = 0; i < NUM_STATES; i++) {
 		if (i < 3)
-			u_n[i] = x_n[i] = in_x_n[i];
+			u_n[i] = in_x_n[i];
 		else if (i < (9 + 3))
-			R_n[i - 3] = x_n[i] = in_x_n[i];
-		else
-			p_n[i - 12] = x_n[i] = in_x_n[i];
+			R_n[i - 3] = in_x_n[i];
+		else if (i < (3+ 9 + 3))
+			p_n[i - 12] = in_x_n[i];
+        x_n[i] = in_x_n[i];
 	}
+    std::cout << "RK2******" <<  std::endl;
 
 
 	//RK2_STEP_STEP1:
 	CRMIntegrand(t_n, x_n, Li, dlambdainv, in_K, in_Kinv, in_l, in_ustar, in_fcumlambda, in_ftip, u_pre, xdot_n);
+
+    for (int i = 0; i < NUM_INTEGRATION_STATES; ++i) {
+        std::cout <<  "xdot_n " << xdot_n[i] << std::endl;
+    }
 	for (int i=0; i<3; i++) {
 		k1[i] 			= h * xdot_n[i];
 		x_n_p_k1o2[i] 	= x_n[i] + k1[i] * 0.5;

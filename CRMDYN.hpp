@@ -7,8 +7,8 @@
 #define NUM_INTEGRATION_STATES 9   // u[0..2],v[0..2],w[0..2]
 #define EQNDIMENSION 9	// domain: u[0..2],v[0..2],w[0..2] range: m_tip[0..2]
 
-#define NUM_ACT_SET 1								// Number of actuator sets
-#define NUM_FLEX_SEG 2								// Number of flexible segments
+#define NUM_ACT_SET 2								// Number of actuator sets
+#define NUM_FLEX_SEG 3								// Number of flexible segments
 #define NUM_SEGMENTS (NUM_ACT_SET+NUM_FLEX_SEG)		// Total number of segments
 #define NUM_LOCALIZATION_MARKERS 10					// Total number of localization markers
 
@@ -372,6 +372,7 @@ void RodriguesExpanded (adType in_w[3], adType in_theta, adType out_R[9]);
 //   g = [R p; 0 0 0 1];
 template <typename adType>
 void SE3_Analytical_Step(adType in_R_n[9], adType in_p_n[3], adType in_u_n[3], double h, adType out_R_np1[9], adType out_p_np1[3]);
+
 
 #include "CRMIVP_Defs.hpp"
 
