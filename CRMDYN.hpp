@@ -6,6 +6,7 @@
 #define NUM_STATES 21   // u[0..2],R[0..9],p[0..2],v[0..2],w[0..2]
 #define NUM_INTEGRATION_STATES 9   // u[0..2],v[0..2],w[0..2]
 #define EQNDIMENSION 9	// domain: u[0..2],v[0..2],w[0..2] range: m_tip[0..2]
+#define RESIDUALDIM 6   // force and torque residual
 
 #define NUM_ACT_SET 2								// Number of actuator sets
 #define NUM_FLEX_SEG 3								// Number of flexible segments
@@ -17,13 +18,16 @@
 // Regularization scales used for Nonlinear Solver
 #define IVALUE_SCALE_U	1.0 //(0.01)			// the variable used in Nonlinear Solver is multiplied with this scale to calculate u (curvature) that will be used in IVP
 #define IVALUE_SCALE_F	(0.01)			// the variable used in Nonlinear Solver is multiplied with this scale to calculate ftip (tip force) that will be used in IVP
+#define IVALUE_SCALE_V	1.0 //(0.01)			// the variable used in Nonlinear Solver is multiplied with this scale to calculate u (curvature) that will be used in IVP
+#define IVALUE_SCALE_W	1.0 //(0.01)			// the variable used in Nonlinear Solver is multiplied with this scale to calculate u (curvature) that will be used in IVP
+
 #define RESIDUAL_SCALE_M	1.0 //(10.0)			// the residual for tip moment coming out of the IVP will be multiplied with this scale to return to the Nonlinear Solver
 #define RESIDUAL_SCALE_P	100.0 //(10.0)			// the residual for tip position error coming out of the IVP will be multiplied with this scale to return to the Nonlinear Solver
 
 // NL Solver method selection
 #define TRUSTREGION							// Trust Region Method with the numerical jacobian (Default)
 
-#define DELTA_T 0.02
+#define DELTA_T 0.1
 #define TRUSTREGION							// Trust Region Method with the numerical jacobian (Default)
 
 
@@ -71,6 +75,7 @@ struct CRMDYNShootingMethodParams {
     adType 	MagMoment[NUM_ACT_SET][3];
     double 	fcumlambda[NUM_FCUM_LAMBDA + 1][3];
     double 	B0[3];
+    double  g0[3];
     double	IntegrationStepSize;
     double	R0[9];
     double	p0[3];
@@ -177,14 +182,14 @@ void CRMSolverIVP (	adType in_x_0[NUM_STATES], double in_IntegrationStepSize,
                        double in_MagMoment[NUM_ACT_SET][3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3], double in_ftip[3],
                        double in_B0[3], double in_g[3],
                        bool in_FinalValueOnly,
-                       adType out_x_N[NUM_STATES], adType out_WrenchResidual[6],
+                       adType out_x_N[NUM_STATES], adType out_WrenchResidual[RESIDUALDIM],
                        adType out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]);
 
 //template <typename adType>
 //void CRMSolverIVP(	CRMShootingMethodParams<adType> in_Params,
 //                      adType in_u0[3], adType in_ftip[3], adType v_L_pre[3], adType w_L_pre[3],
 //                      bool in_FinalValueOnly,
-//                      adType out_x_N[NUM_STATES], adType out_WrenchResidual[6],
+//                      adType out_x_N[NUM_STATES], adType out_WrenchResidual[RESIDUALDIM],
 //                      double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]	);
 
 // Preparation of CRMIVPCoreParams for subsequent call to CRMSolverIVP_Core
@@ -208,15 +213,15 @@ template <typename adType>
 void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
                          adType in_u[3], adType in_v[3], adType in_w[3], adType in_ftip[3],
                          adType v_L_pre[3], adType w_L_pre[3], adType actMass[NUM_ACT_SET], adType actInertia[NUM_ACT_SET][9],
-                         adType out_x_N[NUM_STATES], adType out_MomentResidual[6],
+                         adType out_x_N[NUM_STATES], adType out_WrenchResidual[RESIDUALDIM],
                          double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]);
 
 
 // Function for copying data in device memory to global memory --- used for dataflow pipelining
 template <typename adType>
-void CRMSolverIVP_Return (  adType in_x_N[NUM_STATES], adType in_WrenchResidual[6],
+void CRMSolverIVP_Return (  adType in_x_N[NUM_STATES], adType in_WrenchResidual[RESIDUALDIM],
                             double in_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3],
-                            double out_x_N[NUM_STATES], double out_WrenchResidual[6],
+                            double out_x_N[NUM_STATES], double out_WrenchResidual[RESIDUALDIM],
                             double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]);
 
 // Cosserat Dynamics Model Integrand

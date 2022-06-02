@@ -214,7 +214,7 @@ int RunTests (void) {
 
     // declare the output variables
     double xf[NUM_STATES];
-    double residual[3];
+    double residual[RESIDUALDIM];
     double ReportedMarkerPos[NUM_LOCALIZATION_MARKERS][3];
 
     // Cosserat Rod Model - Integrator for Solving the Initial Value Problem
@@ -235,6 +235,7 @@ int RunTests (void) {
 
     printMatrix(ExpectedStates, 1, NUM_STATES, "ExpectedStates");
     printMatrix(xf, 1, NUM_STATES, "xf");
+    printMatrix(residual, 1, RESIDUALDIM, "residual");
 //    printMatrix(errorv2, 1, NUM_STATES, "errorv2");
 //    std::cout << "Error Norm:" << sqrt(ssqerrorv2) << std::endl;
 //    std::cout << "----" << std::endl;

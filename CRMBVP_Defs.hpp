@@ -4,70 +4,25 @@
 
 #define M_PI 3.14159265358979323846
 
-template <typename adType>
-void CRM_ForwardKinematics(double in_x[], double out_y[], CRMForwardKinematicsData Params) {
-	
-	ContactModeType ContactMode = Params.ContactMode;
-	int X_Dim = NUM_ACT_SET * 3 + 1;	// Dimension of the Input 3 x NUM_ACT_SET + 1 for inserted length
-	int Y_Dim;							// Dimension of the Output
-	if (ContactMode == ContactModeType::FREE_TIP) {
-		Y_Dim = 3 + 9 + 3;					// tip position + R + u_0
-	}
-	else { // FIXED_TIP
-		Y_Dim = 3 + 9 + 3 + 3;				//   ... + tip force
-	}
-	
-	double u0_initialguess[3] = { 0.0, 0.0, 0.0 };
-	double ftip_initialguess[3] = { 0.0, 0.0, 0.0 };
-	adType ActuationCurrents[NUM_ACT_SET][3];
-	adType InsertedLength;
-	adType u0_calc[3];
-	adType ftip_calc[3];
-	adType x0[NUM_STATES];
-	adType xf[NUM_STATES];
-	adType residual[3];
-	CRMShootingMethodParams<adType> BVPParams;
-	int localmin;
-
-	for (int i = 0; i < NUM_ACT_SET; i++)	for (int j = 0; j < 3; j++)	ActuationCurrents[i][j] = in_x[i * 3 + j];
-	InsertedLength = in_x[NUM_ACT_SET * 3];
-
-	CRMConstructShootingMethodParamSet(*(Params.CathParams), *(Params.CathConfig), InsertedLength, ActuationCurrents, ContactMode, Params.TipConstraintPoint, Params.TipForce, Params.IntegrationStepSize, BVPParams);
-
-	CRMShootingMethodBVP(BVPParams, u0_initialguess, ftip_initialguess, u0_calc, ftip_calc, localmin);
-
-	for (int i = 0; i < 3; i++) x0[i] = u0_calc[i];
-	for (int i = 0; i < 9; i++) x0[i + 3] = Params.CathConfig->R0[i];
-	for (int i = 0; i < 3; i++) x0[i + 3 + 9] = Params.CathConfig->p0[i];
-
-	// Cosserat Rod Model - Solve the Initial Value Problem to calculate the shape of the catheter 
-	CRMSolverIVP(BVPParams, x0, ftip_calc, Params.FinalValueOnly, xf, residual, *(Params.ReportedMarkerPos));
-
-	for (int i = 0; i < 3; i++) {
-		out_y[i] = xf[3 + 9 + i];
-		out_y[3 + 9 + i] = u0_calc[i];
-		if (ContactMode == ContactModeType::FIXED_TIP) out_y[3 + 9 + 3 + i] = ftip_calc[i];
-	}
-	for (int i = 0; i < 9; i++) {
-		out_y[3 + i] = xf[3 + i];
-	}
-
-}
-
 
 template <typename adType>
 void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params, 
-							double in_u0_initialguess[3], double in_ftip_initialguess[3],
-							adType out_u0[3], adType out_ftip[3], int& out_localmin) {
+							double in_u0_initialguess[3], double in_v0_initialguess[3],double in_w0_initialguess[3],  double in_ftip_initialguess[3],
+							adType out_u0[3], adType out_v0[3], adType out_w0[3], adType out_ftip[3], int& out_localmin) {
 
+
+    /*Now we just assume no contact */
 	ContactModeType ContactMode = in_Params.ContactMode;
 	int NLEq_Dim;  // Dimension of the Nonlinear Equation to Solve
 	if (ContactMode == ContactModeType::FREE_TIP) {
-		NLEq_Dim = 3;
+		NLEq_Dim = 9;
 	}
 	else { // FIXED_TIP
-		NLEq_Dim = 6;
+		NLEq_Dim = 12;
 	}
+
+
+
 	// Call CRMSolverIVP_Prep, to pre-process parameters
 	adType x_0[NUM_STATES];
 	for (int i = 0; i < NUM_STATES; i++) {
@@ -77,9 +32,15 @@ void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params,
 		else if (i < 12) {
 			x_0[i] = in_Params.R0[i - 3];
 		}
-		else {
+		else if (i < 15){
 			x_0[i] = in_Params.p0[i - 12];
 		}
+        else if (i < 18){
+            x_0[i] = in_v0_initialguess[i - 15];
+        }
+        else {
+            x_0[i] = in_w0_initialguess[i - 18];
+        }
 	}
 	bool FinalValueOnly = true;
 	NLEqnParams<adType> NLEParams;
@@ -89,7 +50,7 @@ void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params,
 		in_Params.SegEndLambdas, in_Params.LocMarkerLambdas,
 		in_Params.K, in_Params.Kinv, in_Params.ustar,
 		in_Params.MagMoment, in_Params.fcumlambda,
-		in_Params.B0,
+		in_Params.B0, in_Params.g0,
 		FinalValueOnly,
 		NLEParams);
 	NLEParams.ContactMode = ContactMode;
@@ -98,12 +59,20 @@ void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params,
 	// Scale parameters and call the nonlinear equation solver
 	const double uscaleinv = 1.0 / IVALUE_SCALE_U;
 	const double fscaleinv = 1.0 / IVALUE_SCALE_F;
+
+    const double vscaleinv = 1.0 / IVALUE_SCALE_V;
+    const double wscaleinv = 1.0 / IVALUE_SCALE_W;
+
 	double* initialguessscaled = new double [NLEq_Dim];
 	adType* returnedparamscaled = new adType [NLEq_Dim];
 	if (ContactMode == ContactModeType::FREE_TIP) {
 		for (int i = 0; i < 3; i++) {
 			initialguessscaled[i] = uscaleinv * in_u0_initialguess[i];
-			NLEParams.TipForce[i] = in_Params.TipForce[i];  // if the catheter is not in contact, the tip force specified within in_Params needs to be used; this would not be scaled as it is not changed by the solver
+            initialguessscaled[i+3] = vscaleinv * in_v0_initialguess[i];
+            initialguessscaled[i+6] = wscaleinv * in_w0_initialguess[i];
+
+
+            NLEParams.TipForce[i] = in_Params.TipForce[i];  // if the catheter is not in contact, the tip force specified within in_Params needs to be used; this would not be scaled as it is not changed by the solver
 		}
 	}
 	else { // FIXED_TIP
@@ -114,10 +83,13 @@ void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params,
 
 	}
 
+
+
 	int localmin = 0, errorcode = 0;
 
 	adType* x = new adType[NLEq_Dim]; // we will create a new variable here and not use initial guess scaled since truss-region-dogleg algorithm uses the same variable for both input and output
-	adType* residual = new adType[NLEq_Dim];
+	adType* residual = new adType[RESIDUALDIM];
+
 	int info;
 	int lwa = (NLEq_Dim * (3 * NLEq_Dim + 13)) / 2;
 	double tol = 0.00001;
@@ -145,9 +117,13 @@ void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params,
 	*/
 
 	if (ContactMode == ContactModeType::FREE_TIP) {
-		for (int i = 0; i < EQNDIMENSION; i++) {
+		for (int i = 0; i < 3; i++) {
 			out_u0[i] = IVALUE_SCALE_U * returnedparamscaled[i];
-			out_ftip[i] = in_Params.TipForce[i];  // if it is free-tip, return the tip force specified within in_Params
+            out_v0[i] = IVALUE_SCALE_V * returnedparamscaled[i+3];
+            out_w0[i] = IVALUE_SCALE_W * returnedparamscaled[i+6];
+
+
+            out_ftip[i] = in_Params.TipForce[i];  // if it is free-tip, return the tip force specified within in_Params
 		}
 	}
 	else { // FIXED_TIP
