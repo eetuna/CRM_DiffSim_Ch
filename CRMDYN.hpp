@@ -133,6 +133,12 @@ void CRMConstructShootingMethodParamSet	(	CRMDynamicsModelParams CathParams, Cat
 // ---------------------------------------------------------
 //
 
+struct UHistory //store the curvature in each time period
+{
+    int length;
+    double* data;
+};
+
 //  Parameter Set used to call CRMSolverIVP_Core
 template <typename adType>
 struct CRMIVPCoreParams {
@@ -159,12 +165,6 @@ struct CRMIVPCoreParams {
     int   StartSegmentIndex;							// Index of the segment where the integration to solve IVP will start -- the segment located at the entry point; note that segment indices start at 0
     int	  NextLocMarker;								// Next Localization Marker to be computed
     double p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]; // positions of markers (ordered proximal to distal)
-
-    struct UHistory
-            {
-                int length;
-                double* data;
-            };
 
     UHistory u_history[NUM_FLEX_SEG];
     //   only the entries 0..NextLocMarker-1 are filled
@@ -214,7 +214,7 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
                          adType in_u[3], adType in_v[3], adType in_w[3], adType in_ftip[3],
                          adType v_L_pre[3], adType w_L_pre[3], adType actMass[NUM_ACT_SET], adType actInertia[NUM_ACT_SET][9],
                          adType out_x_N[NUM_STATES], adType out_WrenchResidual[RESIDUALDIM],
-                         double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]);
+                         double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3], UHistory out_u_history[NUM_FLEX_SEG] );
 
 
 // Function for copying data in device memory to global memory --- used for dataflow pipelining
@@ -257,6 +257,10 @@ double dVal(adType x) { return (x); }
 // ---------------------------------------------------------
 //
 
+template <typename adType>
+void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params,
+                              double in_u0_initialguess[3], double in_v0_initialguess[3],double in_w0_initialguess[3],  double in_ftip_initialguess[3],
+                              adType out_u0[3], adType out_v0[3], adType out_w0[3], adType out_ftip[3], int& out_localmin);
 
 //// Cosserat Rod Model forward kinematics
 ////		This is a wrapper for a sequence of CRMShootingMethodBVP + CRMSolverIVP calls
@@ -327,6 +331,19 @@ double dVal(adType x) { return (x); }
 //
 //
 
+// wrapper for equation to be solved -- needed for CRMNonlinearSolver
+template <typename adType>
+struct NLEqnParams : CRMIVPCoreParams<adType> {
+    ContactModeType ContactMode;			// Enumerated type defining catheter contact mode.  ContactMode == FREE_TIP if the catheter is not in contact with a surface, FIXED_TIP if catheter tip is constrained to be at TipContraintPoint
+    double			TipConstraintPoint[3];	// The spatial coordinates of the point where the catheter tip is constrained to be (used if ContactMode == FIXED_TIP)
+    double			TipForce[3];			// External point force (in spatial coordinates) applied at the tip of the catheter (\lambda = 0) (used if ContactMode == FREE_TIP)
+};
+
+template <typename adType>
+void NLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params);
+
+
+
 /*
  * Numerical Integration Functions
  */
@@ -380,6 +397,7 @@ void SE3_Analytical_Step(adType in_R_n[9], adType in_p_n[3], adType in_u_n[3], d
 
 
 #include "CRMIVP_Defs.hpp"
+#include "CRMBVP_Defs.hpp"
 
 
 #define MAX(a,b) 	( ((b)>(a))?(b):(a) )

@@ -1,6 +1,6 @@
 #pragma once
 #include <cmath>
-//#include "CRMDYN.hpp"
+#include "CRMDYN.hpp"
 
 
 template <typename adType>
@@ -24,6 +24,7 @@ void CRMSolverIVP (adType in_x_0[NUM_STATES], double in_IntegrationStepSize,
 	adType u_0[3], v_0[3], w_0[3], ftip[3];
 	adType WrenchResidual[RESIDUALDIM];
 	double p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3];
+    UHistory u_history[NUM_FLEX_SEG];
 
 	// copy to local variable
 	adType MagMoment[NUM_ACT_SET][3];
@@ -45,7 +46,11 @@ void CRMSolverIVP (adType in_x_0[NUM_STATES], double in_IntegrationStepSize,
         w_0[i] = CoreParams.xi[i+3+9+6];
 	}
 
-	CRMSolverIVP_Core ( CoreParams, u_0, v_0, w_0, ftip, v_L_pre, w_L_pre, actMass, actInertia, x_N, WrenchResidual, p_atLocMarkers );
+	CRMSolverIVP_Core ( CoreParams, u_0, v_0, w_0, ftip, v_L_pre, w_L_pre, actMass, actInertia, x_N, WrenchResidual, p_atLocMarkers, u_history );
+
+    for (int l = 0; l < u_history[0].length; ++l) {
+        std::cout<< "curvature history: " <<  u_history[0].data[l*3] << " " <<  u_history[0].data[l*3+1] << " " <<  u_history[0].data[l*3+2] << " " << std::endl;
+    }
 
 	CRMSolverIVP_Return( x_N, WrenchResidual, p_atLocMarkers, out_x_N, out_WrenchResidual, out_p_atLocMarkers);
 
@@ -243,7 +248,7 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 						 adType in_u[3], adType in_v[3], adType in_w[3], adType in_ftip[3],
                          adType v_L_pre[3], adType w_L_pre[3], adType actMass[NUM_ACT_SET], adType actInertia[NUM_ACT_SET][9],
 						 adType out_x_N[NUM_STATES], adType out_WrenchResidual[RESIDUALDIM],
-						 double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3] )
+						 double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3], UHistory out_u_history[NUM_FLEX_SEG] )
 {
 
 	adType xi[NUM_STATES];  			//  Initial value of the state for the next segment to be integrated
@@ -325,6 +330,14 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 	}
 
 
+    // Output the curvature along the catheter at each time period
+    for (int i = 0; i < NUM_FLEX_SEG; ++i) {
+        int length = SegSteps[i]*3;
+        out_u_history[i].length = length;
+        out_u_history[i].data = new double[length];
+    }
+
+
     std::cout << StartSegmentIndex << " StartSegmentIndex " << std::endl;
 	for (int i=StartSegmentIndex; i< 2 ; i++){
 		if ( i%2 == 0 ) {  // Flexible Segment
@@ -333,7 +346,7 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 			fsegno=i>>1; // i/2, flexible segment no
 			// Calculate the actual stepsize, based on the number of steps
             h=dVal((SegBounds[i+1]-SegBounds[i]))/(SegSteps[fsegno]*1.0);
-            std::cout <<  " h "  << h << std::endl;
+//            std::cout <<  " h "  << h << std::endl;
 			int N_ = SegSteps[fsegno];
 
             adType segu_history[N_][3];
@@ -344,13 +357,18 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
                 segu_history[j][2] = u_history[fsegno].data[j*3+2];
             }
 
-
-
             // Integrate
 			ABM4( 	xi, SegBounds[i], SegSteps[fsegno], h,
 					InsertedLength, dlambdainv, K[fsegno], Kinv[fsegno], l_zero, ustar[fsegno], segu_history, fcumlambda, ftip,
 					FinalValueOnly, LocMarkers, &NextLocMarker,
 					xf, p_atLocMarkers, u_history_update);
+
+
+            for (int j = 0; j < N_; ++j) {
+                out_u_history[fsegno].data[j*3] = u_history_update[j][0];
+                out_u_history[fsegno].data[j*3+1] = u_history_update[j][1];
+                out_u_history[fsegno].data[j*3+2] = u_history_update[j][2];
+            }
 
 		}
 		else {  // Need to do actuation/rigid segment calculations to transfer Initial Conditions to next flexible segment
@@ -591,6 +609,9 @@ void ABM4 (	adType in_x_0[NUM_STATES], adType t_0, int N, double h,
         u_history_update[idx][0] =  x_n[0];
         u_history_update[idx][1] =  x_n[1];
         u_history_update[idx][2] =  x_n[2];
+
+        std::cout<< "x_n_update: " <<  x_n[0] << " " <<  x_n[1]  << " " <<  x_n[2]  << " " << std::endl;
+
 	}
 
 
