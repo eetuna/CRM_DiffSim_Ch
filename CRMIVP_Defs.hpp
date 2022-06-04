@@ -34,8 +34,9 @@ void CRMSolverIVP (adType in_x_0[NUM_STATES], double in_IntegrationStepSize,
 	CRMSolverIVP_Prep ( x_0, in_IntegrationStepSize, Li, in_dlambdainv,
 						in_SegEndLambdas, in_LocMarkerLambdas, in_K, in_Kinv,
 						in_ustar, MagMoment, in_fcumlambda,
-						in_B0, in_g, in_FinalValueOnly,
-						CoreParams	);
+                        in_B0, in_g,
+                        v_L_pre, w_L_pre, actMass, actInertia,
+						in_FinalValueOnly, CoreParams	);
 	// copy to local variable
 	for (int i=0; i<3; i++) ftip[i]=in_ftip[i];
 
@@ -46,11 +47,11 @@ void CRMSolverIVP (adType in_x_0[NUM_STATES], double in_IntegrationStepSize,
         w_0[i] = CoreParams.xi[i+3+9+6];
 	}
 
-	CRMSolverIVP_Core ( CoreParams, u_0, v_0, w_0, ftip, v_L_pre, w_L_pre, actMass, actInertia, x_N, WrenchResidual, p_atLocMarkers, u_history );
+	CRMSolverIVP_Core ( CoreParams, u_0, v_0, w_0, ftip, x_N, WrenchResidual, p_atLocMarkers, u_history );
 
-    for (int l = 0; l < u_history[0].length; ++l) {
-        std::cout<< "curvature history: " <<  u_history[0].data[l*3] << " " <<  u_history[0].data[l*3+1] << " " <<  u_history[0].data[l*3+2] << " " << std::endl;
-    }
+//    for (int l = 0; l < u_history[0].length; ++l) {
+//        std::cout<< "curvature history: " <<  u_history[0].data[l*3] << " " <<  u_history[0].data[l*3+1] << " " <<  u_history[0].data[l*3+2] << " " << std::endl;
+//    }
 
 	CRMSolverIVP_Return( x_N, WrenchResidual, p_atLocMarkers, out_x_N, out_WrenchResidual, out_p_atLocMarkers);
 
@@ -114,6 +115,7 @@ void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSiz
                          double in_ustar[NUM_FLEX_SEG][3],
                          adType in_MagMoment[NUM_ACT_SET][3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3],
                          double in_B0[3], double in_g[3],
+                         double in_v_L_pre[3], double in_w_L_pre[3], double in_actMass[NUM_ACT_SET], double in_actInertia[NUM_ACT_SET][9],
                          bool in_FinalValueOnly,
                          CRMIVPCoreParams<adType> &out_CoreParams) {
 	// Process the incoming parameters (including changing from distal-proximal order to proximal-distal order)
@@ -239,6 +241,21 @@ void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSiz
         }
     }
 
+    auto & v_L_pre = out_CoreParams.v_L_pre;
+    auto & w_L_pre = out_CoreParams.w_L_pre;
+
+    mCopy_AB<3>(in_v_L_pre, v_L_pre);
+    mCopy_AB<3>(in_w_L_pre, w_L_pre);
+
+    auto & actMass = out_CoreParams.actMass;
+    auto & actInertia = out_CoreParams.actInertia;
+    for (int i = 0; i < NUM_ACT_SET; ++i) {
+        actMass[i] = in_actMass[i];
+        for (int j = 0; j < 9; ++j) {
+           actInertia[i][j] = in_actInertia[i][j];
+        }
+    }
+
 
 }
 
@@ -246,7 +263,6 @@ void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSiz
 template <typename adType>
 void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 						 adType in_u[3], adType in_v[3], adType in_w[3], adType in_ftip[3],
-                         adType v_L_pre[3], adType w_L_pre[3], adType actMass[NUM_ACT_SET], adType actInertia[NUM_ACT_SET][9],
 						 adType out_x_N[NUM_STATES], adType out_WrenchResidual[RESIDUALDIM],
 						 double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3], UHistory out_u_history[NUM_FLEX_SEG] )
 {
@@ -303,6 +319,20 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 		}
 	}
 	auto & u_history = in_params.u_history;
+
+    auto & v_L_pre = in_params.v_L_pre;
+    auto & w_L_pre = in_params.w_L_pre;
+    auto & actMass = in_params.actMass;
+    auto & actInertia = in_params.actInertia;
+
+
+
+//    for (int i = 0; i < NUM_ACT_SET; ++i) {
+//        std::cout << "actInertia inside: " << actInertia[i][0] << " " << actInertia[i][4] << " " << actInertia[i][8] << std::endl;
+//        std::cout << "actMass inside: " << actMass[i]  << std::endl;
+//    }
+
+
 
 	// IMPORTANT NOTE: most proximal segment is assumed to be always flexible
 	//    and the flexible and rigid segments are assumed to be alternating
@@ -486,7 +516,7 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 //
 
     for (int i = 0; i < RESIDUALDIM; ++i) {
-        std::cout << "Residual: " << Residual[i] << std::endl;
+        std::cout << "Residual in core function: " << Residual[i] << std::endl;
     }
     // Copy the residual to the output
 	mCopy_AB<RESIDUALDIM>(Residual,out_WrenchResidual);
@@ -610,7 +640,7 @@ void ABM4 (	adType in_x_0[NUM_STATES], adType t_0, int N, double h,
         u_history_update[idx][1] =  x_n[1];
         u_history_update[idx][2] =  x_n[2];
 
-        std::cout<< "x_n_update: " <<  x_n[0] << " " <<  x_n[1]  << " " <<  x_n[2]  << " " << std::endl;
+//        std::cout<< "x_n_update: " <<  x_n[0] << " " <<  x_n[1]  << " " <<  x_n[2]  << " " << std::endl;
 
 	}
 
