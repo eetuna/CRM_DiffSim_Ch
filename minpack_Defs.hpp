@@ -197,7 +197,7 @@ void TrustRegionDogleg(	int n, adType x[], adType fvec[], double tol, int& info,
 	int j;
 	int nprint = 0;
 	int lr = (n * (n + 1)) / 2;
-	int index = 6 * n + lr;;
+	int index = 6 * n + lr;
 	int nfev;	
 	info = 0;
 	//C

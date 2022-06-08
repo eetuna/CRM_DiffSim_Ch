@@ -43,8 +43,8 @@ void CRMSolverIVP (adType in_x_0[NUM_STATES], double in_IntegrationStepSize,
 	// We need to pass u_0 as input argument as the values in CoreParams will be overriden with the values provided in the input arguments - functionality needed for solving Boundary Value Problems (BVP)
 	for (int i = 0; i < 3; i++) {
 		u_0[i] = CoreParams.xi[i];
-        v_0[i] = CoreParams.xi[i+3+9+3];
-        w_0[i] = CoreParams.xi[i+3+9+6];
+		v_0[i] = CoreParams.xi[1+3+9+3];
+		w_0[i] = CoreParams.xi[i+3+9+3+3];
 	}
 
 	CRMSolverIVP_Core ( CoreParams, u_0, v_0, w_0, ftip, x_N, WrenchResidual, p_atLocMarkers, u_history );
@@ -160,7 +160,9 @@ void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSiz
 	// process parameters as needed and copy into CoreParams
 	mCopy_AB<NUM_STATES>(in_x_0,xi);		// Initial value of the state for the next segment to be integrated
 											//  States are packed u[0..2],R[0..8],p[0..2]  (R: 3x3 matrix stored in row major order R11 R12 R13 R21 R22 R23 R31 R32 R33)
-	mCopy_AB<3>(in_B0,B0);				//  B0 field vector of the MRI scanner (in spatial coordinates)
+	                                        // The last two entries of v0 and w0 are included in this vector
+
+    mCopy_AB<3>(in_B0,B0);				//  B0 field vector of the MRI scanner (in spatial coordinates)
 
 	mCopy_AB<3>(in_g, g);               // gravitational vector
 
@@ -262,7 +264,7 @@ void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSiz
 
 template <typename adType>
 void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
-						 adType in_u[3], adType in_v[3], adType in_w[3], adType in_ftip[3],
+						 adType in_u[3], adType in_ftip[3],
 						 adType out_x_N[NUM_STATES], adType out_WrenchResidual[RESIDUALDIM],
 						 double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3], UHistory out_u_history[NUM_FLEX_SEG] )
 {
@@ -284,13 +286,7 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 	int   actno, fsegi, fsegip1;	// actuator no, flexible segment before, flexible segment after
 	bool  LastSegmentIsRigid=true;	// Flag indicating if the last segment processed is rigid (true) or not (false)
 
-	// we need to copy xi from in_params to the local variable and update it with u[0..2] specified in in_u
-	for (int i=0; i<NUM_STATES; i++) xi[i]=in_params.xi[i];
-	for (int i=0; i<3; i++) {
-		xi[i]=in_u[i];
-        xi[i+3+9+3]=in_v[i];
-        xi[i+3+9+6]=in_w[i];
-	}
+
 	// we need to copy in_ftip to local variable
 	adType ftip[3];
 	mCopy_AB<3,adType>(in_ftip, ftip);
@@ -325,7 +321,13 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
     auto & actMass = in_params.actMass;
     auto & actInertia = in_params.actInertia;
 
-
+    // we need to copy xi from in_params to the local variable and update it with u[0..2] specified in in_u
+    for (int i=0; i<NUM_STATES; i++) xi[i]=in_params.xi[i];
+    for (int i=0; i<3; i++) {
+        xi[i]=in_u[i];
+//        xi[i+3+9+3] = in_v[i];
+//        xi[i+3+9+3+3] = in_w[i];
+    }
 
 //    for (int i = 0; i < NUM_ACT_SET; ++i) {
 //        std::cout << "actInertia inside: " << actInertia[i][0] << " " << actInertia[i][4] << " " << actInertia[i][8] << std::endl;
@@ -345,6 +347,7 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 		for (int i=0; i<3; i++) { 										// u[0..2] and R[0..8] remain the same
 			xi[i+9+3] = xi[i+9+3] + RigidSegmentLength * xi[3+i*3+2];	// p[0..2] will translate along the z direction of the R matrix (3rd column)
             Residual[i]=0.0;											// Residual is initialized to the 0 vector, just in case the rigid segment is the only segment (it is both the start and the end segment),
+            Residual[i+3] = 0.0;
 		}																//     In this case, the main integration loop will not execute, so, we need to have valid return values
 		mCopy_AB<NUM_STATES>(xi,xf);									//     for both xf and Residual
 		StartSegmentIndex++;  // move the start segment to the next segment
@@ -369,7 +372,7 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 
 
     std::cout << StartSegmentIndex << " StartSegmentIndex " << std::endl;
-	for (int i=StartSegmentIndex; i< 2 ; i++){
+	for (int i=StartSegmentIndex; i < 2 ; i++){
 		if ( i%2 == 0 ) {  // Flexible Segment
 			LastSegmentIsRigid=false;
 			// Prepare the CRMIntegrand Parameters
@@ -386,7 +389,9 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
                 segu_history[j][1] = u_history[fsegno].data[j*3+1];
                 segu_history[j][2] = u_history[fsegno].data[j*3+2];
             }
-
+//            for (int j = 0; j < NUM_STATES; ++j) {
+//                std::cout << " Input xi " << xi[j] << std::endl;
+//            }
             // Integrate
 			ABM4( 	xi, SegBounds[i], SegSteps[fsegno], h,
 					InsertedLength, dlambdainv, K[fsegno], Kinv[fsegno], l_zero, ustar[fsegno], segu_history, fcumlambda, ftip,
@@ -443,17 +448,27 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 
             adType w_L_hat[9];
             wHat(w_L, w_L_hat);
+            std::cout << " deltav: " << deltav[0] << " " << deltav[1] << " " << deltav[2] << std::endl;
+//            for (int j = 0; j < 9; ++j) {
+//                std::cout << " w_L_hat: " << w_L_hat[j] << std::endl;
+//            }
             mMult_AB<3,3,1>(w_L_hat, v_L, wvL);
+            for (int j = 0; j < 3; ++j) {
+                std::cout << " wvL: " << wvL[j] << std::endl;
+            }
+
 
             adType R[9];
             for (int i = 0; i < 9; ++i) {
                 R[i] = xf[i+3];
             }
             mMult_ATB<3,3,1>(R, g, gravity_force);
+            std::cout << " gravity_force in core: " << gravity_force[0] << " " << gravity_force[1] << " " << gravity_force[2] << std::endl;
 
             for (int j = 0; j < 3; ++j) { //Residual force
                 Residual[j] = actMass[actno] * (deltav[j] / DELTA_T + wvL[j] - gravity_force[j]);
             }
+            std::cout << " Residual force in core: " << Residual[0] << " " << Residual[1] << " " << Residual[2] << std::endl;
 
             // Residual moment
             mSub_AB<3,1>(w_L, w_L_pre, deltaw);
@@ -464,9 +479,10 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
             mMult_AB<3,3,1>(w_L_hat, IwL, wIwL);
 
             for (int j = 0; j < 3; ++j) {
-                Residual[j+3] = Ideltaw[j] /DELTA_T + wIwL[j] +tauDiff[j];
+                Residual[j+3] = Ideltaw[j] /DELTA_T + wIwL[j] + tauDiff[j];
             }
 
+            std::cout << " Residual moment in core: " << Residual[3] << " " << Residual[4] << " " << Residual[5] << std::endl;
 
             if (i < (NUM_SEGMENTS-1)) {	// we want to make sure that we are not at the last segment
                 mMult_AB<3,3,1>( Kinv[fsegip1], tauDiff, K2invResidual );
@@ -520,6 +536,10 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
     }
     // Copy the residual to the output
 	mCopy_AB<RESIDUALDIM>(Residual,out_WrenchResidual);
+
+//    out_WrenchResidual[0] = Residual[3]; out_WrenchResidual[1] = Residual[4]; out_WrenchResidual[2] = Residual[5];
+
+//    std::cout << "Core function Done: "  << std::endl;
 
 }
 
@@ -599,9 +619,16 @@ void ABM4 (	adType in_x_0[NUM_STATES], adType t_0, int N, double h,
 //        std::cout << "IN abm in_ustar: " << in_ustar[0] << " " << in_ustar[1] << " " << in_ustar[2] << std::endl;
 		if (idx<3) {  // RK2 initialization steps
 			RK2_step(x_n, t_n, h, Li, dlambdainv, in_K, in_Kinv, in_l, in_ustar, u_pre, in_fcumlambda, in_ftip, x_np1, xdot_n);
+//            for (int i = 0; i < NUM_STATES; ++i) {
+//                std::cout << "RK2 xn: " << x_np1[i] << std::endl;
+//            }
 		}
 		else { 		 // ABM4 steps
 			ABM4_step(x_n, t_n, h, xdot_nm1, xdot_nm2, xdot_nm3, x_nm1, x_nm2, x_nm3, Li, dlambdainv, in_K, in_Kinv, in_l, in_ustar, u_pre, in_fcumlambda, in_ftip, x_np1, xdot_n);
+            if ( isnan(x_n[0]) ) {
+                std::cout << "FLY ME TO THE MOON!! " << std::endl;
+                exit( 3 );
+            }
 		}
 
 		// increment length
@@ -651,7 +678,7 @@ void ABM4 (	adType in_x_0[NUM_STATES], adType t_0, int N, double h,
 	}
 
     for (int i = 0; i < NUM_STATES; ++i) {
-        std::cout <<  "Updated x_n " << x_n[i] << std::endl;
+        std::cout <<  "ABM4 x_n " << x_n[i] << std::endl;
     }
     std::cout << "----------------------- " << std::endl;
 
@@ -723,6 +750,10 @@ void CRMIntegrand (	adType s, adType x[NUM_STATES],
     adType u_hat[9];
     wHat(u,u_hat);
 
+//    for (int i = 0; i < NUM_STATES; ++i) {
+//        std::cout << "crm_iNTEGRAD: " << x[i] << std::endl;
+//    }
+
     // udot = ustardot - Kinv*((um*K+Kdot)*(u-ustar_s) + e3m*R'*intf + R'*l); % udot
     //
     //   e3hat*R' = [ -r12 -r22 -r32; r11 r21 r31; 0 0 0];
@@ -762,7 +793,7 @@ void CRMIntegrand (	adType s, adType x[NUM_STATES],
 //
 //
 //    for (int i = 0; i < 9; ++i) {
-//        std::cout << "u_hat: " << u_hat[0] << std::endl;
+//        std::cout << "u_hat: " << u_hat[i] << std::endl;
 //    }
 
     mMult_AB<3,3,1>(u_hat, v, qs_uhatq);
@@ -783,7 +814,7 @@ void CRMIntegrand (	adType s, adType x[NUM_STATES],
 
 //    std::cout << "u_diff: " << u_diff[0] << " " << u_diff[1] << " " << u_diff[2] << std::endl;
 //    std::cout << "uhat_w: " << uhat_w[0] << " " << uhat_w[1] << " " << uhat_w[2] << std::endl;
-
+//
 
     //xdot(1:3) = ustardot - Kinv*((um*K+Kdot)*(u-ustar_s) + e3m*R'*intf + R'*l); % udot
     //xdot(4:12) = reshape(R*um,9,1); % Rdot   --- Note that matlab code reshapes in column major order while we are saving in row major order
@@ -794,11 +825,11 @@ void CRMIntegrand (	adType s, adType x[NUM_STATES],
         xdot[i+3] = vdot[i];
         xdot[i+6] = wdot[i];
     }
-//    std::cout << "CRMIntegrad----------------------- " << std::endl;
 //    for (int i = 0; i < NUM_INTEGRATION_STATES; ++i) {
 //        std::cout <<  " xdot " << xdot[i] << std::endl;
 //    }
-
+//    std::cout << "CRMIntegrad----------------------- " << std::endl;
+//
 
 }
 
@@ -847,6 +878,12 @@ void ABM4_step(	adType in_x_n[NUM_STATES], adType t_n, double h,
 
 	//ABM4_STEP_STEP1:
 	CRMIntegrand(t_n, x_n, Li, dlambdainv, in_K, in_Kinv, in_l, in_ustar, in_fcumlambda, in_ftip, u_pre, xdot_n);
+
+//    for (int i = 0; i < NUM_INTEGRATION_STATES; ++i) {
+//        std::cout << "ABM xdot_n: " << xdot_n[i] << std::endl;
+//    }
+//    std::cout << "------------- " << std::endl;
+
 	for (int i=0; i<3; i++) {
 		x_np1_hat[i]    = x_n[i] + h * ( P_COEFF_N * xdot_n[i] + P_COEFF_Nm1 * xdot_nm1[i] + P_COEFF_Nm2 * xdot_nm2[i] + P_COEFF_Nm3 * xdot_nm3[i] );
 	}
@@ -885,8 +922,8 @@ void RK2_step(	adType in_x_n[NUM_STATES], adType t_n, double h,
 				adType out_x_np1[NUM_STATES], adType out_xdot_n[NUM_INTEGRATION_STATES] ) {
 
 	adType x_n[NUM_STATES];       // from input
-	adType k1[NUM_STATES];
-	adType k2oh[NUM_STATES];
+	adType k1[NUM_INTEGRATION_STATES];
+	adType k2oh[NUM_INTEGRATION_STATES];
 	adType x_n_p_k1o2[NUM_STATES];
 	adType xdot_n[NUM_INTEGRATION_STATES];
 
@@ -900,14 +937,21 @@ void RK2_step(	adType in_x_n[NUM_STATES], adType t_n, double h,
 			p_n[i - 12] = in_x_n[i];
         x_n[i] = in_x_n[i];
 	}
-//    std::cout << "RK2******" <<  std::endl;
+//    std::cout << "IN RK2******" <<  std::endl;
+
+//    for (int i = 0; i < NUM_STATES; ++i) {
+//        std::cout <<  "before change x_n " << x_n[i] << std::endl;
+//    }
 
 	//RK2_STEP_STEP1:
 	CRMIntegrand(t_n, x_n, Li, dlambdainv, in_K, in_Kinv, in_l, in_ustar, in_fcumlambda, in_ftip, u_pre, xdot_n);
 
+//    std::cout << "--------------" <<  std::endl;
+
 //    for (int i = 0; i < NUM_INTEGRATION_STATES; ++i) {
 //        std::cout <<  "xdot_n " << xdot_n[i] << std::endl;
 //    }
+
 	for (int i=0; i<3; i++) {
 		k1[i] 			= h * xdot_n[i];
 		x_n_p_k1o2[i] 	= x_n[i] + k1[i] * 0.5;
@@ -931,7 +975,9 @@ void RK2_step(	adType in_x_n[NUM_STATES], adType t_n, double h,
 
 	//RK2_STEP_STEP2:
 	CRMIntegrand(t_n + h * 0.5, x_n_p_k1o2, Li, dlambdainv, in_K, in_Kinv, in_l, in_ustar, in_fcumlambda, in_ftip, u_pre, k2oh);
-	for (int i = 0; i < 3; i++) {
+
+
+    for (int i = 0; i < 3; i++) {
 		out_x_np1[i] = x_n[i] + h * k2oh[i];
 	}
     for (int i = 3; i < NUM_INTEGRATION_STATES; i++) { //twists
@@ -950,6 +996,8 @@ void RK2_step(	adType in_x_n[NUM_STATES], adType t_n, double h,
 	for (int i = 0; i < NUM_INTEGRATION_STATES; i++) {
 		out_xdot_n[i] = xdot_n[i];
 	}
+
+//    std::cout << "-******************-" <<  std::endl;
 
 }
 
