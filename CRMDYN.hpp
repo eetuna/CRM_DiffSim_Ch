@@ -20,17 +20,17 @@
 // Regularization scales used for Nonlinear Solver
 #define IVALUE_SCALE_U	1.0 //(0.01)			// the variable used in Nonlinear Solver is multiplied with this scale to calculate u (curvature) that will be used in IVP
 #define IVALUE_SCALE_F	(0.01)			// the variable used in Nonlinear Solver is multiplied with this scale to calculate ftip (tip force) that will be used in IVP
-#define IVALUE_SCALE_V	1.0 //(0.01)			// the variable used in Nonlinear Solver is multiplied with this scale to calculate u (curvature) that will be used in IVP
-#define IVALUE_SCALE_W	1.0 //(0.01)			// the variable used in Nonlinear Solver is multiplied with this scale to calculate u (curvature) that will be used in IVP
+//#define IVALUE_SCALE_V	1.0 //(0.01)			// the variable used in Nonlinear Solver is multiplied with this scale to calculate u (curvature) that will be used in IVP
+//#define IVALUE_SCALE_W	1.0 //(0.01)			// the variable used in Nonlinear Solver is multiplied with this scale to calculate u (curvature) that will be used in IVP
 
 #define RESIDUAL_SCALE_M	1.0 //(10.0)			// the residual for tip moment coming out of the IVP will be multiplied with this scale to return to the Nonlinear Solver
-#define RESIDUAL_SCALE_F	10.0 //(10.0)			// the residual for tip FORCE coming out of the IVP will be multiplied with this scale to return to the Nonlinear Solver
+#define RESIDUAL_SCALE_F	1.0 //(10.0)			// the residual for tip FORCE coming out of the IVP will be multiplied with this scale to return to the Nonlinear Solver
 #define RESIDUAL_SCALE_P	100.0 //(10.0)			// the residual for tip position error coming out of the IVP will be multiplied with this scale to return to the Nonlinear Solver
 
 // NL Solver method selection
 #define TRUSTREGION							// Trust Region Method with the numerical jacobian (Default)
 
-#define DELTA_T 0.1
+#define DELTA_T 0.0001
 #define TRUSTREGION							// Trust Region Method with the numerical jacobian (Default)
 
 
@@ -209,12 +209,12 @@ void CRMSolverIVP (	adType in_x_0[NUM_STATES], double in_IntegrationStepSize,
                        adType out_x_N[NUM_STATES], adType out_WrenchResidual[RESIDUALDIM],
                        adType out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]);
 
-//template <typename adType>
-//void CRMSolverIVP(	CRMShootingMethodParams<adType> in_Params,
-//                      adType in_u0[3], adType in_ftip[3], adType v_L_pre[3], adType w_L_pre[3],
-//                      bool in_FinalValueOnly,
-//                      adType out_x_N[NUM_STATES], adType out_WrenchResidual[RESIDUALDIM],
-//                      double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]	);
+template <typename adType>
+void CRMSolverIVP(	CRMShootingMethodParams<adType> in_Params,
+                      adType in_u0[3], adType in_ftip[3], adType v_L_pre[3], adType w_L_pre[3],
+                      bool in_FinalValueOnly,
+                      adType out_x_N[NUM_STATES], adType out_WrenchResidual[RESIDUALDIM],
+                      double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]	);
 
 // Preparation of CRMIVPCoreParams for subsequent call to CRMSolverIVP_Core
 template <typename adType>

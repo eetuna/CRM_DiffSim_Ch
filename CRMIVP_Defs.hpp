@@ -43,11 +43,9 @@ void CRMSolverIVP (adType in_x_0[NUM_STATES], double in_IntegrationStepSize,
 	// We need to pass u_0 as input argument as the values in CoreParams will be overriden with the values provided in the input arguments - functionality needed for solving Boundary Value Problems (BVP)
 	for (int i = 0; i < 3; i++) {
 		u_0[i] = CoreParams.xi[i];
-		v_0[i] = CoreParams.xi[1+3+9+3];
-		w_0[i] = CoreParams.xi[i+3+9+3+3];
 	}
 
-	CRMSolverIVP_Core ( CoreParams, u_0, v_0, w_0, ftip, x_N, WrenchResidual, p_atLocMarkers, u_history );
+	CRMSolverIVP_Core ( CoreParams, u_0, ftip, x_N, WrenchResidual, p_atLocMarkers, u_history );
 
 //    for (int l = 0; l < u_history[0].length; ++l) {
 //        std::cout<< "curvature history: " <<  u_history[0].data[l*3] << " " <<  u_history[0].data[l*3+1] << " " <<  u_history[0].data[l*3+2] << " " << std::endl;
@@ -57,54 +55,57 @@ void CRMSolverIVP (adType in_x_0[NUM_STATES], double in_IntegrationStepSize,
 
 }
 
-//
-//template <typename adType>
-//void CRMSolverIVP(	CRMShootingMethodParams<adType> in_Params,
-//					adType in_u0[3], adType in_ftip[3], adType v_L_pre[3], adType w_L_pre[3],
-//					bool in_FinalValueOnly,
-//					adType out_x_N[NUM_STATES], adType out_WrenchResidual[RESIDUALDIM],
-//					double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]	) {
-//
-//	adType x_0[NUM_STATES];
-//	for (int i = 0; i < NUM_STATES; i++) {
-//		if (i < 3) x_0[i] = in_u0[i];
-//		else if (i < 12) x_0[i] = in_Params.R0[i - 3];
-//		else x_0[i] = in_Params.p0[i - 12];
-//	}
-//
-//	CRMIVPCoreParams<adType> CoreParams;
-//	adType u_0[3],v_0[3], w_0[3], ftip[3];
-//
-//
-//	CRMSolverIVP_Prep(x_0, in_Params.IntegrationStepSize,
-//		in_Params.Li, in_Params.dlambdainv,
-//		in_Params.SegEndLambdas, in_Params.LocMarkerLambdas,
-//		in_Params.K, in_Params.Kinv, in_Params.ustar,
-//		in_Params.MagMoment, in_Params.fcumlambda,
-//		in_Params.B0, in_Params.g,
-//		in_FinalValueOnly,
-//		CoreParams);
-//
-//	// copy to local variable
-//	for (int i = 0; i < 3; i++) ftip[i] = in_ftip[i];
-//
-//	// We need to pass u_0 as input argument as the values in CoreParams will be overriden with the values provided in the input arguments - functionality needed for solving Boundary Value Problems (BVP)
-//	for (int i = 0; i < 3; i++)
-//    {
-//        u_0[i] = CoreParams.xi[i];
-//        v_0[i] = CoreParams.xi[i+3+9+3];
-//        w_0[i] = CoreParams.xi[i+3+9+6];
-//    }
-//
-//
-//
-////	CRMSolverIVP_Core(CoreParams, u_0, ftip, out_x_N, out_MomentResidual, out_p_atLocMarkers);
-//    CRMSolverIVP_Core ( CoreParams, u_0, v_0, w_0, ftip, v_L_pre, w_L_pre, in_Params.actMass, in_Params.actInertia, out_x_N, out_WrenchResidual, out_p_atLocMarkers );
-//
-//
-//    // NO NEED FOR CRMSolverIVP_Return
-//
-//}
+
+template <typename adType>
+void CRMSolverIVP(	CRMShootingMethodParams<adType> in_Params,
+					adType in_u0[3], adType in_ftip[3], adType v_L_pre[3], adType w_L_pre[3],
+					bool in_FinalValueOnly,
+					adType out_x_N[NUM_STATES], adType out_WrenchResidual[RESIDUALDIM],
+					double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]	) {
+
+	adType x_0[NUM_STATES];
+	for (int i = 0; i < NUM_STATES; i++) {
+		if (i < 3) x_0[i] = in_u0[i];
+		else if (i < 12) x_0[i] = in_Params.R0[i - 3];
+		else if (i < 15) x_0[i] = in_Params.p0[i - 12];
+        else if (i < 18) x_0[i] = in_Params.v0[i - 15];
+        else  x_0[i] = in_Params.w0[i - 18];
+
+	}
+
+    for (int i = 0; i < NUM_STATES; ++i) {
+        std::cout << "IN x_0: " << x_0[i]  << std::endl;
+    }
+
+
+	CRMIVPCoreParams<adType> CoreParams;
+	adType u_0[3], ftip[3];
+
+	CRMSolverIVP_Prep(x_0, in_Params.IntegrationStepSize,
+		in_Params.Li, in_Params.dlambdainv,
+		in_Params.SegEndLambdas, in_Params.LocMarkerLambdas,
+		in_Params.K, in_Params.Kinv, in_Params.ustar,
+		in_Params.MagMoment, in_Params.fcumlambda,
+		in_Params.B0, in_Params.g, v_L_pre, w_L_pre, in_Params.actMass, in_Params.actInertia,
+		in_FinalValueOnly,
+		CoreParams);
+
+	// copy to local variable
+	for (int i = 0; i < 3; i++) ftip[i] = in_ftip[i];
+
+	// We need to pass u_0 as input argument as the values in CoreParams will be overriden with the values provided in the input arguments - functionality needed for solving Boundary Value Problems (BVP)
+	for (int i = 0; i < 3; i++)
+    {
+        u_0[i] = CoreParams.xi[i];
+    }
+
+	UHistory u_history[NUM_FLEX_SEG];
+
+    CRMSolverIVP_Core ( CoreParams, u_0, ftip, out_x_N, out_WrenchResidual, out_p_atLocMarkers, u_history );
+
+    // NO NEED FOR CRMSolverIVP_Return
+
+}
 
 
 template <typename adType>
@@ -625,13 +626,19 @@ void ABM4 (	adType in_x_0[NUM_STATES], adType t_0, int N, double h,
 		}
 		else { 		 // ABM4 steps
 			ABM4_step(x_n, t_n, h, xdot_nm1, xdot_nm2, xdot_nm3, x_nm1, x_nm2, x_nm3, Li, dlambdainv, in_K, in_Kinv, in_l, in_ustar, u_pre, in_fcumlambda, in_ftip, x_np1, xdot_n);
-            if ( isnan(x_n[0]) ) {
+			if ( isnan(x_n[0]) ) {
                 std::cout << "FLY ME TO THE MOON!! " << std::endl;
                 exit( 3 );
             }
 		}
 
-		// increment length
+//        std::cout << "v: " << x_n[3+9+3] << " " << x_n[3+9+4] << " "  << x_n[3+9+5] << std::endl;
+//        std::cout << "w: " << x_n[3+9+6] << " " << x_n[3+9+7] << " "  << x_n[3+9+8] << std::endl;
+        std::cout << "v dot: " << xdot_n[3] << " " << xdot_n[4] << " "  << xdot_n[5] << std::endl;
+        std::cout << "w dot: " << xdot_n[6] << " " << xdot_n[7] << " "  << xdot_n[8] << std::endl;
+
+
+        // increment length
 		t_n=t_n+h;
 
 		if (!FinalValueOnly) {
@@ -805,8 +812,8 @@ void CRMIntegrand (	adType s, adType x[NUM_STATES],
     adType u_diff_[3], u_diff[3];
 
 //    std::cout << "w: " << w[0] << " " << w[1] << " " << w[2] << std::endl;
-//    std::cout << "u_pre: " << u_pre[0] << " " << u_pre[1] << " " << u_pre[2] << std::endl;
-//    std::cout << "u: " << u[0] << " " << u[1] << " " << u[2] << std::endl;
+    std::cout << "u_pre: " << u_pre[0] << " " << u_pre[1] << " " << u_pre[2] << std::endl;
+    std::cout << "u: " << u[0] << " " << u[1] << " " << u[2] << std::endl;
 
     mSub_AB<3,1>(u, u_pre, u_diff_);
     u_diff[0] = u_diff_[0]/DELTA_T; u_diff[1] = u_diff_[1]/DELTA_T; u_diff[2] = u_diff_[2]/DELTA_T;

@@ -6,6 +6,7 @@
 #define M_PI 3.14159265358979323846
 
 
+
 template <typename adType>
 void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params,
                               double in_u0_initialguess[3], double in_ftip_initialguess[3],
@@ -60,8 +61,8 @@ void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params,
 	const double uscaleinv = 1.0 / IVALUE_SCALE_U;
 	const double fscaleinv = 1.0 / IVALUE_SCALE_F;
 
-    const double vscaleinv = 1.0 / IVALUE_SCALE_V;
-    const double wscaleinv = 1.0 / IVALUE_SCALE_W;
+//    const double vscaleinv = 1.0 / IVALUE_SCALE_V;
+//    const double wscaleinv = 1.0 / IVALUE_SCALE_W;
 
 	double* initialguessscaled = new double [NLEq_Dim];
 	adType* returnedparamscaled = new adType [NLEq_Dim];
@@ -81,14 +82,6 @@ void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params,
 
 	}
 
-
-
-//    for (int i = 0; i < NUM_ACT_SET; ++i) {
-//        std::cout << "ActInertia: " << NLEParams.actInertia[i][0] << " " << NLEParams.actInertia[i][4] << " " << NLEParams.actInertia[i][8] << std::endl;
-//        std::cout << "ActMass: " << NLEParams.actMass[i]  << std::endl;
-//    }
-
-
     int localmin = 0, errorcode = 0;
 
 	adType* x = new adType[NLEq_Dim]; // we will create a new variable here and not use initial guess scaled since truss-region-dogleg algorithm uses the same variable for both input and output
@@ -96,7 +89,7 @@ void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params,
 
 	int info;
 	int lwa = (NLEq_Dim * (3 * NLEq_Dim + 13)) / 2; // what is this?
-	double tol = 0.00001;
+	double tol = 0.000001;
 	adType* wa = new adType[lwa];
 	for (int i = 0; i < NLEq_Dim; i++) x[i] = initialguessscaled[i];
 
@@ -245,7 +238,7 @@ void NLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params) {
 	// don't forget to scale parameters before returning to the nonlinear equation solver
 	if (Params.ContactMode == ContactModeType::FREE_TIP) {
 		for (int i = 0; i < 3; i++) {
-            out_y[i] = RESIDUAL_SCALE_F * (WrenchResidual[i] * WrenchResidual[i])  + RESIDUAL_SCALE_M * (WrenchResidual[i+3] * WrenchResidual[i+3] ) ;
+            out_y[i] = RESIDUAL_SCALE_F * fabs(WrenchResidual[i]) + RESIDUAL_SCALE_M * fabs(WrenchResidual[i+3] ) ;
 //            out_y[i+3] = RESIDUAL_SCALE_M * WrenchResidual[i+3];
 		}
 	}
