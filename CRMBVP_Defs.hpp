@@ -89,7 +89,7 @@ void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params,
 
 	int info;
 	int lwa = (NLEq_Dim * (3 * NLEq_Dim + 13)) / 2; // what is this?
-	double tol = 0.000001;
+	double tol = 0.0000001;
 	adType* wa = new adType[lwa];
 	for (int i = 0; i < NLEq_Dim; i++) x[i] = initialguessscaled[i];
 

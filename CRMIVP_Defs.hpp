@@ -455,7 +455,7 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 //            }
             mMult_AB<3,3,1>(w_L_hat, v_L, wvL);
             for (int j = 0; j < 3; ++j) {
-                std::cout << " wvL: " << wvL[j] << std::endl;
+                std::cout << "w_L: " << w_L[j] << std::endl;
             }
 
 
@@ -464,15 +464,17 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
                 R[i] = xf[i+3];
             }
             mMult_ATB<3,3,1>(R, g, gravity_force);
-            std::cout << " gravity_force in core: " << gravity_force[0] << " " << gravity_force[1] << " " << gravity_force[2] << std::endl;
+//            std::cout << " gravity_force in core: " << gravity_force[0] << " " << gravity_force[1] << " " << gravity_force[2] << std::endl;
 
             for (int j = 0; j < 3; ++j) { //Residual force
-                Residual[j] = actMass[actno] * (deltav[j] / DELTA_T + wvL[j] - gravity_force[j]);
+                Residual[j] = -1 * actMass[actno] * gravity_force[j]; // actMass[actno] * (deltav[j] / DELTA_T + wvL[j] - gravity_force[j]);
             }
             std::cout << " Residual force in core: " << Residual[0] << " " << Residual[1] << " " << Residual[2] << std::endl;
 
             // Residual moment
             mSub_AB<3,1>(w_L, w_L_pre, deltaw);
+//            std::cout << " actInertia core: " << actInertia[actno][0] << " " << actInertia[actno][4] << " " << actInertia[actno][8] << std::endl;
+//            std::cout << " w_L_pre: " << w_L_pre[0] << " " << w_L_pre[1] << " " << w_L_pre[2] << std::endl;
 
             mMult_AB<3,3,1>(actInertia[actno], deltaw, Ideltaw);
             mMult_AB<3,3,1>(actInertia[actno], w_L, IwL);
@@ -480,7 +482,7 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
             mMult_AB<3,3,1>(w_L_hat, IwL, wIwL);
 
             for (int j = 0; j < 3; ++j) {
-                Residual[j+3] = Ideltaw[j] /DELTA_T + wIwL[j] + tauDiff[j];
+                Residual[j+3] = tauDiff[j]; // Ideltaw[j] /DELTA_T + wIwL[j] + tauDiff[j];
             }
 
             std::cout << " Residual moment in core: " << Residual[3] << " " << Residual[4] << " " << Residual[5] << std::endl;
@@ -522,15 +524,15 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 //	// Copy the final values of the state x_f to the output
 	mCopy_AB<NUM_STATES>(xf,out_x_N);
 //
-////	 Calculate the Boundary Value Residual if last segment is flexible
-////	adType deltau[3];
-////	if (!LastSegmentIsRigid) {
-////		// residual = K (u1 - u1star)
-////		mSub_AB<3,1>( &(xf[0]) , ustar[NUM_FLEX_SEG-1], deltau);
-////		mMult_AB<3,3,1>( K[NUM_FLEX_SEG-1], deltau, Residual);
-////	}   // else residual = K1 (u1 - u1star ) - Tb  ; already calculated above
-//
-//
+	// Calculate the Boundary Value Residual if last segment is flexible
+	adType deltau[3];
+	if (!LastSegmentIsRigid) {
+		// residual = K (u1 - u1star)
+		mSub_AB<3,1>( &(xf[0]) , ustar[NUM_FLEX_SEG-1], deltau);
+		mMult_AB<3,3,1>( K[NUM_FLEX_SEG-1], deltau, Residual);
+	}   // else residual = K1 (u1 - u1star ) - Tb  ; already calculated above
+
+
 
     for (int i = 0; i < RESIDUALDIM; ++i) {
         std::cout << "Residual in core function: " << Residual[i] << std::endl;
@@ -634,8 +636,8 @@ void ABM4 (	adType in_x_0[NUM_STATES], adType t_0, int N, double h,
 
 //        std::cout << "v: " << x_n[3+9+3] << " " << x_n[3+9+4] << " "  << x_n[3+9+5] << std::endl;
 //        std::cout << "w: " << x_n[3+9+6] << " " << x_n[3+9+7] << " "  << x_n[3+9+8] << std::endl;
-        std::cout << "v dot: " << xdot_n[3] << " " << xdot_n[4] << " "  << xdot_n[5] << std::endl;
-        std::cout << "w dot: " << xdot_n[6] << " " << xdot_n[7] << " "  << xdot_n[8] << std::endl;
+//        std::cout << "v dot: " << xdot_n[3] << " " << xdot_n[4] << " "  << xdot_n[5] << std::endl;
+//        std::cout << "w dot: " << xdot_n[6] << " " << xdot_n[7] << " "  << xdot_n[8] << std::endl;
 
 
         // increment length
@@ -704,8 +706,13 @@ void CRMIntegrand (	adType s, adType x[NUM_STATES],
 
     adType Length;
     double deltalambdainv;
-    adType u[3], v[3], w[3], R[9]; 	// p[3];   				we will not need this for analytical calculation
-    adType udot[3], vdot[3], wdot[3]; 		//] Rdot[9], pdot[3];	we will not need this for analytical calculation
+#ifdef ANALYTICAL_SE3_STEP
+    adType u[3], R[9], v[3], w[3]; 	// p[3];   				we will not need this for analytical calculation
+	adType udot[3], vdot[3], wdot[3]; 	// Rdot[9], pdot[3];	we will not need this for analytical calculation
+#else
+    adType u[3], R[9], p[3], v[3], w[3];
+    adType udot[3], Rdot[9], pdot[3], vdot[3], wdot[3];
+#endif
     adType K[9], Kinv[9], l[3], fcum[3], ustar[3], ustardot[3];  //  We are assuming Kdot=0.0 (K=const)
 
     // copy inputs and parameters to local variables
@@ -716,10 +723,12 @@ void CRMIntegrand (	adType s, adType x[NUM_STATES],
         else if (i<12) { 	// 3 <= i < 12
             R[i-3]=x[i];
         }
-        // we will not need this for analytical calculation
-        //else { 				// 12 <= i < 15
-        //	p[i-12]=x[i];
-        //}
+#ifndef ANALYTICAL_SE3_STEP
+            // we will not need this for analytical calculation
+        else { 				// 12 <= i < 15
+            p[i - 12] = x[i];
+        }
+#endif
     }
     Length=Li;
     deltalambdainv=dlambdainv;
@@ -757,10 +766,6 @@ void CRMIntegrand (	adType s, adType x[NUM_STATES],
     adType u_hat[9];
     wHat(u,u_hat);
 
-//    for (int i = 0; i < NUM_STATES; ++i) {
-//        std::cout << "crm_iNTEGRAD: " << x[i] << std::endl;
-//    }
-
     // udot = ustardot - Kinv*((um*K+Kdot)*(u-ustar_s) + e3m*R'*intf + R'*l); % udot
     //
     //   e3hat*R' = [ -r12 -r22 -r32; r11 r21 r31; 0 0 0];
@@ -783,6 +788,15 @@ void CRMIntegrand (	adType s, adType x[NUM_STATES],
     mMult_AB<3,3,1>(Kinv,sumterm,KinvSum);					// Kinv*((um*K+Kdot)*(u-ustar_s) + e3m*R'*intf + R'*l)
     mSub_AB<3,1>(ustardot,KinvSum,udot);					// udot = ustardot - Kinv*((um*K+Kdot)*(u-ustar_s) + e3m*R'*intf + R'*l);
 
+#ifndef ANALYTICAL_SE3_STEP
+    // we will not need these for analytical calculation
+    // Rdot = R*u_hat
+    mMult_AB<3, 3, 3>(R, u_hat, Rdot);
+    // pdot = R*e3,
+    for (int i = 0; i < 3; i++) {
+        pdot[i] = R[i * 3 + 2];
+    }
+#endif
 
     /*
      * Twist
@@ -812,8 +826,8 @@ void CRMIntegrand (	adType s, adType x[NUM_STATES],
     adType u_diff_[3], u_diff[3];
 
 //    std::cout << "w: " << w[0] << " " << w[1] << " " << w[2] << std::endl;
-    std::cout << "u_pre: " << u_pre[0] << " " << u_pre[1] << " " << u_pre[2] << std::endl;
-    std::cout << "u: " << u[0] << " " << u[1] << " " << u[2] << std::endl;
+//    std::cout << "u_pre: " << u_pre[0] << " " << u_pre[1] << " " << u_pre[2] << std::endl;
+//    std::cout << "u: " << u[0] << " " << u[1] << " " << u[2] << std::endl;
 
     mSub_AB<3,1>(u, u_pre, u_diff_);
     u_diff[0] = u_diff_[0]/DELTA_T; u_diff[1] = u_diff_[1]/DELTA_T; u_diff[2] = u_diff_[2]/DELTA_T;

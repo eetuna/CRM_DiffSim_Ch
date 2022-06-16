@@ -166,7 +166,7 @@ void RunBVPTest(){
     double ShearModlist[NUM_FLEX_SEG] = { 2.3881, 2.3881};
     double CoilAlignmentAngles[NUM_ACT_SET][2] = { {0.0, 0.0} };
     double CoilTurnAreaMat[NUM_ACT_SET][9] = { { 1.44, 0.0, 0.0, 0.0, 1.3851, 0.0, 0.0, 0.0, 1.60 }  };
-    double ActuationCurrents[NUM_ACT_SET][3] = { {0.1, 0.1, 0.1}};
+    double ActuationCurrents[NUM_ACT_SET][3] = { {0.0, 0.0, 0.1}};
     double SegmentLengths[NUM_SEGMENTS] = {10.72, 16.14, 15.395}; // { 10.72, 16.14, 15.395, 15.61, 46.135 };
     double SegEnds[NUM_SEGMENTS] = { 10.72, 26.86, 42.255}; //{ 10.72, 26.86, 42.255, 57.865, 104.02 };
     double ActMass[NUM_ACT_SET] = {7.7736e-5};
