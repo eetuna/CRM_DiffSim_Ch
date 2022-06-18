@@ -4,7 +4,7 @@
 # compile CXX with /usr/bin/c++
 CXX_DEFINES = 
 
-CXX_INCLUDES = -I/home/ranhao/Documents/CRM_Dynamics/build -I/home/ranhao/Documents/CRM_Dynamics -I/home/ranhao/Documents/CRM_Dynamics/CRMDYN.hpp -isystem /usr/include/python3.8
+CXX_INCLUDES = -I/home/ranhao/Documents/CRM_Dynamics/build -I/home/ranhao/Documents/CRM_Dynamics -I/home/ranhao/Documents/CRM_Dynamics/CRMDYN.hpp -isystem /usr/include/python3.6m
 
 CXX_FLAGS = -std=gnu++1z
 
