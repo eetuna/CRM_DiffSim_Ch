@@ -246,10 +246,10 @@ void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSiz
     }
 
 
-    for (int i = 0; i < NUM_ACT_SET; ++i) {
-        std::cout << "actInertia inside: " << actInertia[i][0] << " " << actInertia[i][4] << " " << actInertia[i][8] << std::endl;
-        std::cout << "actMass inside: " << actMass[i]  << std::endl;
-    }
+//    for (int i = 0; i < NUM_ACT_SET; ++i) {
+//        std::cout << "actInertia inside: " << actInertia[i][0] << " " << actInertia[i][4] << " " << actInertia[i][8] << std::endl;
+//        std::cout << "actMass inside: " << actMass[i]  << std::endl;
+//    }
 }
 
 
@@ -470,6 +470,7 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
             mMult_AB<3,3,1>(actInertia[actno], w_L, IwL);
 
             mMult_AB<3,3,1>(w_L_hat, IwL, wIwL);
+
 
             for (int j = 0; j < 3; ++j) {
                 WrenchResidual[j+3] =  Ideltaw[j] /DELTA_T + wIwL[j] + Residual[j];

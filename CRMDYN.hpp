@@ -24,7 +24,8 @@
 
 #define NUM_RESIDUAL 6
 #define DELTA_T 0.0001
-#define RESIDUAL_SCALE_F	0.5 //(10.0)			// the residual for coil force coming out of the IVP will be multiplied with this scale to return to the Nonlinear Solver
+#define RESIDUAL_SCALE_F	10 //(10.0)			// the residual for coil force coming out of the IVP will be multiplied with this scale to return to the Nonlinear Solver
+#define RESIDUAL_SCALE_M	100.0 //(10.0)			// the residual for tip moment coming out of the IVP will be multiplied with this scale to return to the Nonlinear Solver
 
 
 #define NUM_FCUM_LAMBDA 104  	//  Number of steps used in calculating fcumlambda (cumulative forces); number of entries in fcumlambda is (NUM_FCUM+1)
@@ -32,7 +33,6 @@
 // Regularization scales used for Nonlinear Solver
 #define IVALUE_SCALE_U	1.0 //(0.01)			// the variable used in Nonlinear Solver is multiplied with this scale to calculate u (curvature) that will be used in IVP
 #define IVALUE_SCALE_F	(0.01)			// the variable used in Nonlinear Solver is multiplied with this scale to calculate ftip (tip force) that will be used in IVP
-#define RESIDUAL_SCALE_M	1.0 //(10.0)			// the residual for tip moment coming out of the IVP will be multiplied with this scale to return to the Nonlinear Solver
 #define RESIDUAL_SCALE_P	100.0 //(10.0)			// the residual for tip position error coming out of the IVP will be multiplied with this scale to return to the Nonlinear Solver
 
 // NL Solver method selection
