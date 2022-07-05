@@ -417,10 +417,10 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 			mMult_ATB<3,3,1>(&(xf[3]),B0,RscTB0);
 			mMult_AB<3,3,1>(muhat,RscTB0,Tb);
 			// u2=u2star + ( K2inv K1 (u1 - u1star ) - K2inv Tb )
-			mSub_AB<3,1>( &(xi[0]) , ustar[fsegi], deltau1); // ?????????????????
+//			mSub_AB<3,1>( &(xi[0]) , ustar[fsegi], deltau1); // ?????????????????
 //            std::cout << "xi" << xi[0] << " " << xi[1] << " " << xi[2] << " " << std::endl;
 
-//            mSub_AB<3,1>( &(xf[0]) , ustar[fsegi], deltau1);
+            mSub_AB<3,1>( &(xf[0]) , ustar[fsegi], deltau1);
 
             mMult_AB<3,3,1>( K[fsegi], deltau1, K1deltau1 );
 			mSub_AB<3,1>( K1deltau1 , Tb, Residual);
@@ -431,9 +431,9 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
             //Dynamic boundary value problem
             adType v_L[3], w_L[3], deltav[3], deltaw[3];
             adType wvL[3], Ideltaw[3], IwL[3], wIwL[3], gravity_force[3];
-            for (int i = 0; i < 3; ++i) {
-                v_L[i] = xf[i+3+9+3];
-                w_L[i] = xf[i+3+9+6];
+            for (int j = 0; j < 3; ++j) {
+                v_L[j] = xf[j+3+9+3];
+                w_L[j] = xf[j+3+9+6];
             }
             mSub_AB<3,1>(v_L, v_L_pre, deltav);
 
@@ -450,8 +450,8 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 
 
             adType R[9];
-            for (int i = 0; i < 9; ++i) {
-                R[i] = xf[i+3];
+            for (int j = 0; j < 9; ++j) {
+                R[j] = xf[j+3];
             }
             mMult_ATB<3,3,1>(R, g, gravity_force);
 //            std::cout << " gravity_force in core: " << gravity_force[0] << " " << gravity_force[1] << " " << gravity_force[2] << std::endl;
@@ -473,7 +473,7 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 
 
             for (int j = 0; j < 3; ++j) {
-                WrenchResidual[j+3] =  Ideltaw[j] /DELTA_T + wIwL[j] + Residual[j];
+                WrenchResidual[j+3] = Ideltaw[j] /DELTA_T + wIwL[j] + Residual[j];
             }
 
             std::cout << " Residual moment in core: " << WrenchResidual[3] << " " << WrenchResidual[4] << " " << WrenchResidual[5] << std::endl;
@@ -481,8 +481,7 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
             if (i < (NUM_SEGMENTS-1)) {	// we want to make sure that we are not at the last segment
 				mMult_AB<3,3,1>( Kinv[fsegip1], Residual, K2invResidual );
 				mAdd_AB<3,1>( ustar[fsegip1], K2invResidual, &(xi[0]) );
-			}
-			else {	// otherwise, we are at the last segment, and we need to copy the R and p values calculated for xi to xf so that they can be returned
+			}else {	// otherwise, we are at the last segment, and we need to copy the R and p values calculated for xi to xf so that they can be returned
 				for (int j=0; j<NUM_STATES; j++) {
 					if (j<3) xf[j]=0.0;  // u[0..2] are assigned to zero
 					else xf[j]=xi[j];
@@ -916,8 +915,8 @@ void RK2_step(	adType in_x_n[NUM_STATES], adType t_n, double h,
 				adType out_x_np1[NUM_STATES], adType out_xdot_n[NUM_INTEGRATION_STATES] ) {
 
     adType x_n[NUM_STATES];       // from input
-	adType k1[NUM_STATES];
-	adType k2oh[NUM_STATES];
+	adType k1[NUM_INTEGRATION_STATES];
+	adType k2oh[NUM_INTEGRATION_STATES];
 	adType x_n_p_k1o2[NUM_STATES];
 	adType xdot_n[NUM_INTEGRATION_STATES];
 

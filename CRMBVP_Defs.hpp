@@ -255,7 +255,7 @@ void NLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params) {
     // don't forget to scale parameters before returning to the nonlinear equation solver
     if (Params.ContactMode == ContactModeType::FREE_TIP) {
         for (int i = 0; i < 3; i++) {
-            out_y[i] = RESIDUAL_SCALE_M * fabs(WrenchResidual[i+3] ) + RESIDUAL_SCALE_F * fabs(WrenchResidual[i] ) ;
+            out_y[i] = RESIDUAL_SCALE_M * fabs(WrenchResidual[i+3] );// + RESIDUAL_SCALE_F * fabs(WrenchResidual[i] ) ;
 //            out_y[i+3] = RESIDUAL_SCALE_M * WrenchResidual[i+3];
         }
     }

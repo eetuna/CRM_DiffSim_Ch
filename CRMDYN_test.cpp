@@ -120,7 +120,7 @@ int RunExample(void) {
 	// Inserted Length of the catheter (length of the catheter that is inside the heart chamber) - unit: mm
 	double InsertedLength = 104.0;
 	// Actuation currents for each of the coils for each of the coil sets - unit: A
-	double ActuationCurrents[NUM_ACT_SET][3] = { {0.100, 0.100, 0.100}};
+	double ActuationCurrents[NUM_ACT_SET][3] = { {0.0, 0.0, 0.0}};;//{ {0.100, 0.100, 0.100}};
 
 	// *** Numerical Computation Parameters
 	// Stepsize used in numerical integration along the length of the catehter during IVP - unit: mm
@@ -130,7 +130,7 @@ int RunExample(void) {
     for (int i = 0; i < NUM_ACT_SET; ++i)
     {
         double I_zz = 0.5 * ActMass[i] * (oRlist[0] * oRlist[0] + iRlist[0] * iRlist[0]);
-        double I_xx = 0.25 * ActMass[i] * (oRlist[0] * oRlist[0] + iRlist[0] * iRlist[0]) + 1 / 12 * ActMass[i] * SegEnds[2*i+1];
+        double I_xx = 0.25 * ActMass[i] * (oRlist[0] * oRlist[0] + iRlist[0] * iRlist[0]) + 1.0 / 12 * ActMass[i] * SegEnds[2*i+1];
         ActInertia[i][0] = I_xx; ActInertia[i][1] = 0.0; ActInertia[i][2] = 0.0;
         ActInertia[i][3] = 0.0; ActInertia[i][4] = I_xx; ActInertia[i][5] = 0.0;
         ActInertia[i][6] = 0.0; ActInertia[i][7] = 0.0; ActInertia[i][8] = I_zz;
