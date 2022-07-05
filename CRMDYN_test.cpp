@@ -120,7 +120,7 @@ int RunExample(void) {
 	// Inserted Length of the catheter (length of the catheter that is inside the heart chamber) - unit: mm
 	double InsertedLength = 104.0;
 	// Actuation currents for each of the coils for each of the coil sets - unit: A
-	double ActuationCurrents[NUM_ACT_SET][3] = { {0.0, 0.0, 0.0}};;//{ {0.100, 0.100, 0.100}};
+	double ActuationCurrents[NUM_ACT_SET][3] = { {0.100, 0.100, 0.100}};
 
 	// *** Numerical Computation Parameters
 	// Stepsize used in numerical integration along the length of the catehter during IVP - unit: mm
