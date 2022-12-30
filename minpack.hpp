@@ -63,7 +63,7 @@
 	*/
 
 
-#include "CRMDYN.hpp"
+//#include "CRMDYN.hpp"
 
 template <typename adType>
 void TrustRegionDogleg(		int n, adType x[], adType fvec[], double tol, int& info, adType wa[], int lwa, NLEqnParams<adType> Params);

@@ -4,67 +4,32 @@
 
 #define M_PI 3.14159265358979323846
 
-template <typename adType>
-void CRM_ForwardKinematics(double in_x[], double out_y[], CRMForwardKinematicsData Params) {
-	
-	ContactModeType ContactMode = Params.ContactMode;
-	int X_Dim = NUM_ACT_SET * 3 + 1;	// Dimension of the Input 3 x NUM_ACT_SET + 1 for inserted length
-	int Y_Dim;							// Dimension of the Output
-	if (ContactMode == ContactModeType::FREE_TIP) {
-		Y_Dim = 3 + 9 + 3;					// tip position + R + u_0
-	}
-	else { // FIXED_TIP
-		Y_Dim = 3 + 9 + 3 + 3;				//   ... + tip force
-	}
-	
-	adType ActuationCurrents[NUM_ACT_SET][3];
-	adType InsertedLength;
-	adType u0_calc[3];
-	adType ftip_calc[3];
-	adType x0[NUM_STATES];
-	adType xf[NUM_STATES];
-	adType residual[3];
-	CRMShootingMethodParams<adType> BVPParams;
-	int localmin;
-
-	for (int i = 0; i < NUM_ACT_SET; i++)	for (int j = 0; j < 3; j++)	ActuationCurrents[i][j] = in_x[i * 3 + j];
-	InsertedLength = in_x[NUM_ACT_SET * 3];
-
-	CRMConstructShootingMethodParamSet(*(Params.CathParams), *(Params.CathConfig), InsertedLength, ActuationCurrents, ContactMode, Params.TipConstraintPoint, Params.TipForce, Params.IntegrationStepSize, BVPParams);
-
-	CRMShootingMethodBVP(BVPParams, Params.u0_initialguess, Params.ftip_initialguess, u0_calc, ftip_calc, localmin);
-
-	for (int i = 0; i < 3; i++) x0[i] = u0_calc[i];
-	for (int i = 0; i < 9; i++) x0[i + 3] = Params.CathConfig->R0[i];
-	for (int i = 0; i < 3; i++) x0[i + 3 + 9] = Params.CathConfig->p0[i];
-
-	// Cosserat Rod Model - Solve the Initial Value Problem to calculate the shape of the catheter 
-	CRMSolverIVP(BVPParams, x0, ftip_calc, Params.FinalValueOnly, xf, residual, *(Params.ReportedMarkerPos));
-
-	for (int i = 0; i < 3; i++) {
-		out_y[i] = xf[3 + 9 + i];
-		out_y[3 + 9 + i] = u0_calc[i];
-		if (ContactMode == ContactModeType::FIXED_TIP) out_y[3 + 9 + 3 + i] = ftip_calc[i];
-	}
-	for (int i = 0; i < 9; i++) {
-		out_y[3 + i] = xf[3 + i];
-	}
-
-}
-
 
 template <typename adType>
-void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params, 
-							double in_u0_initialguess[3], double in_ftip_initialguess[3],
-							adType out_u0[3], adType out_ftip[3], int& out_localmin) {
+void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params,  adType in_initial_guess[NUM_RESIDUAL], double in_ftip_initialguess[3],
+							adType out_calc[NUM_RESIDUAL], adType out_ftip[3], int& out_localmin) {
 
-	ContactModeType ContactMode = in_Params.ContactMode;
+    double in_u0_initialguess[3], in_n0_initialguess[3], in_nL_initialguess[3], in_uL_initialguess[3];
+    for (int i = 0; i < 3; ++i) {
+        in_u0_initialguess[i] = in_initial_guess[i];
+        in_n0_initialguess[i] = in_initial_guess[i+3];
+    }
+
+    if (NUM_RESIDUAL > 6)
+    {
+        for (int i = 0; i < 3; ++i) {
+            in_uL_initialguess[i] = in_initial_guess[i+6];
+            in_nL_initialguess[i] = in_initial_guess[i+9];
+        }
+    }
+
+    ContactModeType ContactMode = in_Params.ContactMode;
 	int NLEq_Dim;  // Dimension of the Nonlinear Equation to Solve
 	if (ContactMode == ContactModeType::FREE_TIP) {
-		NLEq_Dim = 3;
+		NLEq_Dim = NUM_RESIDUAL;
 	}
 	else { // FIXED_TIP
-		NLEq_Dim = 6;
+		NLEq_Dim = 9;
 	}
 	// Call CRMSolverIVP_Prep, to pre-process parameters
 	adType x_0[NUM_STATES];
@@ -78,44 +43,62 @@ void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params,
 		else if (i < 15) {
 			x_0[i] = in_Params.p0[i - 12];
 		}
+        else if (i < 18) {
+            x_0[i] = in_Params.v0[i - 15];
+        }
+        else if (i < 21) {
+            x_0[i] = in_Params.w0[i - 18];
+        }
+        else if (i < 24) {
+            x_0[i] = in_n0_initialguess[i - 21];
+        }
+        else{
+            x_0[i] = 0.0; //else, m_0 initialize with 0, initialize in IVPcore
+        }
 	}
 	bool FinalValueOnly = true;
 	NLEqnParams<adType> NLEParams;
 
-	CRMSolverIVP_Prep(x_0, in_Params.IntegrationStepSize,
+
+    CRMSolverIVP_Prep(x_0, in_Params.IntegrationStepSize,
 		in_Params.Li, in_Params.dlambdainv,
 		in_Params.SegEndLambdas, in_Params.LocMarkerLambdas,
 		in_Params.K, in_Params.Kinv, in_Params.ustar,
 		in_Params.MagMoment, in_Params.fcumlambda,
-		in_Params.B0, in_Params.g, in_Params.v_L_pre, in_Params.w_L_pre, in_Params.actMass, in_Params.actInertia,
-		FinalValueOnly,
-		NLEParams);
+		in_Params.B0, in_Params.g, in_Params.u_history, in_Params.v_history, in_Params.w_history,
+        in_Params.v_L_pre, in_Params.w_L_pre, in_Params.actMass, in_Params.actInertia,
+		in_Params.rho, in_Params.tubingInertia,
+        in_Params.DELTA_T, in_Params.damping_tubing_mat, in_Params.damping_coil_diag,
+                      in_Params.inv_K_D, FinalValueOnly, NLEParams);
 
     NLEParams.ContactMode = ContactMode;
 	mCopy_AB<3>(in_Params.TipConstraintPoint, NLEParams.TipConstraintPoint);
 
 	// Scale parameters and call the nonlinear equation solver
 	const double uscaleinv = 1.0 / IVALUE_SCALE_U;
-	const double fscaleinv = 1.0 / IVALUE_SCALE_F;
-	double* initialguessscaled = new double [NLEq_Dim];
-	adType* returnedparamscaled = new adType [NLEq_Dim];
-	if (ContactMode == ContactModeType::FREE_TIP) {
+    const double nscaleinv = 1.0 / IVALUE_SCALE_N;
+
+    const double fscaleinv = 1.0 / IVALUE_SCALE_F;
+	auto* initialguessscaled = new double [NLEq_Dim];
+	auto* returnedparamscaled = new adType [NLEq_Dim];
+
+    if (ContactMode == ContactModeType::FREE_TIP) {
+
 		for (int i = 0; i < 3; i++) {
 			initialguessscaled[i] = uscaleinv * in_u0_initialguess[i];
-			NLEParams.TipForce[i] = in_Params.TipForce[i];  // if the catheter is not in contact, the tip force specified within in_Params needs to be used; this would not be scaled as it is not changed by the solver
+            initialguessscaled[i+3] = nscaleinv * in_n0_initialguess[i];
+            if (NUM_RESIDUAL > 6){
+                initialguessscaled[i+6] = uscaleinv * in_uL_initialguess[i];
+                initialguessscaled[i+9] = nscaleinv * in_nL_initialguess[i];
+            }
+            NLEParams.TipForce[i] = in_Params.TipForce[i];  // if the catheter is not in contact, the tip force specified within in_Params needs to be used; this would not be scaled as it is not changed by the solver
 		}
 	}
-	else { // FIXED_TIP
-		for (int i = 0; i < 3; i++) {
-			initialguessscaled[i] = uscaleinv * in_u0_initialguess[i];
-			initialguessscaled[i+3] = fscaleinv * in_ftip_initialguess[i];
-		}
 
-	}
-
-	int localmin = 0, errorcode = 0;
+    int localmin = 0, errorcode = 0;
 
 	adType* x = new adType[NLEq_Dim]; // we will create a new variable here and not use initial guess scaled since truss-region-dogleg algorithm uses the same variable for both input and output
+
 	adType* residual = new adType[NLEq_Dim];
 	int info;
 	int lwa = (NLEq_Dim * (3 * NLEq_Dim + 13)) / 2;
@@ -133,6 +116,7 @@ void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params,
 	delete[] x;
 	delete[] wa;
 
+
 	/*
 	// AUTODIFF TEST CODE
 	using Eigen::MatrixXd;
@@ -144,129 +128,103 @@ void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params,
 	*/
 
 	if (ContactMode == ContactModeType::FREE_TIP) {
-		for (int i = 0; i < EQNDIMENSION; i++) {
-			out_u0[i] = IVALUE_SCALE_U * returnedparamscaled[i];
-			out_ftip[i] = in_Params.TipForce[i];  // if it is free-tip, return the tip force specified within in_Params
+		for (int i = 0; i < 3; i++) {
+			out_calc[i] = IVALUE_SCALE_U * returnedparamscaled[i];
+            out_calc[i+3] = IVALUE_SCALE_N * returnedparamscaled[i+3];
+            if (NUM_RESIDUAL > 6){
+                out_calc[i+6] = IVALUE_SCALE_U * returnedparamscaled[i+6];
+                out_calc[i+9] = IVALUE_SCALE_N * returnedparamscaled[i+9];
+            }
+            out_ftip[i] = in_Params.TipForce[i];  // if it is free-tip, return the tip force specified within in_Params
 		}
 	}
 	else { // FIXED_TIP
-		for (int i = 0; i < EQNDIMENSION; i++) {
-			out_u0[i] = IVALUE_SCALE_U * returnedparamscaled[i];
+		for (int i = 0; i < 3; i++) {
+            out_calc[i] = IVALUE_SCALE_U * returnedparamscaled[i];
 			out_ftip[i] = IVALUE_SCALE_F * returnedparamscaled[i+3];
 		}
 	}
+
 	out_localmin = localmin;
 	delete[] initialguessscaled;
-	delete[] returnedparamscaled;
+    delete[] returnedparamscaled;
+
 }
-
-//
-//template <typename adType>
-//void CRMShootingMethodBVP(
-//	ContactModeType in_ContactMode,					// in_ContactMode == FREE_TIP if the catheter is not in contact with a surface, FIXED_TIP if catheter tip is constrained to be at TipContraintPoint
-//	double 	in_u0_initialguess[3],					// Initial guess for the local curvature vector at the entry point
-//	double 	in_ftip_initialguess[3],				// Initial guess for the tip force (\lambda=0), used when in_ContactMode == FIXED_TIP
-//	double	in_InsertedLength, 						// Inserted Length (length of the catheter from the entry point to the tip)
-//	double 	in_ActuationCurrents[NUM_ACT_SET][3], 	// Actuation current for each of the actuation coils
-//													//    actuator units are numbered/ordered from the tip of the catheter towards the base (distal to proximal)
-//	double	in_TipConstraintPoint[3],				// The spatial coordinates of the point where the catheter tip is constrained to be (used if in_ContactMode == FIXED_TIP)
-//	double	in_TipForce[3],							// External point force (in spatial coordinates) applied at the tip of the catheter (\lambda = 0) - this value will not be used if in_ContactMode == FIXED_TIP
-//	double	in_IntegrationStepSize,					// Stepsize used in numerical integration along the length of the catheter
-//	// Catheter Configuration Parameters
-//	double 	in_B0[3],								// B0 field vector of the MRI scanner (in spatial coordinates)
-//	double 	in_g[3],								// Gravity vector (in spatial coordinates)
-//	double 	in_p0[3],								// Catheter entry port position (in spatial coordinates)
-//	double 	in_R0[9],								// Catheter orientation at the entry port (relative to the spatial frame); 3x3 matrix stored in row major order
-//	// Catheter Model Parameters
-//	//	For all parameters below, segments and actuator units are numbered/ordered from the tip of the catheter towards the base (distal to proximal)
-//	double 	in_SegLengths[NUM_SEGMENTS],			// Array of segment lengths; NUM_SEGMENTS long array
-//	double	in_LocMarkers[NUM_LOCALIZATION_MARKERS],// Array of localization marker locations (in lambda coordinates); NUM_LOCALIZATION_MARKERS long array
-//	double	in_InnerRadius[NUM_FLEX_SEG],			// Inner radii of the flexible catheter segments
-//	double	in_OuterRadius[NUM_FLEX_SEG],			// Outer radii of the flexible catheter segments
-//	double	in_YoungsModulus[NUM_FLEX_SEG],			// Youngs Moduli of the flexible catheter segments
-//	double	in_ShearModulus[NUM_FLEX_SEG],			// Shear Moduli of the flexible catheter segments
-//	double 	in_ustar[NUM_FLEX_SEG][3],				// Local curvature in unloaded configuration for each of the flexible segments; (NUM_FLEX_SEG)*3 long array, (NUM_FLEX_SEG) 3x1 vectors
-//													//		Actuator segments are assumed to be straight
-//	double 	in_CoilAlignmentAngles[NUM_ACT_SET][2],	// Coil Alignment Angles; NUM_ACT_SET*2 long array, for each actuator set, the angle for the first coil is relative to x axis, and the angle for the second coil is relative to y axis
-//	double 	in_CoilTurnAreaMat[NUM_ACT_SET][9], 	// Coil Turn Area matrices; NUM_ACT_SET*9 long array, NUM_ACT_SET 3x3 matrices stored in row major order
-//	double 	in_rho[NUM_SEGMENTS],					// Length density (mass per unit length) of the flexible catheter substrate (tubing); (NUM_SEGMENTS) long array
-//	double 	in_ActMass[NUM_ACT_SET],				// Actuator segment masses, does not include the flexible substrate; (NUM_ACT_SET) long array
-//	// Outputs
-//	double 	out_u0[3], 								// Local curvature vector at the entry point calculated through the solution of BVP
-//	double 	out_ftip[3],							// Tip force calculated through the solution of BVP (\lambda=0) --- used when in_ContactMode == FIXED_TIP
-//	int& out_localmin							// out_localmin!=0 if algorithms is stuck at a local minimum, or cannot make further progress
-//) {
-//
-//	// Copy input parameters to local variables --- needed for dataflow optimization
-//	CRMCatheterModelParams CathParams;
-//	CatheterConfiguration CathConfig;
-//	CRMShootingMethodBVP_Prep(in_B0, in_g, in_p0, in_R0,
-//		in_SegLengths, in_LocMarkers, in_InnerRadius, in_OuterRadius, in_YoungsModulus, in_ShearModulus,
-//		in_ustar, in_CoilAlignmentAngles, in_CoilTurnAreaMat, in_rho, in_ActMass,
-//		CathParams, CathConfig);
-//
-//    adType InsertedLength = in_InsertedLength;
-//	adType ActuationCurrents[NUM_ACT_SET][3];
-//	mCopy_AB<NUM_ACT_SET * 3>(&(in_ActuationCurrents[0][0]), &(ActuationCurrents[0][0]));
-//	double IntegrationStepSize = in_IntegrationStepSize;
-//	// Calculate Shooting Method Parameter Set from model and configuration parameters
-//	CRMShootingMethodParams<adType> ShootingParams;
-//	CRMConstructShootingMethodParamSet(CathParams, CathConfig,
-//		InsertedLength, ActuationCurrents, in_ContactMode, in_TipConstraintPoint, in_TipForce,
-//		IntegrationStepSize,
-//		ShootingParams);
-//
-//	adType u0_calc[3], ftip_calc[3];
-//
-//	CRMShootingMethodBVP(ShootingParams, in_u0_initialguess, in_ftip_initialguess, u0_calc, ftip_calc, out_localmin);
-//
-//	for (int i = 0; i < 3; i++) out_u0[i] = dVal(u0_calc[i]);
-//	for (int i = 0; i < 3; i++) out_ftip[i] = dVal(ftip_calc[i]);
-//
-//}
-
 
 template <typename adType>
 void NLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params) {
 
-    adType x_N[NUM_STATES];
-    double p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3];
-    adType WrenchResidual[NUM_RESIDUAL];
-    UHistory u_history[NUM_FLEX_SEG];
+//    adType x_N[NUM_STATES];
+//    double p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3];
+//    adType OutResidual[NUM_RESIDUAL];
+//    paramHistory u_history[NUM_FLEX_SEG], v_history[NUM_FLEX_SEG], w_history[NUM_FLEX_SEG];
+//    adType v_L[3], w_L[3], pL[3], RL[9];
+//    adType ftip[3], in_initials[NUM_RESIDUAL];
 
-    adType u_0[3], ftip[3];
+    auto* x_N = new adType [NUM_STATES];
+    auto* p_atLocMarkers = new adType [NUM_LOCALIZATION_MARKERS][3];
+    auto* OutResidual = new adType [NUM_RESIDUAL];
+    auto* u_history = new paramHistory [NUM_FLEX_SEG];
+    auto* v_history = new paramHistory [NUM_FLEX_SEG];
+    auto* w_history = new paramHistory [NUM_FLEX_SEG];
+
+    auto* v_L = new adType [3];
+    auto* w_L = new adType [3];
+    auto* pL = new adType [3];
+    auto* RL = new adType [9];
+    auto* ftip = new adType [3];
+    auto* in_initials = new adType [NUM_RESIDUAL];
+
+
     // don't forget to scale parameters before passing to the CRMSolverIVP
     if (Params.ContactMode == ContactModeType::FREE_TIP) {
         for (int i = 0; i < 3; i++) {
-            u_0[i] = IVALUE_SCALE_U * in_x[i];
+            in_initials[i] = IVALUE_SCALE_U * in_x[i];
+            in_initials[i+3] = IVALUE_SCALE_N * in_x[i+3];
+            if (NUM_RESIDUAL > 6){
+                in_initials[i+6] = IVALUE_SCALE_U * in_x[i+6];
+                in_initials[i+9] = IVALUE_SCALE_N * in_x[i+9];
+            }
+
             ftip[i] = Params.TipForce[i];  // for free-tip, this parameter is not given by the nonlinear equation solver, and hence, does not need to be scaled
         }
     }
     else { // FIXED_TIP
         for (int i = 0; i < 3; i++) {
-            u_0[i] = IVALUE_SCALE_U * in_x[i];
+            in_initials[i] = IVALUE_SCALE_U * in_x[i];
             ftip[i] = IVALUE_SCALE_F * in_x[i + 9];
         }
     }
 
     // We will only call the IVP_Core, since preprocessing is already done
-    CRMSolverIVP_Core(Params, u_0, ftip, x_N, WrenchResidual, p_atLocMarkers, u_history );
+    CRMSolverIVP_Core(Params, in_initials, ftip, x_N, OutResidual, p_atLocMarkers,
+                      u_history, v_history, w_history, v_L, w_L , pL, RL);
+
+    delete[] u_history;
+    delete[] v_history;
+    delete[] w_history;
+    delete[] x_N;
+    delete[] p_atLocMarkers;
+    delete[] v_L;
+    delete[] w_L;
+    delete[] pL;
+    delete[] RL;
+    delete[] ftip;
+    delete[] in_initials;
 
     // don't forget to scale parameters before returning to the nonlinear equation solver
     if (Params.ContactMode == ContactModeType::FREE_TIP) {
         for (int i = 0; i < 3; i++) {
-            out_y[i] = RESIDUAL_SCALE_M * fabs(WrenchResidual[i+3] );// + RESIDUAL_SCALE_F * fabs(WrenchResidual[i] ) ;
-//            out_y[i+3] = RESIDUAL_SCALE_M * WrenchResidual[i+3];
-        }
-    }
-    else { // FIXED_TIP
-        for (int i = 0; i < 3; i++) {
-            out_y[i] = RESIDUAL_SCALE_M * WrenchResidual[i];
-            out_y[i + 3] = RESIDUAL_SCALE_P * (x_N[i + 12] - Params.TipConstraintPoint[i]);
+            out_y[i] = RESIDUAL_SCALE_M * OutResidual[i+3];// RESIDUAL_SCALE_F * WrenchResidual[i] ;
+            out_y[i+3] = RESIDUAL_SCALE_F * OutResidual[i] ;
+            if (NUM_RESIDUAL > 6){
+                out_y[i+6] = RESIDUAL_SCALE_F * OutResidual[i+6];
+                out_y[i+9] = RESIDUAL_SCALE_M * OutResidual[i+9];
+            }
         }
     }
 
-
+    delete[] OutResidual;
 
 }
 
@@ -279,6 +237,7 @@ void CRMShootingMethodBVP_Prep (
         double in_ustar[NUM_FLEX_SEG][3],
         double in_CoilAlignmentAngles[NUM_ACT_SET][2], double in_CoilTurnAreaMat[NUM_ACT_SET][9],
         double in_rho[NUM_SEGMENTS],	double in_ActMass[NUM_ACT_SET], double in_ActInertia[NUM_ACT_SET][9],
+        double in_tubingInertia[NUM_ACT_SET][9],
         CRMCatheterModelParams &CathParams, CatheterConfiguration &CathConfig ) {
 
     mCopy_AB<NUM_SEGMENTS>(in_SegLengths,CathParams.SegLengths);
@@ -293,6 +252,7 @@ void CRMShootingMethodBVP_Prep (
     mCopy_AB<NUM_SEGMENTS>(in_rho,CathParams.rho);
     mCopy_AB<NUM_ACT_SET>(in_ActMass,CathParams.ActMass);
     mCopy_AB<NUM_ACT_SET, 9>(in_ActInertia,CathParams.ActInertia);
+    mCopy_AB<NUM_FLEX_SEG, 9>(in_tubingInertia,CathParams.tubingInertia);
 
     mCopy_AB<3>(in_B0,CathConfig.B0);
     mCopy_AB<3>(in_g,CathConfig.g);
@@ -309,6 +269,8 @@ void CRMConstructShootingMethodParamSet(	CRMCatheterModelParams CathParams, Cath
                                             double TipConstraintPoint[3], double TipForce[3],
                                             double IntegrationStepSize,
                                             double in_v_L_pre[3], double in_w_L_pre[3],
+                                            paramHistory u_history[NUM_FLEX_SEG],paramHistory v_history[NUM_FLEX_SEG],paramHistory w_history[NUM_FLEX_SEG],
+                                            double in_DELTA_T, double in_damping_tubing[3], double in_damping_coil[6],
                                             CRMShootingMethodParams<adType> &ShootingParams) {
     double length = 0.0;
     for (int i = 0; i < NUM_SEGMENTS; i++) {
@@ -362,6 +324,33 @@ void CRMConstructShootingMethodParamSet(	CRMCatheterModelParams CathParams, Cath
     mCopy_AB<3>(CathConfig.v0, ShootingParams.v0);
     mCopy_AB<3>(CathConfig.w0, ShootingParams.w0);
 
+    mCopy_AB<NUM_SEGMENTS>(CathParams.rho, ShootingParams.rho);
+    for (int i = 0; i < NUM_FLEX_SEG; ++i)
+    {
+        for (int j = 0; j < 9; ++j) {ShootingParams.tubingInertia[i][j] = CathParams.tubingInertia[i][j];}
+    }
+
+    //parameter history
+    for (int i = 0; i < NUM_FLEX_SEG; ++i) {
+        int length_h = u_history[i].length;
+        if (length < NUM_HISTORY_LENGTH) {
+            ShootingParams.u_history[i].length = length_h;
+            for (int j = 0; j < length_h; ++j) {
+                ShootingParams.u_history[i].data[j] = u_history[i].data[j];
+            }
+            ShootingParams.v_history[i].length = length_h;
+            for (int j = 0; j < length_h; ++j) {
+                ShootingParams.v_history[i].data[j] = v_history[i].data[j];
+            }
+            ShootingParams.w_history[i].length = length_h;
+            for (int j = 0; j < length_h; ++j) {
+                ShootingParams.w_history[i].data[j] = w_history[i].data[j];
+            }
+        }else{std::cout <<" Maximum history length exceeded!";
+            exit(1);
+        }
+    }
+
 
     ShootingParams.fcumlambda[0][0] = 0.0;
     ShootingParams.fcumlambda[0][1] = 0.0;
@@ -394,6 +383,25 @@ void CRMConstructShootingMethodParamSet(	CRMCatheterModelParams CathParams, Cath
     ShootingParams.IntegrationStepSize = IntegrationStepSize;
     mCopy_AB<9>(CathConfig.R0, ShootingParams.R0);
     mCopy_AB<3>(CathConfig.p0, ShootingParams.p0);
+
+//    std:: cout << "damping_tubing " << in_damping_tubing[0] << " " << in_damping_tubing[1] << " " << in_damping_tubing[2] << std::endl;
+
+    double damping_tubing[9], inv_K_D[9]; //(K+D)^-1
+    damping_tubing[0] = in_damping_tubing[0];		damping_tubing[1] = 0.0;			damping_tubing[2] = 0.0;
+    damping_tubing[3] = 0.0;			damping_tubing[4] = in_damping_tubing[1];		damping_tubing[5] = 0.0;
+    damping_tubing[6] = 0.0;			damping_tubing[7] = 0.0;			damping_tubing[8] = in_damping_tubing[2];
+    mCopy_AB<9>(damping_tubing, ShootingParams.damping_tubing_mat);
+
+    double C_0 = 1 / in_DELTA_T;
+    inv_K_D[0] = 1.0 / (K[0] + C_0 * in_damping_tubing[0]);		inv_K_D[1] = 0.0;				inv_K_D[2] = 0.0;
+    inv_K_D[3] = 0.0;				inv_K_D[4] = 1.0 / (K[4] + C_0 * in_damping_tubing[1]);		inv_K_D[5] = 0.0;
+    inv_K_D[6] = 0.0;				inv_K_D[7] = 0.0;				inv_K_D[8] = 1.0 / (K[8] + C_0 * in_damping_tubing[2]);
+    mCopy_AB<9>(inv_K_D, ShootingParams.inv_K_D);
+//    std:: cout << "inv_K_D " << inv_K_D[0] << " " << inv_K_D[4] << " " << inv_K_D[8] << std::endl;
+
+    mCopy_AB<6>(in_damping_coil, ShootingParams.damping_coil_diag);
+
+    ShootingParams.DELTA_T = in_DELTA_T;
 
     ShootingParams.ContactMode = ContactMode;
     mCopy_AB<3>(TipConstraintPoint, ShootingParams.TipConstraintPoint);

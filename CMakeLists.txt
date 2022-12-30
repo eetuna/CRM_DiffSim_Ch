@@ -3,10 +3,8 @@ project(CRM_Dynamics)
 
 find_package(PythonLibs REQUIRED)
 
-
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_INCLUDE_CURRENT_DIR_IN_INTERFACE ON)
-
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -30,7 +28,7 @@ add_executable(CRMDYN_test CRMDYN_test.cpp)
 
 #target_link_libraries(ILQR ${PYTHON_LIBRARIES} CRM_Model::CRM Load_LAA_model::Load_LAA_model)
 
-target_link_libraries(CRMDYN_test CRMDYN )
+target_link_libraries(CRMDYN_test CRMDYN ${PYTHON_LIBRARIES} )
 
 #target_include_directories(ILQR
 #        INTERFACE
