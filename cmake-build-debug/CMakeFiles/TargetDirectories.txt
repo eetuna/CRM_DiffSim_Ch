@@ -1,0 +1,3 @@
+/home/ranhao/Desktop/CRM_Dynamics/cmake-build-debug/CMakeFiles/edit_cache.dir
+/home/ranhao/Desktop/CRM_Dynamics/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/home/ranhao/Desktop/CRM_Dynamics/cmake-build-debug/CMakeFiles/CRMTest.dir

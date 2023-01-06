@@ -9,9 +9,8 @@ addpath(genpath('./3D_dynamic_response_data'));
 
 % Add matlab source to path
 addpath(genpath('./matlab'));
-
-addpath(genpath('./Numerical_quasi_static'));
-
+addpath(genpath('./src'));
+addpath(genpath('./main'));
 
 % Remove the magic (clownyness stays)
 clear;
