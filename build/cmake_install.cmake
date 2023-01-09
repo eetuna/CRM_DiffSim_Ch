@@ -1,4 +1,4 @@
-# Install script for directory: /home/ranhao/Documents/backup/CRM_landing_control
+# Install script for directory: /home/ranhao/CRM_Dynamics
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -50,5 +50,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "/home/ranhao/Documents/backup/CRM_landing_control/build/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "/home/ranhao/CRM_Dynamics/build/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")

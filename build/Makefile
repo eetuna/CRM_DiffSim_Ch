@@ -57,10 +57,10 @@ RM = /usr/local/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/ranhao/Documents/backup/CRM_landing_control
+CMAKE_SOURCE_DIR = /home/ranhao/CRM_Dynamics
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/ranhao/Documents/backup/CRM_landing_control/build
+CMAKE_BINARY_DIR = /home/ranhao/CRM_Dynamics/build
 
 #=============================================================================
 # Targets provided globally by CMake.
@@ -87,9 +87,9 @@ edit_cache/fast: edit_cache
 
 # The main all target
 all: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/ranhao/Documents/backup/CRM_landing_control/build/CMakeFiles /home/ranhao/Documents/backup/CRM_landing_control/build//CMakeFiles/progress.marks
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/ranhao/CRM_Dynamics/build/CMakeFiles /home/ranhao/CRM_Dynamics/build//CMakeFiles/progress.marks
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 all
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/ranhao/Documents/backup/CRM_landing_control/build/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/ranhao/CRM_Dynamics/build/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
@@ -117,41 +117,41 @@ depend:
 .PHONY : depend
 
 #=============================================================================
-# Target rules for targets named CRMTest
+# Target rules for targets named CRMDYN_test
 
 # Build rule for target.
-CRMTest: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CRMTest
-.PHONY : CRMTest
+CRMDYN_test: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CRMDYN_test
+.PHONY : CRMDYN_test
 
 # fast build rule for target.
-CRMTest/fast:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/CRMTest.dir/build.make CMakeFiles/CRMTest.dir/build
-.PHONY : CRMTest/fast
+CRMDYN_test/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/CRMDYN_test.dir/build.make CMakeFiles/CRMDYN_test.dir/build
+.PHONY : CRMDYN_test/fast
 
-main/CRMTest.o: main/CRMTest.cpp.o
-.PHONY : main/CRMTest.o
+CRMDYN_test.o: CRMDYN_test.cpp.o
+.PHONY : CRMDYN_test.o
 
 # target to build an object file
-main/CRMTest.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/CRMTest.dir/build.make CMakeFiles/CRMTest.dir/main/CRMTest.cpp.o
-.PHONY : main/CRMTest.cpp.o
+CRMDYN_test.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/CRMDYN_test.dir/build.make CMakeFiles/CRMDYN_test.dir/CRMDYN_test.cpp.o
+.PHONY : CRMDYN_test.cpp.o
 
-main/CRMTest.i: main/CRMTest.cpp.i
-.PHONY : main/CRMTest.i
+CRMDYN_test.i: CRMDYN_test.cpp.i
+.PHONY : CRMDYN_test.i
 
 # target to preprocess a source file
-main/CRMTest.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/CRMTest.dir/build.make CMakeFiles/CRMTest.dir/main/CRMTest.cpp.i
-.PHONY : main/CRMTest.cpp.i
+CRMDYN_test.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/CRMDYN_test.dir/build.make CMakeFiles/CRMDYN_test.dir/CRMDYN_test.cpp.i
+.PHONY : CRMDYN_test.cpp.i
 
-main/CRMTest.s: main/CRMTest.cpp.s
-.PHONY : main/CRMTest.s
+CRMDYN_test.s: CRMDYN_test.cpp.s
+.PHONY : CRMDYN_test.s
 
 # target to generate assembly for a file
-main/CRMTest.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/CRMTest.dir/build.make CMakeFiles/CRMTest.dir/main/CRMTest.cpp.s
-.PHONY : main/CRMTest.cpp.s
+CRMDYN_test.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/CRMDYN_test.dir/build.make CMakeFiles/CRMDYN_test.dir/CRMDYN_test.cpp.s
+.PHONY : CRMDYN_test.cpp.s
 
 # Help Target
 help:
@@ -161,10 +161,10 @@ help:
 	@echo "... depend"
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
-	@echo "... CRMTest"
-	@echo "... main/CRMTest.o"
-	@echo "... main/CRMTest.i"
-	@echo "... main/CRMTest.s"
+	@echo "... CRMDYN_test"
+	@echo "... CRMDYN_test.o"
+	@echo "... CRMDYN_test.i"
+	@echo "... CRMDYN_test.s"
 .PHONY : help
 
 

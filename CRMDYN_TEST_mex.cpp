@@ -3,10 +3,8 @@
 #include "mex.hpp"
 
 #include <cmath>
-#include "src/CRM.hpp"
-#include "src/numerical/minpack_DYN.hpp"
-#include <iostream>
-#include <eigen3/Eigen/Dense>
+#include "CRMDYN.hpp"
+#include "minpack_DYN.hpp"
 
 #define M_PI 3.14159265358979323846
 #define _USE_MATH_DEFINES
@@ -33,20 +31,40 @@ public:
         // Outer radii of each of the flexible segments - unit: mm
         /** Retrieve everything from inputs **/
         /** Retrieve x. **/
-        double v_L_pre[3], w_L_pre[3],  u0_initialguess[3], nL_initialguess[3], mL_initialguess[3], pL_pre[3], RL_pre[9];
+        double v_L_pre[NUM_ACT_SET][3], w_L_pre[NUM_ACT_SET][3],  u0_initialguess[3], nL_initialguess[3], mL_initialguess[3], pL_pre[NUM_ACT_SET][3], RL_pre[NUM_ACT_SET][9];
         // Define initial guesses to be used when solving boundary value problem
+
+
+        for (int i = 0; i < NUM_ACT_SET; ++i) {
+            for (int j = 0; j < 3; ++j) {
+                v_L_pre[i][j] = inputs[0][j+i*3];
+                w_L_pre[i][j] = inputs[1][j+i*3];
+            }
+        }
+
         for (int i = 0; i < 3; ++i) {
-            v_L_pre[i] = inputs[0][i];
-            w_L_pre[i] = inputs[1][i];
             u0_initialguess[i] = inputs[2][i];
             mL_initialguess[i] = inputs[3][i];
             nL_initialguess[i] = inputs[4][i];
-            pL_pre[i] = inputs[5][i];
-        }
-        for (int i = 0; i < 9; ++i) {
-            RL_pre[i] = inputs[6][i];
         }
 
+        for (int i = 0; i < NUM_ACT_SET; ++i) {
+            for (int j = 0; j < 3; ++j) {pL_pre[i][j] = inputs[5][j+i*3];}
+        }
+
+        for (int i = 0; i < NUM_ACT_SET; ++i) {
+            for (int j = 0; j < 9; ++j) {RL_pre[i][j] = inputs[6][j+i*9];}
+        }
+
+        // Declare the output variables for BVP
+        // calculated curvature at the catheter base
+        double u0_calc[3];
+        double nL_calc[3];
+        double mL_calc[3];
+        // calculated contstraint force at the catheter tip (this will be used when ContactMode == ContactModeType::FIXED_TIP)
+        double ftip_calc[3];
+        // numerical nonlinear equation solver diagnostic outputs
+        int localmin;
 
         /** Retrieve u. **/
         double ActuationCurrents[NUM_ACT_SET][3];
@@ -54,12 +72,12 @@ public:
         for (int i = 0; i < NUM_ACT_SET; i++)	for (int j = 0; j < 3; j++)	ActuationCurrents[i][j] = inputs[7][i * 3 + j];
 
         /** Retrieve model parameters. **/
-        double damping_[6];
-//        for (int i = 0; i < 6; ++i) {
-//            damping_[i] = inputs[8][i];
-//        }
-        damping_[0] = damping_[1] = inputs[8][0]; damping_[2] =inputs[8][1];
-        damping_[3] = damping_[4] = inputs[8][2]; damping_[5] =inputs[8][3];
+        double damping_[NUM_ACT_SET][6];
+
+        for (int i = 0; i < NUM_ACT_SET; ++i) {
+            damping_[i][0] = damping_[i][1] = inputs[8][0+i*4]; damping_[i][2] =inputs[8][1+i*4];
+            damping_[i][3] = damping_[i][4] = inputs[8][2+i*4]; damping_[i][5] =inputs[8][3+i*4];
+        }
 
         double Delta_T = inputs[9][0];
 
@@ -84,7 +102,7 @@ public:
         // Array of lambda values for marker locations  (distance from the tip to each of the markers) - unit: mm
         double MarkerLoc[NUM_LOCALIZATION_MARKERS] = { 2.18, 18.79, 50.06, 101.52, 104.02 };
         // Length density for each of the catheter segments
-        double rho[NUM_SEGMENTS] = { 2.8814e-7, 2.8814e-7, 2.8814e-7 };
+        double rho[NUM_SEGMENTS] ={ 2.8814e-7, 2.8814e-7, 2.8814e-7 }; // {1.1701e-6, 1.1701e-6, 1.1701e-6}; 
         // Local curvature in unloaded configuration for each of the flexible segments; NUM_FLEX_SEG*3 long array corresponding to NUM_FLEX_SEG many 3x1 vectors
         double ustarlist[NUM_FLEX_SEG][3] = { 0.0148626102272827, 0.0094448815853795, 0, 0.000799849479553773, -0.0001892201697658481, 0};//0.00567, -0.00822, 0.0};
 
@@ -116,6 +134,7 @@ public:
         /**
          * These are hard coded, need to revise these later
          */
+        // we are adding the tubing mass of the coil section to the total mass of actuator:
         double ActInertia[NUM_ACT_SET][9];
         for (int i = 0; i < NUM_ACT_SET; ++i)
         {
@@ -134,55 +153,96 @@ public:
 
         CRMShootingMethodBVP_Prep(B0,gravity, p0, R0,SegmentLengths, MarkerLoc,
                                   iRlist, oRlist, YoungModlist, ShearModlist, ustarlist,
-                                  CoilAlignmentAngles, CoilTurnAreaMat, rho, ActMass,
+                                  CoilAlignmentAngles, CoilTurnAreaMat, rho, ActMass, ActInertia,
                                   CathParams, CathConfig);
 
 
         double ftip_initialguess[3] = { 0.0, 0.0, 0.0 };
 
+        /**
+          * initial curvature is assumed constant curvature, we are initializing the full length u_history,
+          * Prepare for interpolation of dynamic insertion length
+          */
+        double SegEnds[NUM_SEGMENTS+1];
+        SegEnds[0] = 0.0;
+        for (int i = 1; i < NUM_SEGMENTS+1; ++i) {
+            SegEnds[i] = SegEnds[i-1] + SegmentLengths[NUM_SEGMENTS - i]; // SegmentLengths is ordered from the distal
+        }
+//    std::cout << "segends: " << SegEnds[0] << " " << SegEnds[1] << " " << SegEnds[2] << " " << SegEnds[3] << std::endl;
+
+        int SegSteps[NUM_FLEX_SEG];
+        double h0[NUM_FLEX_SEG];
+        for (int i=0; i<NUM_FLEX_SEG; i++) { 		// flexible catheter segment
+            // Calculate the number of integration steps based on the given IntegrationStepSize
+            SegSteps[i]=int(ceil( (SegEnds[2*i+1]-SegEnds[2*i]) / IntegrationStepSize ) );
+            h0[i] = dVal((SegEnds[2*i+1]-SegEnds[2*i]))/(SegSteps[i]*1.0);
+        }
+
+
         /** Compute next state **/
-        CRMShootingMethod_DYNParams<double> BVPParams{};
+        CRMShootingMethodParams<double> BVPParams{};
+
+
 
         // Declare output variables
         // catheter shape state at the entry point of the catheter
         //   states are packed u[0..2], R[0..8], p[0..2](R: 3x3 matrix stored in row major order R11 R12 R13 R21 R22 R23 R31 R32 R33)
         double xf[NUM_STATES];
+        // moment residual at the catheter tip - this should converge to {0,0,0} if the catheter is at its equilibrium configuration
+        double residual[NUM_RESIDUAL];
+
+//        CRMConstructShootingMethodParamSet<double>(CathParams, CathConfig, InsertedLength, ActuationCurrents, ContactMode,
+//                                                   TipConstraintPoint, TipForce, IntegrationStepSize,
+//                                                   v_L_pre, w_L_pre, p0,  R0, damping_, Delta_T,
+//                                                   BVPParams);
+//
+//
+//        // Cosserat Rod Model - Solve the Boundary Value Problem to calculate the equilibrium configuration of the catheter
+//        CRMShootingMethodBVP(BVPParams, u0_initialguess, ftip_initialguess, u0_calc, ftip_calc, localmin);
+//
+//
+//        // spatial coordinates of the localization markers
+//        double ReportedMarkerPos[NUM_LOCALIZATION_MARKERS][3];
+//
+//        // output for time advance, not used in BVP, just placeholders
+//        double pL_[3], RL_[9], TBcoil[3];
+//
+//        // Cosserat Rod Model - Solve the Initial Value Problem to calculate the shape of the catheter
+//        CRMSolverIVP(BVPParams, u0_calc, ftip_calc, false, xf, residual,TBcoil, pL_, RL_, ReportedMarkerPos);
+
+
+//        std::cout << "DELTA_T! " << Delta_T << std::endl;
+//        std::cout << "t_step! " << t_step << std::endl;
 
         std::cout << "ActuationCurrents: " << ActuationCurrents[0][0] << " " << ActuationCurrents[0][1] << " " << ActuationCurrents[0][2] <<  std::endl;
-        std::cout << "pL_pre: " << pL_pre[0] << " " << pL_pre[1] << " " << pL_pre[2] <<  std::endl;
-        std::cout << "RL: " << std::endl;
-        std::cout <<  RL_pre[0] << " " << RL_pre[1] << " " << RL_pre[2] <<  std::endl;
-        std::cout <<  RL_pre[3] << " " << RL_pre[4] << " " << RL_pre[5] <<  std::endl;
-        std::cout <<  RL_pre[6] << " " << RL_pre[7] << " " << RL_pre[8] <<  std::endl;
+
+
+//        std::cout << "pL_pre: " << pL_pre[0] << " " << pL_pre[1] << " " << pL_pre[2] <<  std::endl;
+//        std::cout << "RL: " << std::endl;
+//        std::cout <<  RL_pre[0] << " " << RL_pre[1] << " " << RL_pre[2] <<  std::endl;
+//        std::cout <<  RL_pre[3] << " " << RL_pre[4] << " " << RL_pre[5] <<  std::endl;
+//        std::cout <<  RL_pre[6] << " " << RL_pre[7] << " " << RL_pre[8] <<  std::endl;
 
         double InsertedLength =  0.0;//98.5; // u[NUM_CONTROL -1 ];
         for (int i = 0; i < NUM_SEGMENTS; ++i) {
             InsertedLength += SegmentLengths[i]; // we are not controlling this now
         }
 
-        double out_ReportedMarkerPos[NUM_LOCALIZATION_MARKERS][3], x_coil[NUM_COIL_STATES];
-
 
         CRMConstructShootingMethodParamSet<double>(CathParams, CathConfig, InsertedLength, ActuationCurrents, ContactMode,
-                                                   TipConstraintPoint, TipForce, IntegrationStepSize, ActInertia,
+                                                   TipConstraintPoint, TipForce, IntegrationStepSize,
                                                    v_L_pre, w_L_pre, pL_pre,  RL_pre, damping_, Delta_T,
                                                    BVPParams);
-
-        // Declare the output variables for BVP
-        // calculated curvature at the catheter base
-        double u0_calc[3];
-        double nL_calc[3];
-        double mL_calc[3];
-        // calculated contstraint force at the catheter tip (this will be used when ContactMode == ContactModeType::FIXED_TIP)
-        double ftip_calc[3];
-        // numerical nonlinear equation solver diagnostic outputs
-        int localmin;
 
 
         DynamicsBVP(BVPParams, u0_initialguess, mL_initialguess, nL_initialguess, ftip_initialguess,
                     u0_calc, mL_calc, nL_calc, ftip_calc, localmin);
 
+        std::cout << "out_u0: " << u0_calc[0] << " " << u0_calc[1] << " " << u0_calc[2] <<  std::endl;
+        std::cout << "out_mL: " << mL_calc[0] << " " << mL_calc[1] << " " << mL_calc[2] <<  std::endl;
+        std::cout << "out_nL: " << nL_calc[0] << " " << nL_calc[1] << " " << nL_calc[2] <<  std::endl;
 
+        double out_ReportedMarkerPos[NUM_LOCALIZATION_MARKERS][3], x_coil[NUM_COIL_STATES];
 
         DYNSolverIVP(BVPParams, u0_calc, mL_calc, nL_calc, ftip_calc,
                      true, xf, x_coil,out_ReportedMarkerPos);
