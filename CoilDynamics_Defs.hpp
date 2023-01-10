@@ -384,20 +384,17 @@ void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, ad
     double p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3];
 
     // output for time advance, not used in BVP, just placeholders
-    adType m_L[3], n_L[3], ftip[3];
+    adType m_L[NUM_ACT_SET][3], n_L[NUM_ACT_SET][3], ftip[3];
     // don't forget to scale parameters before passing to the CRMSolverIVP
     if (Params.ContactMode == ContactModeType::FREE_TIP) {
-        for (int i = 0; i < 3; i++) {
-            m_L[i] = IVALUE_SCALE_M * in_x[i];
-            n_L[i] = IVALUE_SCALE_N * in_x[i+3];
-
-            ftip[i] = Params.TipForce[i];  // for free-tip, this parameter is not given by the nonlinear equation solver, and hence, does not need to be scaled
+        for (int i = 0; i < NUM_ACT_SET; ++i) {
+            for (int j = 0; j < 3; ++j) {
+                m_L[i][j] = IVALUE_SCALE_M * in_x[j+ 6*i];
+                n_L[i][j] = IVALUE_SCALE_N * in_x[j+3 + 6*i];
+            }
         }
-    }
-    else { // FIXED_TIP
         for (int i = 0; i < 3; i++) {
-            m_L[i] = IVALUE_SCALE_M * in_x[i];
-            ftip[i] = IVALUE_SCALE_F * in_x[i + 9];
+            ftip[i] = Params.TipForce[i];  // for free-tip, this parameter is not given by the nonlinear equation solver, and hence, does not need to be scaled
         }
     }
 
@@ -405,10 +402,17 @@ void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, ad
 //    std::cout << "n_L dyn: " << n_L[0] << " " << n_L[1] << " " <<n_L[2] << std::endl;
 
     auto & update_m_L = Params.m_L;
-    mCopy_AB<3>(m_L, update_m_L);
+//    mCopy_AB<3>(m_L, update_m_L);
+//    mCopy_AB<3>(n_L, update_n_L);
 
     auto & update_n_L = Params.n_L;
-    mCopy_AB<3>(n_L, update_n_L);
+
+    for (int i = 0; i < NUM_ACT_SET; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            update_m_L[i][j] = m_L[i][j];
+            update_n_L[i][j] = n_L[i][j];
+        }
+    }
 
 
     adType xf[NUM_STATES], MomentResidual[3], Tbcoil[NUM_ACT_SET][3], RL[NUM_ACT_SET][9], pL[NUM_ACT_SET][3], Rcoil[9], x_coil[NUM_COIL_STATES], out_x_coil[NUM_COIL_STATES];
@@ -430,68 +434,93 @@ void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, ad
 //    std::cout << "RL dyn: " << RL[6] << " " << RL[7] << " " <<RL[8] << std::endl;
 
     mCopy_AB<3>(u0_calc, out_u0);
-
-//    std::cout << "MomentResidual: " << MomentResidual[0] << " " << MomentResidual[1] << " " << MomentResidual[2] <<  std::endl;
-
-    for (int i = 0; i < 3; ++i) {
-        x_coil[i] = Params.v_L_pre[0][i];
-        x_coil[i+3] = Params.w_L_pre[0][i];
-        x_coil[i+6] = Params.p_pre[0][i];
-    }
-    for (int i = 0; i < 9; ++i) {
-        x_coil[i+9] = Params.R_pre[0][i];
-    }
-
-    double actMass = Params.actMass[0];
-    double actInertia[9];
-    for (int j = 0; j < 9; ++j) {
-        actInertia[j] = Params.actInertia[0][j];
-    }
-//    std::cout << "in x_coil PL: " << x_coil[6] << " " << x_coil[7] << " " << x_coil[8] <<  std::endl;
-    double damping[6];
-    for (int i = 0; i < 6; ++i) {
-        damping[i] = Params.damping[0][i];
-    }
-    double tau[3];
-    for (int i = 0; i < 3; ++i) {
-        tau[i] = Tbcoil[0][i] - m_L[i];
-    }
-
-    CoilDynamics(x_coil, n_L, Params.g, actMass, actInertia, damping, Params.DELTA_T, tau, out_x_coil);
-
-    double RESIDUAL[NUM_DYN_RESIDUAL];
-//    std::cout << "pL: " << pL[0] << " " << pL[1] << " " << pL[2] <<  std::endl;
-//    std::cout << "out_x_coil pL: " << out_x_coil[6] << " " << out_x_coil[7] << " " << out_x_coil[8] <<  std::endl;
-
-    for (int i = 0; i < 3; ++i) {
-        RESIDUAL[i] = pL[0][i] - out_x_coil[i+6];
-    }
-
-    //rotation residual
-    for (int i = 0; i < 9; ++i) {
-        Rcoil[i] = out_x_coil[i+9];
-    }
-
-//    std::cout << "Rcoil dyn: " << Rcoil[0] << " " << Rcoil[1] << " " <<Rcoil[2] << std::endl;
-//    std::cout << "Rcoil dyn: " << Rcoil[3] << " " << Rcoil[4] << " " <<Rcoil[5] << std::endl;
-//    std::cout << "Rcoil dyn: " << Rcoil[6] << " " << Rcoil[7] << " " <<Rcoil[8] << std::endl;
-
-
-    // calculate vector norm of the rotation matrices
+    double actMass, actInertia[9], damping[6], tau[3], residual_per_coil[6], n_L_p[3];
     double v1[3], v2[3], v3[3];
-    for (int i = 0; i < 3; ++i) {
-        v1[i] = Rcoil[i*3] - RL[0][i*3];
-        v2[i] = Rcoil[1+i*3] - RL[0][1+ i*3];
-        v3[i] = Rcoil[2+i*3] - RL[0][2 + i*3];
-    }
-//    std::cout << "v1: " << v1[0] << " " << v1[1] << " " << v1[2] <<  std::endl;
-//    std::cout << "v2: " << v2[0] << " " << v2[1] << " " << v2[2] <<  std::endl;
-//    std::cout << "v3: " << v3[0] << " " << v3[1] << " " << v3[2] <<  std::endl;
+    double RESIDUAL[NUM_DYN_RESIDUAL];
+//    std::cout << "MomentResidual: " << MomentResidual[0] << " " << MomentResidual[1] << " " << MomentResidual[2] <<  std::endl;
+    for (int i = 0; i < NUM_ACT_SET; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            x_coil[j] = Params.v_L_pre[i][j];
+            x_coil[j+3] = Params.w_L_pre[i][j];
+            x_coil[j+6] = Params.p_pre[i][j];
+        }
+        for (int j = 0; j < 9; ++j) {
+            x_coil[j+9] = Params.R_pre[i][j];
+        }
 
-    RESIDUAL[3] = vNormSq<3>(v1);
-    RESIDUAL[4] = vNormSq<3>(v2);
-    RESIDUAL[5] = vNormSq<3>(v3);
-    for (int i = 0; i < 3; ++i) RESIDUAL[i+3] = sqrt(RESIDUAL[i+3]);
+        actMass = Params.actMass[i];
+        for (int j = 0; j < 9; ++j) {
+            actInertia[j] = Params.actInertia[i][j];
+        }
+    //    std::cout << "in x_coil PL: " << x_coil[6] << " " << x_coil[7] << " " << x_coil[8] <<  std::endl;
+        for (int j = 0; j < 6; ++j) {
+            damping[j] = Params.damping[i][j];
+        }
+        for (int j = 0; j < 3; ++j) {
+            tau[j] = Tbcoil[i][j] - m_L[i][j];
+        }
+
+        for (int j = 0; j < 3; ++j) {
+            n_L_p[j] = n_L[i][j];
+        }
+        CoilDynamics(x_coil, n_L_p, Params.g, actMass, actInertia, damping, Params.DELTA_T, tau, out_x_coil);
+
+        for (int j = 0; j < 3; ++j) {
+            residual_per_coil[j] = pL[i][j] - out_x_coil[j+6];
+        }
+
+        for (int j = 0; j < 9; ++j) {
+            Rcoil[j] = out_x_coil[j+9];
+        }
+        for (int j = 0; j < 3; ++j) {
+            v1[j] = Rcoil[j*3] - RL[i][j*3];
+            v2[j] = Rcoil[1+j*3] - RL[i][1+ j*3];
+            v3[j] = Rcoil[2+j*3] - RL[i][2 + j*3];
+        }
+        residual_per_coil[3] = vNormSq<3>(v1);
+        residual_per_coil[4] = vNormSq<3>(v2);
+        residual_per_coil[5] = vNormSq<3>(v3);
+        for (int j = 0; j < 3; ++j) residual_per_coil[j+3] = sqrt(residual_per_coil[j+3]);
+
+        for (int j = 0; j < 3; ++j) {
+            RESIDUAL[j + i*6] = residual_per_coil[j];
+            RESIDUAL[j + 3+ i*6] = residual_per_coil[j+3];
+        }
+    }
+
+
+////    std::cout << "pL: " << pL[0] << " " << pL[1] << " " << pL[2] <<  std::endl;
+////    std::cout << "out_x_coil pL: " << out_x_coil[6] << " " << out_x_coil[7] << " " << out_x_coil[8] <<  std::endl;
+//
+//    for (int i = 0; i < 3; ++i) {
+//        RESIDUAL[i] = pL[0][i] - out_x_coil[i+6];
+//    }
+//
+//    //rotation residual
+//    for (int i = 0; i < 9; ++i) {
+//        Rcoil[i] = out_x_coil[i+9];
+//    }
+//
+////    std::cout << "Rcoil dyn: " << Rcoil[0] << " " << Rcoil[1] << " " <<Rcoil[2] << std::endl;
+////    std::cout << "Rcoil dyn: " << Rcoil[3] << " " << Rcoil[4] << " " <<Rcoil[5] << std::endl;
+////    std::cout << "Rcoil dyn: " << Rcoil[6] << " " << Rcoil[7] << " " <<Rcoil[8] << std::endl;
+//
+//
+//    // calculate vector norm of the rotation matrices
+//
+//    for (int i = 0; i < 3; ++i) {
+//        v1[i] = Rcoil[i*3] - RL[0][i*3];
+//        v2[i] = Rcoil[1+i*3] - RL[0][1+ i*3];
+//        v3[i] = Rcoil[2+i*3] - RL[0][2 + i*3];
+//    }
+////    std::cout << "v1: " << v1[0] << " " << v1[1] << " " << v1[2] <<  std::endl;
+////    std::cout << "v2: " << v2[0] << " " << v2[1] << " " << v2[2] <<  std::endl;
+////    std::cout << "v3: " << v3[0] << " " << v3[1] << " " << v3[2] <<  std::endl;
+//
+//    RESIDUAL[3] = vNormSq<3>(v1);
+//    RESIDUAL[4] = vNormSq<3>(v2);
+//    RESIDUAL[5] = vNormSq<3>(v3);
+//    for (int i = 0; i < 3; ++i) RESIDUAL[i+3] = sqrt(RESIDUAL[i+3]);
 
 ////    euler angles difference
 //    double v1[3], v2[3];
@@ -504,11 +533,18 @@ void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, ad
 //    std::cout << "p diff: " << RESIDUAL[0] << " " << RESIDUAL[1] << " " << RESIDUAL[2] <<  std::endl;
 //    std::cout << "R diff: " << RESIDUAL[3] << " " << RESIDUAL[4] << " " << RESIDUAL[5] <<  std::endl;
 
-    // don't forget to scale parameters before returning to the nonlinear equation solver
-    for (int i = 0; i < 3; i++) {
-        out_y[i] = RESIDUAL_SCALE_P * RESIDUAL[i]; // RESIDUAL_SCALE_F * WrenchResidual[i] ;
-        out_y[i+3] = RESIDUAL_SCALE_R * RESIDUAL[i+3]; // RESIDUAL_SCALE_F * WrenchResidual[i] ;
+    for (int i = 0; i < NUM_ACT_SET; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            out_y[j+ 6*i] = RESIDUAL_SCALE_P * RESIDUAL[j+ 6*i]; // RESIDUAL_SCALE_F * WrenchResidual[i] ;
+            out_y[j+3+ 6*i] = RESIDUAL_SCALE_R * RESIDUAL[j+3+6*i]; // RESIDUAL_SCALE_F * WrenchResidual[i] ;
+
+        }
     }
+//    // don't forget to scale parameters before returning to the nonlinear equation solver
+//    for (int i = 0; i < 3; i++) {
+//        out_y[i] = RESIDUAL_SCALE_P * RESIDUAL[i]; // RESIDUAL_SCALE_F * WrenchResidual[i] ;
+//        out_y[i+3] = RESIDUAL_SCALE_R * RESIDUAL[i+3]; // RESIDUAL_SCALE_F * WrenchResidual[i] ;
+//    }
 
 }
 
@@ -578,8 +614,8 @@ void CRMShootingMethodBVP_DYN(	NLEqnParams<adType> in_Params, adType out_u0[3], 
 
 template <typename adType>
 void DynamicsBVP(	CRMShootingMethodParams<adType> in_Params, double in_u0_initialguess[3],
-                              double in_mL_initialguess[3], double in_nL_initialguess[3], double in_ftip_initialguess[3],
-                              adType out_u0[3], adType out_mL[3], adType out_nL[3], adType out_ftip[3], int& out_localmin) {
+                              double in_mL_initialguess[NUM_ACT_SET][3], double in_nL_initialguess[NUM_ACT_SET][3], double in_ftip_initialguess[3],
+                              adType out_u0[3], adType out_mL[NUM_ACT_SET][3], adType out_nL[NUM_ACT_SET][3], adType out_ftip[3], int& out_localmin) {
 
     ContactModeType ContactMode = in_Params.ContactMode;
     int NLEq_Dim;  // Dimension of the Nonlinear Equation to Solve
@@ -626,18 +662,15 @@ void DynamicsBVP(	CRMShootingMethodParams<adType> in_Params, double in_u0_initia
     auto* returnedparamscaled = new adType [NLEq_Dim];
 
     if (ContactMode == ContactModeType::FREE_TIP) {
+        for (int i = 0; i < NUM_ACT_SET; ++i) {
+            for (int j = 0; j < 3; j++) {
+                initialguessscaled[j+ 6*i] = mscaleinv * in_mL_initialguess[i][j];
+                initialguessscaled[j+3 + 6*i] = nscaleinv * in_nL_initialguess[i][j];
+            }
+        }
         for (int i = 0; i < 3; i++) {
-            initialguessscaled[i] = mscaleinv * in_mL_initialguess[i];
-            initialguessscaled[i+3] = nscaleinv * in_nL_initialguess[i];
-
             DYNNLEParams.TipForce[i] = in_Params.TipForce[i];  // if the catheter is not in contact, the tip force specified within in_Params needs to be used; this would not be scaled as it is not changed by the solver
         }
-    }else { // FIXED_TIP
-        for (int i = 0; i < 3; i++) {
-            initialguessscaled[i] = mscaleinv * in_mL_initialguess[i];
-            initialguessscaled[i+3] = fscaleinv * in_ftip_initialguess[i];
-        }
-
     }
 
     int localmin = 0;
@@ -661,11 +694,13 @@ void DynamicsBVP(	CRMShootingMethodParams<adType> in_Params, double in_u0_initia
     delete[] x;
     delete[] wa;
 
-
+    for (int i = 0; i < NUM_ACT_SET; ++i) {
+        for (int j = 0; j < 3; j++) {
+            out_mL[i][j] = IVALUE_SCALE_M * returnedparamscaled[j+ 6*i];
+            out_nL[i][j] = IVALUE_SCALE_N * returnedparamscaled[j+3 + 6*i];
+        }
+    }
     for (int i = 0; i < 3; i++) {
-        out_mL[i] = IVALUE_SCALE_M * returnedparamscaled[i];
-        out_nL[i] = IVALUE_SCALE_N * returnedparamscaled[i+3];
-
         out_ftip[i] = in_Params.TipForce[i];  // if it is free-tip, return the tip force specified within in_Params
     }
 
@@ -678,7 +713,7 @@ void DynamicsBVP(	CRMShootingMethodParams<adType> in_Params, double in_u0_initia
 
 template <typename adType>
 void DYNSolverIVP(	CRMShootingMethodParams<adType> in_Params, adType in_u0[3],
-                      adType in_mL[3], adType in_nL[3], adType in_ftip[3],
+                      adType in_mL[NUM_ACT_SET][3], adType in_nL[NUM_ACT_SET][3], adType in_ftip[3],
                       bool in_FinalValueOnly, adType out_x_N[NUM_STATES], adType out_coil_state[NUM_COIL_STATES],
                       double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]){
 
@@ -690,12 +725,16 @@ void DYNSolverIVP(	CRMShootingMethodParams<adType> in_Params, adType in_u0[3],
     }
 
     CRMIVPCoreParams<adType> CoreParams;
-    adType u_0[3], n_L[3], m_L[3], ftip[3];
+    adType u_0[3], n_L[NUM_ACT_SET][3], m_L[NUM_ACT_SET][3], ftip[3];
     // We need to pass u_0 as input argument as the values in CoreParams will be overriden with the values provided in the input arguments - functionality needed for solving Boundary Value Problems (BVP)
     // copy to local variable
     for (int i = 0; i < 3; i++) u_0[i] = in_u0[i];
-    for (int i = 0; i < 3; i++) n_L[i] = in_nL[i];
-    for (int i = 0; i < 3; i++) m_L[i] = in_mL[i];
+    for (int i = 0; i < NUM_ACT_SET; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            n_L[i][j] = in_nL[i][j];
+            m_L[i][j] = in_mL[i][j];
+        }
+    }
     for (int i = 0; i < 3; i++) ftip[i] = in_ftip[i];
 
     CRMSolverIVP_Prep(x_0, in_Params.IntegrationStepSize,
@@ -732,10 +771,10 @@ void DYNSolverIVP(	CRMShootingMethodParams<adType> in_Params, adType in_u0[3],
 
     double tau[3];
     for (int i = 0; i < 3; ++i) {
-        tau[i] = Tbcoil[0][i] - m_L[i];
+        tau[i] = Tbcoil[0][i] - m_L[0][i];
     }
 
-    CoilDynamics(x_coil, n_L, CoreParams.g, actMass, actInertia, damping, CoreParams.DELTA_T, tau, out_coil_state);
+    CoilDynamics(x_coil, n_L[0], CoreParams.g, actMass, actInertia, damping, CoreParams.DELTA_T, tau, out_coil_state);
 
 }
 

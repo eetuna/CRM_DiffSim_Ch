@@ -18,8 +18,8 @@ void CRMSolverIVP(	CRMShootingMethodParams<adType> in_Params,
 	CRMIVPCoreParams<adType> CoreParams;
 	adType u_0[3], ftip[3];
 
-    adType m_L[3] = {0.0, 0.0, 0.0}; //This is the static case, where no input m/n is involved in the trustregion
-    adType n_L[3] = {0.0, 0.0, 0.0};
+    adType m_L[NUM_ACT_SET][3] = {0.0, 0.0, 0.0}; //This is the static case, where no input m/n is involved in the trustregion
+    adType n_L[NUM_ACT_SET][3] = {0.0, 0.0, 0.0};
 
     CRMSolverIVP_Prep(x_0, in_Params.IntegrationStepSize,
                       in_Params.Li, in_Params.dlambdainv,
@@ -48,7 +48,7 @@ void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSiz
 						 adType in_MagMoment[NUM_ACT_SET][3], double in_fcumlambda[NUM_FCUM_LAMBDA+1][3],
                          double in_B0[3], double in_g[3], const double in_actMass[NUM_ACT_SET], double in_actInertia[NUM_ACT_SET][9], double in_damping[NUM_ACT_SET][6], double in_delta_t,
                          double in_v_L_pre[NUM_ACT_SET][3], double in_w_L_pre[NUM_ACT_SET][3], double in_p_pre[NUM_ACT_SET][3],
-                         double in_R_pre[NUM_ACT_SET][9], double in_mL[3], double in_nL[3],
+                         double in_R_pre[NUM_ACT_SET][9], double in_mL[NUM_ACT_SET][3], double in_nL[NUM_ACT_SET][3],
                          bool in_DYNCORE, bool in_FinalValueOnly, CRMIVPCoreParams<adType> &out_CoreParams) {
 
 	// Process the incoming parameters (including changing from distal-proximal order to proximal-distal order)
@@ -177,6 +177,8 @@ void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSiz
 //    mCopy_AB<9>(in_R_pre, R_pre);
     auto & damping = out_CoreParams.damping;
 //    mCopy_AB<6>(in_damping, damping);
+    auto & m_L = out_CoreParams.m_L;
+    auto & n_L = out_CoreParams.n_L;
 
     auto & actMass = out_CoreParams.actMass;
     auto & actInertia = out_CoreParams.actInertia;
@@ -194,12 +196,12 @@ void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSiz
         for (int j = 0; j < 6; ++j) {
             damping[i][j] = in_damping[i][j];
         }
-    }
-    auto & m_L = out_CoreParams.m_L;
-    mCopy_AB<3>(in_mL, m_L);
+        for (int j = 0; j < 3; ++j) {
+            m_L[i][j] = in_mL[i][j];
+            n_L[i][j] = in_nL[i][j];
+        }
 
-    auto & n_L = out_CoreParams.n_L;
-    mCopy_AB<3>(in_nL, n_L);
+    }
 
     auto & dyn_signal = out_CoreParams.DYN_Core;
     dyn_signal = in_DYNCORE;
@@ -221,9 +223,21 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
      * Other params for dynamics
      * */
     auto & DYN_SIGNAL = in_params.DYN_Core;
-    auto & m_L = in_params.m_L;
-    auto & n_L = in_params.n_L;
-
+    auto & in_m_L = in_params.m_L;
+    auto & in_n_L = in_params.n_L;
+    double m_L[NUM_FLEX_SEG][3], n_L[NUM_FLEX_SEG][3];
+    for (int i = 0; i < NUM_ACT_SET; ++i) { // NUM_ACT_SET <= NUM_FLEX_SEG
+        for (int j = 0; j < 3; ++j) {
+            m_L[i][j] = in_m_L[i][j];
+            n_L[i][j] = in_n_L[i][j];
+        }
+    }
+    if ( NUM_ACT_SET < NUM_FLEX_SEG){ // last segment is flexible
+        for (int i = 0; i < 3; ++i) {
+            m_L[NUM_FLEX_SEG-1][i] = 0.0;
+            n_L[NUM_FLEX_SEG-1][i] = 0.0;
+        }
+    }
 //    std::cout << "in_u CORE: " << in_u[0] << " " << in_u[1] << " " <<in_u[2] << std::endl;
 //    std::cout << "in_n CORE: " << n_L[0] << " " << n_L[1] << " " <<n_L[2] << std::endl;
 
@@ -313,7 +327,7 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 
             // Integrate
             ABM4( 	xi, SegBounds[i], SegSteps[fsegno], h0[fsegno],
-                     InsertedLength, dlambdainv, K[fsegno], Kinv[fsegno], l_zero, ustar[fsegno], n_L,
+                     InsertedLength, dlambdainv, K[fsegno], Kinv[fsegno], l_zero, ustar[fsegno], n_L[fsegno],
                      fcumlambda, ftip,
                      FinalValueOnly, LocMarkers, &NextLocMarker,
                      xf, p_atLocMarkers);
@@ -347,7 +361,7 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
             if (!DYN_SIGNAL){
                 mSub_AB<3,1>( K1deltau1 , Tb, Residual); // Quasi-static residual
             }else{
-                mSub_AB<3,1>( m_L, K1deltau1 , Residual);
+                mSub_AB<3,1>( m_L[fsegi], K1deltau1 , Residual);
             }
 
             for (int j = 0; j < 3; ++j) {
@@ -366,9 +380,9 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 //                mCopy_AB<3>( ustar[fsegip1], &(xi[0]) );
                 mMult_AB<3,3,1>( Kinv[fsegip1], Residual, K2invResidual );
                 mAdd_AB<3,1>( ustar[fsegip1], K2invResidual, &(xi[0]) );
-                for (int j = 0; j < 3; ++j) {
-                    n_L[j]=0.0;
-                }
+//                for (int j = 0; j < 3; ++j) {
+//                    n_L[j]=0.0;
+//                }
 
             }
 			else {	// otherwise, we are at the last segment, and we need to copy the R and p values calculated for xi to xf so that they can be returned

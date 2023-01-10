@@ -154,16 +154,11 @@ int RunExample(void) {
      * These are hard coded, need to revise these later
      */
     // we are adding the tubing mass of the coil section to the total mass of actuator:
-    double tubing_mass = rho[0] * SegmentLengths[1];
-//    ActMass[0] += tubing_mass;
     double ActInertia[NUM_ACT_SET][9];
     for (int i = 0; i < NUM_ACT_SET; ++i)
     {
         double I_zz = 0.5 * (ActMass[i]) * (oRlist[0] * oRlist[0] + iRlist[0] * iRlist[0]);
         double I_xx = 0.25 * (ActMass[i]) * (oRlist[0] * oRlist[0] + iRlist[0] * iRlist[0]) + 1.0 / 12 * (ActMass[i]) * SegmentLengths[2*i+1] * SegmentLengths[2*i+1];
-//        std::cout << "Izz " << I_zz << std::endl;
-//        std::cout << "I_xx " << I_xx << std::endl;
-//        I_xx += 0.001;
         ActInertia[i][0] = I_xx; ActInertia[i][1] = 0.0; ActInertia[i][2] = 0.0;
         ActInertia[i][3] = 0.0; ActInertia[i][4] = I_xx; ActInertia[i][5] = 0.0;
         ActInertia[i][6] = 0.0; ActInertia[i][7] = 0.0; ActInertia[i][8] = I_zz;
@@ -178,10 +173,6 @@ int RunExample(void) {
 
 	// Package catheter physical parameters and spatial configuration parameters
 	//   this step would typically needs to be executed only once
-//	CRMShootingMethodBVP_Prep(B0, gravity, p0, R0,
-//		SegmentLengths, MarkerLoc, iRlist, oRlist, YoungModlist, ShearModlist, ustarlist,
-//		CoilAlignmentAngles, CoilTurnAreaMat, rho, ActMass,
-//		CathParams, CathConfig);
 
     CRMShootingMethodBVP_Prep(B0,gravity, p0, R0,SegmentLengths, MarkerLoc,
                               iRlist, oRlist, YoungModlist, ShearModlist, ustarlist,
@@ -193,9 +184,9 @@ int RunExample(void) {
 	// initial guess for the contstraint force at the catheter tip (this will be used when ContactMode == ContactModeType::FIXED_TIP)
 	double ftip_initialguess[3] = { 0.0, 0.0, 0.0 };
     // Define initial guesses to be used when solving boundary value problem
-    double nL_initialguess[3] = { 0.0, 0.0, 0.0 };
+    double nL_initialguess[NUM_ACT_SET][3] = { 0.0, 0.0, 0.0 };
 
-    double mL_initialguess[3] = { 0.0, 0.0, 0.0 };
+    double mL_initialguess[NUM_ACT_SET][3] = { 0.0, 0.0, 0.0 };
 	// Declare the output variables for BVP
 	// calculated curvature at the catheter base
 	double u0_calc[3];
@@ -275,21 +266,6 @@ int RunExample(void) {
      * TEST DYN
      */
     // Actuation currents for each of the coils for each of the coil sets - unit: A
-//    ActuationCurrents[0][2] = 0.1;     //ActuationCurrents[0][1] = 0.1;   ActuationCurrents[0][0] = 0.1;
-
-//    std::cout << "pL: " << pL[0] << " " << pL[1] << " " << pL[2] <<  std::endl;
-//    std::cout << "RL: " << std::endl;
-//    std::cout <<  RL[0] << " " << RL[1] << " " << RL[2] <<  std::endl;
-//    std::cout <<  RL[3] << " " << RL[4] << " " << RL[5] <<  std::endl;
-//    std::cout <<  RL[6] << " " << RL[7] << " " << RL[8] <<  std::endl;
-
-//    std::cout << "diff pL: " << pL[0] - pL_[0] << " " << pL[1] - pL_[1] << " " << pL[2] - pL_[2]  <<  std::endl;
-//    std::cout << "diffRL: " << std::endl;
-//    std::cout <<  RL[0] - RL_[0] << " " << RL[1]- RL_[1] << " " << RL[2] - RL_[2]<<  std::endl;
-//    std::cout <<  RL[3]- RL_[3] << " " << RL[4]- RL_[4] << " " << RL[5] - RL_[5]<<  std::endl;
-//    std::cout <<  RL[6] - RL_[6]<< " " << RL[7]- RL_[7] << " " << RL[8]- RL_[8] <<  std::endl;
-//
-
 
     ActuationCurrents[0][2] = 0.031;
 
@@ -304,13 +280,13 @@ int RunExample(void) {
 
 //    std::cout << "u0_calc: " << u0_calc[0] << " " << u0_calc[1] << " " << u0_calc[2] <<  std::endl;
 
-    double out_u0[3], out_nL[3], out_mL[3];
+    double out_u0[3], out_nL[NUM_ACT_SET][3], out_mL[NUM_ACT_SET][3];
     DynamicsBVP(BVPParams, u0_initialguess, mL_initialguess, nL_initialguess, ftip_initialguess,
                    out_u0, out_mL, out_nL, ftip_calc, localmin);
 
-        std::cout << "out_u0: " << out_u0[0] << " " << out_u0[1] << " " << out_u0[2] <<  std::endl;
-        std::cout << "out_mL: " << out_mL[0] << " " << out_mL[1] << " " << out_mL[2] <<  std::endl;
-        std::cout << "out_nL: " << out_nL[0] << " " << out_nL[1] << " " << out_nL[2] <<  std::endl;
+//        std::cout << "out_u0: " << out_u0[0] << " " << out_u0[1] << " " << out_u0[2] <<  std::endl;
+//        std::cout << "out_mL: " << out_mL[0] << " " << out_mL[1] << " " << out_mL[2] <<  std::endl;
+//        std::cout << "out_nL: " << out_nL[0] << " " << out_nL[1] << " " << out_nL[2] <<  std::endl;
 
 
     double x_coil[NUM_COIL_STATES];

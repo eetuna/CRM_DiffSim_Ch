@@ -33,8 +33,8 @@ void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params,
 	}
 	bool FinalValueOnly = true;
 	NLEqnParams<adType> NLEParams;
-    double in_mL[3] ={0.0,0.0,0.0};
-    double in_nL[3] ={0.0,0.0,0.0};
+    double in_mL[NUM_ACT_SET][3] ={0.0,0.0,0.0};
+    double in_nL[NUM_ACT_SET][3] ={0.0,0.0,0.0};
 
     CRMSolverIVP_Prep(x_0, in_Params.IntegrationStepSize,
 		in_Params.Li, in_Params.dlambdainv,

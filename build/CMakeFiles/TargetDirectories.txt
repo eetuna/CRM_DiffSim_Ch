@@ -1,3 +1,0 @@
-/home/ranhao/CRM_Dynamics/build/CMakeFiles/rebuild_cache.dir
-/home/ranhao/CRM_Dynamics/build/CMakeFiles/edit_cache.dir
-/home/ranhao/CRM_Dynamics/build/CMakeFiles/CRMDYN_test.dir

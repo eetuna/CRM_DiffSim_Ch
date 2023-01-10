@@ -25,7 +25,7 @@
 
 
 #define NUM_RESIDUAL 3
-#define NUM_DYN_RESIDUAL 6
+#define NUM_DYN_RESIDUAL (6 * NUM_ACT_SET)
 //#define DELTA_T 0.01
 #define NUM_CONTROL (NUM_ACT_SET * 3 + 1) // Control dimension for the dynamic model
 #define RESIDUAL_SCALE_F	1.0	// the residual for coil force coming out of the IVP will be multiplied with this scale to return to the Nonlinear Solver
@@ -198,8 +198,8 @@ struct CRMIVPCoreParams {
 
     double p_pre[NUM_ACT_SET][3];
     double R_pre[NUM_ACT_SET][9];
-    double m_L[3];
-    double n_L[3];
+    double m_L[NUM_ACT_SET][3];
+    double n_L[NUM_ACT_SET][3];
     bool DYN_Core; // true is we are calculating the coer function inside the dynamics function
     double damping[NUM_ACT_SET][6]; //v and w of the coil
     double DELTA_T;
@@ -333,8 +333,8 @@ struct CRMDynamicsParams {
     double	TipConstraintPoint[3];
     double	TipForce[3];
     double	u0_initialguess[3];
-    double	nL_initialguess[3];
-    double	mL_initialguess[3];
+    double	nL_initialguess[NUM_ACT_SET][3];
+    double	mL_initialguess[NUM_ACT_SET][3];
     double	ftip_initialguess[3];
     double	IntegrationStepSize;
     bool	FinalValueOnly;				// Flag used to indicate if only final value is returned (true) or if Marker Locations are returned as well (false)
@@ -369,13 +369,13 @@ template <typename adType>
 void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, adType out_u0[3]);
 
 template <typename adType>
-void DynamicsBVP(CRMShootingMethodParams<adType> in_Params, double in_u0_initialguess[3],
-                        double in_mL_initialguess[3], double in_nL_initialguess[3], double in_ftip_initialguess[3],
-                        adType out_u0[3], adType out_mL[3], adType out_nL[3], adType out_ftip[3], int& out_localmin);
+void DynamicsBVP(	CRMShootingMethodParams<adType> in_Params, double in_u0_initialguess[3],
+                     double in_mL_initialguess[NUM_ACT_SET][3], double in_nL_initialguess[NUM_ACT_SET][3], double in_ftip_initialguess[3],
+                     adType out_u0[3], adType out_mL[NUM_ACT_SET][3], adType out_nL[NUM_ACT_SET][3], adType out_ftip[3], int& out_localmin);
 
 template <typename adType>
 void DYNSolverIVP(	CRMShootingMethodParams<adType> in_Params, adType in_u0[3],
-                         adType in_mL[3], adType in_nL[3], adType in_ftip[3],
+                      adType in_mL[NUM_ACT_SET][3], adType in_nL[NUM_ACT_SET][3], adType in_ftip[3],
                          bool in_FinalValueOnly,
                          adType out_x_N[NUM_STATES], adType out_coil_state[NUM_COIL_STATES],
                          double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]);
@@ -404,28 +404,6 @@ void CRMDYNCoreDataUpdate(CRMCatheterModelParams CathParams, double in_p0[3], do
                           ContactModeType ContactMode, double TipConstraintPoint[3], double TipForce[3], double IntegrationStepSize,
                           double in_v_L_pre[3], double in_w_L_pre[3], double pL_pre[3], double RL_pre[9],
                           CRMShootingMethodParams<adType> &ShootingParams);
-
-/**
- * The dynamics model given current state vector and control. Note v0 and w0 can be treated as control inputs as well
- * @tparam adType
- * @param in_x_t : input state vector at the entry point (u0 (initial guess, to be optimized), R0, p0, v0, w0)
- * @param control_t : control vector
- * @param u_history : last curvature history (at x_t) along the flexible catheter body
- * @param v_L_pre : linear velocity at L (coil linear velocity) at current state
- * @param w_L_pre : angular velocity at L (coil angular velocity) at current state
- * @param in_Params : parameters for shooting method BVP problem
- * @param out_x_t : output state vector at the entry point
- * @param out_u_history : update new curvature history
- * @param out_v_L : update the coil linear velocity
- * @param out_w_L : update the coil angular velocity
- */
-template <typename adType>
-void CRM_Dynamics(const double in_x_t[NUM_STATES], const double control_t[NUM_CONTROL], CRMShootingMethodParams<double> BVPParams,
-                  double in_v_L_pre[3], double in_w_L_pre[3],  double pL_pre[3], double RL_pre[9], CRMDynamicsParams<adType> in_Params,
-                  adType out_x_t[NUM_STATES], adType u0_calc[3], adType nL_calc[3], adType mL_calc[3], adType out_ReportedMarkerPos[NUM_LOCALIZATION_MARKERS][3],
-                  double out_v_L[3], double out_w_L[3],	double out_pL_pre[3], double out_RL_pre[9]);
-
-
 
 ////
 //// Numerical Integration Functions

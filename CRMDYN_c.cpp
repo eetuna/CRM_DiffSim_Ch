@@ -37,7 +37,7 @@ void compute_dx(double *dx, double t, double *x, double *u, double **p,
 {
 
     /** Retrieve x. **/
-    double v_L_pre[NUM_ACT_SET][3], w_L_pre[NUM_ACT_SET][3],  u0_initialguess[3], nL_initialguess[3], mL_initialguess[3], pL_pre[NUM_ACT_SET][3], RL_pre[NUM_ACT_SET][9];
+    double v_L_pre[NUM_ACT_SET][3], w_L_pre[NUM_ACT_SET][3],  u0_initialguess[3], nL_initialguess[NUM_ACT_SET][3], mL_initialguess[NUM_ACT_SET][3], pL_pre[NUM_ACT_SET][3], RL_pre[NUM_ACT_SET][9];
     // Define initial guesses to be used when solving boundary value problem
     for (int i = 0; i < NUM_ACT_SET; ++i) {
         for (int j = 0; j < 3; ++j) {
@@ -53,20 +53,29 @@ void compute_dx(double *dx, double t, double *x, double *u, double **p,
 
     for (int i = 0; i < 3; ++i) {
         u0_initialguess[i] = x[NUM_ACT_SET*6 + i];
-        mL_initialguess[i] = x[NUM_ACT_SET*6 + 3+ i];
-        nL_initialguess[i] = x[NUM_ACT_SET*6 + 6+ i];
     }
 
     for (int i = 0; i < NUM_ACT_SET; ++i) {
         for (int j = 0; j < 3; ++j) {
-            pL_pre[i][j] = x[NUM_ACT_SET*6 + 9 + j+i*3];
+            mL_initialguess[i][j] = x[NUM_ACT_SET*6 + 3 + j+ 3*i];
         }
     }
 
-    int ind_r = NUM_ACT_SET*6 + 9 + NUM_ACT_SET*3;
+    for (int i = 0; i < NUM_ACT_SET; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            nL_initialguess[i][j] = x[NUM_ACT_SET*9 + 3 + j+ 3*i];
+        }
+    }
+    for (int i = 0; i < NUM_ACT_SET; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            pL_pre[i][j] = x[NUM_ACT_SET*12 + 3 + j+i*3];
+        }
+    }
+
+//    int ind_r = NUM_ACT_SET*15 + 3;
     for (int i = 0; i < NUM_ACT_SET; ++i) {
         for (int j = 0; j < 9; ++j) {
-            RL_pre[i][j] = x[ind_r + j+i*9];
+            RL_pre[i][j] = x[NUM_ACT_SET*15 + 3 + j+i*9];
         }
     }
 
@@ -101,8 +110,8 @@ void compute_dx(double *dx, double t, double *x, double *u, double **p,
     // Declare the output variables for BVP
     // calculated curvature at the catheter base
     double u0_calc[3];
-    double nL_calc[3];
-    double mL_calc[3];
+    double nL_calc[NUM_ACT_SET][3];
+    double mL_calc[NUM_ACT_SET][3];
     // calculated contstraint force at the catheter tip (this will be used when ContactMode == ContactModeType::FIXED_TIP)
     double ftip_calc[3];
     // numerical nonlinear equation solver diagnostic outputs
@@ -254,8 +263,8 @@ void compute_dx(double *dx, double t, double *x, double *u, double **p,
     for (int i = 0; i < NUM_DYN_STATE; ++i) {
         if(i < 6){   dx[i] = x_coil[i]; } //v, w
         else if (i < 9) dx[i] = u0_calc[i - 6];
-        else if (i < 12) dx[i] = mL_calc[i - 9];
-        else if (i < 15) dx[i] = nL_calc[i - 12];
+        else if (i < 12) dx[i] = mL_calc[0][i - 9];
+        else if (i < 15) dx[i] = nL_calc[0][i - 12];
         else if (i < 18) dx[i] = x_coil[i - 9]; //p
         else dx[i] = x_coil[i - 9];//R
     }
