@@ -180,7 +180,7 @@ int RunExample(void) {
                               CathParams, CathConfig);
 
 	// Define initial guesses to be used when solving boundary value problem
-    double u0_initialguess[3] = { 0.000709849479553773, -0.0002292201697658481, 0};
+    double u0_initialguess[NUM_FLEX_SEG][3] = { 0.000709849479553773, -0.0002292201697658481, 0, 0.0000148626102272827, 0.000094448815853795, 0};
 	// initial guess for the contstraint force at the catheter tip (this will be used when ContactMode == ContactModeType::FIXED_TIP)
 	double ftip_initialguess[3] = { 0.0, 0.0, 0.0 };
     // Define initial guesses to be used when solving boundary value problem
@@ -189,7 +189,7 @@ int RunExample(void) {
     double mL_initialguess[NUM_ACT_SET][3] = { 0.0, 0.0, 0.0 };
 	// Declare the output variables for BVP
 	// calculated curvature at the catheter base
-	double u0_calc[3];
+	double u0_calc[NUM_FLEX_SEG][3];
 	// calculated contstraint force at the catheter tip (this will be used when ContactMode == ContactModeType::FIXED_TIP)
 	double ftip_calc[3];
 	// numerical nonlinear equation solver diagnostic outputs
@@ -203,7 +203,6 @@ int RunExample(void) {
     // Actuation currents for each of the coils for each of the coil sets - unit: A
     double ActuationCurrents[NUM_ACT_SET][3] = {0.0, 0.0, 0.0};// { {0.100, 0.100, 0.100}};
 //    InsertedLength = 98.5;
-
 
     double damping[NUM_ACT_SET][6] = {0, 0, 0, 0, 0, 0};
     double DELTA_T = 0.01;
@@ -280,7 +279,7 @@ int RunExample(void) {
 
 //    std::cout << "u0_calc: " << u0_calc[0] << " " << u0_calc[1] << " " << u0_calc[2] <<  std::endl;
 
-    double out_u0[3], out_nL[NUM_ACT_SET][3], out_mL[NUM_ACT_SET][3];
+    double out_u0[NUM_FLEX_SEG][3], out_nL[NUM_ACT_SET][3], out_mL[NUM_ACT_SET][3];
     DynamicsBVP(BVPParams, u0_initialguess, mL_initialguess, nL_initialguess, ftip_initialguess,
                    out_u0, out_mL, out_nL, ftip_calc, localmin);
 

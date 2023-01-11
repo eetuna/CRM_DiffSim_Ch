@@ -7,22 +7,19 @@
 
 template <typename adType>
 void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params, 
-							const double in_u0_initialguess[3], const double in_ftip_initialguess[3],
-							adType out_u0[3], adType out_ftip[3], int& out_localmin) {
+							const double in_u0_initialguess[NUM_FLEX_SEG][3], const double in_ftip_initialguess[3],
+							adType out_u0[NUM_FLEX_SEG][3], adType out_ftip[3], int& out_localmin) {
 
 	ContactModeType ContactMode = in_Params.ContactMode;
 	int NLEq_Dim;  // Dimension of the Nonlinear Equation to Solve
-	if (ContactMode == ContactModeType::FREE_TIP) {
-		NLEq_Dim = NUM_RESIDUAL;
-	}
-	else { // FIXED_TIP
-		NLEq_Dim = 6;
-	}
+    NLEq_Dim = NUM_RESIDUAL;
+
+
 	// Call CRMSolverIVP_Prep, to pre-process parameters
 	adType x_0[NUM_STATES];
 	for (int i = 0; i < NUM_STATES; i++) {
 		if (i < 3) {
-			x_0[i] = in_u0_initialguess[i];
+			x_0[i] = in_u0_initialguess[0][i];
 		}
 		else if (i < 12) {
 			x_0[i] = in_Params.R0[i - 3];
@@ -50,23 +47,20 @@ void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params,
 
 	// Scale parameters and call the nonlinear equation solver
 	const double uscaleinv = 1.0 / IVALUE_SCALE_U;
-//    const double nscaleinv = 1.0 / IVALUE_SCALE_N;
 
     const double fscaleinv = 1.0 / IVALUE_SCALE_F;
 	auto* initialguessscaled = new double [NLEq_Dim];
 	auto* returnedparamscaled = new adType [NLEq_Dim];
 
     if (ContactMode == ContactModeType::FREE_TIP) {
+        for (int i = 0; i < NUM_FLEX_SEG; ++i) {
+            for (int j = 0; j < 3; ++j) {
+                initialguessscaled[j+3*i] = uscaleinv * in_u0_initialguess[i][j];
+            }
+        }
 		for (int i = 0; i < 3; i++) {
-			initialguessscaled[i] = uscaleinv * in_u0_initialguess[i];
             NLEParams.TipForce[i] = in_Params.TipForce[i];  // if the catheter is not in contact, the tip force specified within in_Params needs to be used; this would not be scaled as it is not changed by the solver
 		}
-	}else { // FIXED_TIP
-		for (int i = 0; i < 3; i++) {
-			initialguessscaled[i] = uscaleinv * in_u0_initialguess[i];
-			initialguessscaled[i+3] = fscaleinv * in_ftip_initialguess[i];
-		}
-
 	}
 
     int localmin = 0, errorcode = 0;
@@ -102,17 +96,16 @@ void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params,
 	*/
 
 	if (ContactMode == ContactModeType::FREE_TIP) {
+        for (int i = 0; i < NUM_FLEX_SEG; ++i) {
+            for (int j = 0; j < 3; ++j) {
+                out_u0[i][j] = IVALUE_SCALE_U * returnedparamscaled[j+3*i];
+            }
+        }
 		for (int i = 0; i < 3; i++) {
-			out_u0[i] = IVALUE_SCALE_U * returnedparamscaled[i];
             out_ftip[i] = in_Params.TipForce[i];  // if it is free-tip, return the tip force specified within in_Params
 		}
 	}
-	else { // FIXED_TIP
-		for (int i = 0; i < 3; i++) {
-			out_u0[i] = IVALUE_SCALE_U * returnedparamscaled[i];
-			out_ftip[i] = IVALUE_SCALE_F * returnedparamscaled[i+3];
-		}
-	}
+
 
 	out_localmin = localmin;
 	delete[] initialguessscaled;
@@ -132,20 +125,19 @@ void NLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params) {
     auto* OutResidual = new adType [NUM_RESIDUAL];
 
     // output for time advance, not used in BVP, just placeholders
-    adType u_0[3], ftip[3];
+    adType u_0[NUM_FLEX_SEG][3], ftip[3];
     // don't forget to scale parameters before passing to the CRMSolverIVP
     if (Params.ContactMode == ContactModeType::FREE_TIP) {
+        for (int i = 0; i < NUM_FLEX_SEG; ++i) {
+            for (int j = 0; j < 3; ++j) {
+                u_0[i][j] = IVALUE_SCALE_U * in_x[j+3*i];
+            }
+        }
         for (int i = 0; i < 3; i++) {
-            u_0[i] = IVALUE_SCALE_U * in_x[i];
             ftip[i] = Params.TipForce[i];  // for free-tip, this parameter is not given by the nonlinear equation solver, and hence, does not need to be scaled
         }
     }
-    else { // FIXED_TIP
-        for (int i = 0; i < 3; i++) {
-            u_0[i] = IVALUE_SCALE_U * in_x[i];
-            ftip[i] = IVALUE_SCALE_F * in_x[i + 9];
-        }
-    }
+
 
     adType Tbcoil[NUM_ACT_SET][3], pcoil[NUM_ACT_SET][3], Rcoil[NUM_ACT_SET][9];
 //    auto* Tbcoil = new adType [3];
@@ -157,14 +149,8 @@ void NLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params) {
 
     // don't forget to scale parameters before returning to the nonlinear equation solver
     if (Params.ContactMode == ContactModeType::FREE_TIP) {
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < NUM_RESIDUAL; i++) {
             out_y[i] = RESIDUAL_SCALE_M * OutResidual[i];// RESIDUAL_SCALE_F * WrenchResidual[i] ;
-        }
-    }
-    else { // FIXED_TIP
-        for (int i = 0; i < 3; i++) {
-            out_y[i] = RESIDUAL_SCALE_M * OutResidual[i];
-            out_y[i + 3] = RESIDUAL_SCALE_P * (x_N[i + 12] - Params.TipConstraintPoint[i]);
         }
     }
 

@@ -24,7 +24,7 @@
 #define NUM_COIL_STATES (6+3+9) // v[3], w[3], p[3] ,R[9]
 
 
-#define NUM_RESIDUAL 3
+#define NUM_RESIDUAL (NUM_FLEX_SEG* 3)
 #define NUM_DYN_RESIDUAL (6 * NUM_ACT_SET)
 //#define DELTA_T 0.01
 #define NUM_CONTROL (NUM_ACT_SET * 3 + 1) // Control dimension for the dynamic model
@@ -156,9 +156,9 @@ struct CRMShootingMethodParams {
 //    note that in_ftip[] will be used, ignoring the value in_Params.TipForce[]
 template <typename adType>
 void CRMSolverIVP(	CRMShootingMethodParams<adType> in_Params,
-                      adType in_u0[3], adType in_ftip[3],
+                      adType in_u0[NUM_FLEX_SEG][3], adType in_ftip[3],
                       bool in_FinalValueOnly,
-                      adType out_x_N[NUM_STATES], adType out_MomentResidual[3],  adType Tbcoil[NUM_ACT_SET][3], adType pcoil[NUM_ACT_SET][3], adType Rcoil[NUM_ACT_SET][9],
+                      adType out_x_N[NUM_STATES], adType out_MomentResidual[NUM_RESIDUAL],  adType Tbcoil[NUM_ACT_SET][3], adType pcoil[NUM_ACT_SET][3], adType Rcoil[NUM_ACT_SET][9],
                       double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]);
 
 
@@ -235,7 +235,7 @@ void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSiz
  */
 template <typename adType>
 void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
-                         adType in_u[3], adType in_ftip[3],
+                         adType in_u[NUM_FLEX_SEG][3], adType in_ftip[3],
                          adType out_x_N[NUM_STATES], adType out_Residual[NUM_RESIDUAL],
                          adType out_Tbcoil[NUM_ACT_SET][3], adType out_pcoil[NUM_ACT_SET][3], adType out_Rcoil[NUM_ACT_SET][9],
                          double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]);
@@ -279,8 +279,8 @@ void CRMIntegrand (	adType s, adType x[NUM_STATES], adType Li, double dlambdainv
 //              when in_ContactMode == ContactModeType::FREE_TIP  in_ftip_initialguess[] will not be used, and out_ftip[] will be set to inParams.TipForce[]
 template <typename adType>
 void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params,
-                              const double in_u0_initialguess[3], const double in_ftip_initialguess[3],
-                              adType out_u0[3], adType out_ftip[3], int& out_localmin);
+                              const double in_u0_initialguess[NUM_FLEX_SEG][3], const double in_ftip_initialguess[3],
+                              adType out_u0[NUM_FLEX_SEG][3], adType out_ftip[3], int& out_localmin);
 //
 
 // Preparation of NLEqnParams for subsequent call to Nonlinear Equation Solvers
@@ -302,7 +302,7 @@ struct NLEqnParams : CRMIVPCoreParams<adType> {
 	double			TipForce[3];			// External point force (in spatial coordinates) applied at the tip of the catheter (\lambda = 0) (used if ContactMode == FREE_TIP)
 
     // terms used in the dynamics
-    double	u0_initialguess[3];
+    double	u0_initialguess[NUM_FLEX_SEG][3];
     double	ftip_initialguess[3];
 };
 
@@ -332,7 +332,7 @@ struct CRMDynamicsParams {
     ContactModeType ContactMode;
     double	TipConstraintPoint[3];
     double	TipForce[3];
-    double	u0_initialguess[3];
+    double	u0_initialguess[NUM_FLEX_SEG][3];
     double	nL_initialguess[NUM_ACT_SET][3];
     double	mL_initialguess[NUM_ACT_SET][3];
     double	ftip_initialguess[3];
@@ -343,7 +343,7 @@ struct CRMDynamicsParams {
 
 
 template <typename adType>
-void CRMShootingMethodBVP_DYN(	NLEqnParams<adType> in_Params, adType out_u0[3], adType out_ftip[3], int& out_localmin);
+void CRMShootingMethodBVP_DYN(	NLEqnParams<adType> in_Params, adType out_u0[NUM_FLEX_SEG][3], adType out_ftip[3], int& out_localmin);
 
 template <typename adType>
 void CoilDynamics( adType in_coil_state[NUM_COIL_STATES], adType in_n[3], adType g[3],
@@ -366,15 +366,15 @@ void ABM4_coildyn(	adType in_x_n[NUM_COIL_STATES],adType in_xdot_nm1[6], adType 
                       adType out_x_np1[NUM_COIL_STATES], adType out_xdot_n[6]);
 
 template <typename adType>
-void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, adType out_u0[3]);
+void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, adType out_u0[NUM_FLEX_SEG*3]);
 
 template <typename adType>
-void DynamicsBVP(	CRMShootingMethodParams<adType> in_Params, double in_u0_initialguess[3],
+void DynamicsBVP(	CRMShootingMethodParams<adType> in_Params, double in_u0_initialguess[NUM_FLEX_SEG][3],
                      double in_mL_initialguess[NUM_ACT_SET][3], double in_nL_initialguess[NUM_ACT_SET][3], double in_ftip_initialguess[3],
-                     adType out_u0[3], adType out_mL[NUM_ACT_SET][3], adType out_nL[NUM_ACT_SET][3], adType out_ftip[3], int& out_localmin);
+                     adType out_u0[NUM_FLEX_SEG][3], adType out_mL[NUM_ACT_SET][3], adType out_nL[NUM_ACT_SET][3], adType out_ftip[3], int& out_localmin);
 
 template <typename adType>
-void DYNSolverIVP(	CRMShootingMethodParams<adType> in_Params, adType in_u0[3],
+void DYNSolverIVP(	CRMShootingMethodParams<adType> in_Params, adType in_u0[NUM_FLEX_SEG][3],
                       adType in_mL[NUM_ACT_SET][3], adType in_nL[NUM_ACT_SET][3], adType in_ftip[3],
                          bool in_FinalValueOnly,
                          adType out_x_N[NUM_STATES], adType out_coil_state[NUM_COIL_STATES],

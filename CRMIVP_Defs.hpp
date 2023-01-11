@@ -3,20 +3,20 @@
 
 template <typename adType>
 void CRMSolverIVP(	CRMShootingMethodParams<adType> in_Params,
-					adType in_u0[3], adType in_ftip[3],
+					adType in_u0[NUM_FLEX_SEG][3], adType in_ftip[3],
                      bool in_FinalValueOnly,
-					adType out_x_N[NUM_STATES], adType out_MomentResidual[3],  adType Tbcoil[NUM_ACT_SET][3], adType pcoil[NUM_ACT_SET][3], adType Rcoil[NUM_ACT_SET][9],
+					adType out_x_N[NUM_STATES], adType out_MomentResidual[NUM_RESIDUAL],  adType Tbcoil[NUM_ACT_SET][3], adType pcoil[NUM_ACT_SET][3], adType Rcoil[NUM_ACT_SET][9],
 					double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]){
 
 	adType x_0[NUM_STATES];
 	for (int i = 0; i < NUM_STATES; i++) {
-		if (i < 3) x_0[i] = in_u0[i];
+		if (i < 3) x_0[i] = in_u0[0][i];
 		else if (i < 12) x_0[i] = in_Params.R0[i - 3];
 		else if (i < 15) x_0[i] = in_Params.p0[i - 12];
 	}
 
 	CRMIVPCoreParams<adType> CoreParams;
-	adType u_0[3], ftip[3];
+	adType u_0[NUM_FLEX_SEG][3], ftip[3];
 
     adType m_L[NUM_ACT_SET][3] = {0.0, 0.0, 0.0}; //This is the static case, where no input m/n is involved in the trustregion
     adType n_L[NUM_ACT_SET][3] = {0.0, 0.0, 0.0};
@@ -34,7 +34,9 @@ void CRMSolverIVP(	CRMShootingMethodParams<adType> in_Params,
 	for (int i = 0; i < 3; i++) ftip[i] = in_ftip[i];
 
 	// We need to pass u_0 as input argument as the values in CoreParams will be overriden with the values provided in the input arguments - functionality needed for solving Boundary Value Problems (BVP)
-	for (int i = 0; i < 3; i++) u_0[i] = in_u0[i];
+    for (int i = 0; i < NUM_FLEX_SEG; ++i) {
+        for (int j = 0; j < 3; j++) u_0[i][j] = in_u0[i][j];
+    }
 
     CRMSolverIVP_Core ( CoreParams, u_0,ftip, out_x_N, out_MomentResidual, Tbcoil, pcoil, Rcoil, out_p_atLocMarkers);
 
@@ -214,10 +216,13 @@ void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSiz
 
 template <typename adType>
 void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
-						 adType in_u[3], adType in_ftip[3],
+						 adType in_u[NUM_FLEX_SEG][3], adType in_ftip[3],
 						 adType out_x_N[NUM_STATES], adType out_Residual[NUM_RESIDUAL],
                          adType out_Tbcoil[NUM_ACT_SET][3], adType out_pcoil[NUM_ACT_SET][3], adType out_Rcoil[NUM_ACT_SET][9],
 						 double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]){
+
+//    std::cout << "in_u: " << in_u[0][0] << " " <<  in_u[0][1] << " " <<  in_u[0][2] << std::endl;
+//    std::cout << "in_u: " << in_u[1][0] << " " <<  in_u[1][1] << " " <<  in_u[1][2] << std::endl;
 
     /*
      * Other params for dynamics
@@ -252,7 +257,7 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 	adType muhat[9];
 	adType RscTB0[3], Tb[3], deltau1[3], K1deltau1[3], K2invResidual[3]; // intermediate variables
 	adType tempadType;				// intermediate variables
-	adType Residual[3];				// Residual at the catheter tip -- will be returned
+	adType Residual[NUM_FLEX_SEG][3];				// Residual at the catheter tip -- will be returned
 
 	int   fsegno; 					// flexible segment no
 	int   actno, fsegi, fsegip1;	// actuator no, flexible segment before, flexible segment after
@@ -261,7 +266,7 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
     // we need to copy xi from in_params to the local variable and update it with u[0..2] specified in in_u
 	for (int i=0; i<NUM_STATES; i++) xi[i]=in_params.xi[i];
 	for (int i=0; i<3; i++) {
-		xi[i]=in_u[i];
+		xi[i]=in_u[0][i]; // THe first segment
 	}
 
     // we need to copy in_ftip to local variable
@@ -293,7 +298,6 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 		}
 	}
 
-
     // IMPORTANT NOTE: most proximal segment is assumed to be always flexible
 	//    and the flexible and rigid segments are assumed to be alternating
 	//    most distal segment can be flexible or rigid
@@ -304,9 +308,9 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 		RigidSegmentLength	=	SegBounds[StartSegmentIndex+1]-SegBounds[StartSegmentIndex];	// how far we need to move along the length of the rigid segment to reach the next flexible segment
 		for (int i=0; i<3; i++) { 										// u[0..2] and R[0..8] remain the same
 			xi[i+9+3] = xi[i+9+3] + RigidSegmentLength * xi[3+i*3+2];	// p[0..2] will translate along the z direction of the R matrix (3rd column)
-			Residual[i]=0.0;											// Residual is initialized to the 0 vector, just in case the rigid segment is the only segment (it is both the start and the end segment),
+			Residual[0][i]=0.0;											// Residual is initialized to the 0 vector, just in case the rigid segment is the only segment (it is both the start and the end segment),
 		}																//     In this case, the main integration loop will not execute, so, we need to have valid return values
-		mCopy_AB<NUM_STATES>(xi,xf);									//     for both xf and Residual
+        mCopy_AB<NUM_STATES>(xi,xf);									//     for both xf and Residual
 		StartSegmentIndex++;  // move the start segment to the next segment
 		if (!FinalValueOnly) {
 			// are there any localization markers?  If so, calculate their positions
@@ -315,9 +319,10 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 				tempadType =LocMarkers[NextLocMarker]-SegBounds[StartSegmentIndex];  	// this would be a negative number
 				LocMarkerUpdate(p_atLocMarkers[NextLocMarker], xi, tempadType);			//	xi has already been updated
 				NextLocMarker++;
-				loopcondition = ((NextLocMarker<NUM_LOCALIZATION_MARKERS) && (LocMarkers[NextLocMarker]<=SegBounds[StartSegmentIndex]));			}
+				loopcondition = ((NextLocMarker<NUM_LOCALIZATION_MARKERS) && (LocMarkers[NextLocMarker]<=SegBounds[StartSegmentIndex]));	}
 		}
 	}
+
 
     for (int i=StartSegmentIndex; i< NUM_SEGMENTS; i++){
 		if ( i%2 == 0 ) {  // Flexible Segment
@@ -331,6 +336,15 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
                      fcumlambda, ftip,
                      FinalValueOnly, LocMarkers, &NextLocMarker,
                      xf, p_atLocMarkers);
+
+            if (i == NUM_SEGMENTS-1){ // last flexible segment
+                mSub_AB<3,1>( &(xf[0]) , ustar[fsegno], deltau1);
+                mMult_AB<3,3,1>( K[fsegno], deltau1, K1deltau1 );
+
+                for (int j = 0; j < 3; ++j) {
+                    Residual[fsegno][j] = K1deltau1[j];
+                }
+            }
         }
 		else {  // Need to do actuation/rigid segment calculations to transfer Initial Conditions to next flexible segment
 			LastSegmentIsRigid=true;
@@ -358,10 +372,14 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
             mSub_AB<3,1>( &(xf[0]) , ustar[fsegi], deltau1);
             mMult_AB<3,3,1>( K[fsegi], deltau1, K1deltau1 );
 
+            double res[3];
             if (!DYN_SIGNAL){
-                mSub_AB<3,1>( K1deltau1 , Tb, Residual); // Quasi-static residual
+                mSub_AB<3,1>( K1deltau1 , Tb, res); // Quasi-static residual
             }else{
-                mSub_AB<3,1>( m_L[fsegi], K1deltau1 , Residual);
+                mSub_AB<3,1>( m_L[fsegi], K1deltau1 , res);
+            }
+            for (int j = 0; j < 3; ++j) {
+                Residual[fsegi][j] = res[j];
             }
 
             for (int j = 0; j < 3; ++j) {
@@ -378,20 +396,20 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 
             if (i < (NUM_SEGMENTS-1)) {	// we want to make sure that we are not at the last segment
 //                mCopy_AB<3>( ustar[fsegip1], &(xi[0]) );
-                mMult_AB<3,3,1>( Kinv[fsegip1], Residual, K2invResidual );
-                mAdd_AB<3,1>( ustar[fsegip1], K2invResidual, &(xi[0]) );
-//                for (int j = 0; j < 3; ++j) {
-//                    n_L[j]=0.0;
-//                }
+//                mMult_AB<3,3,1>( Kinv[fsegip1], Residual, K2invResidual );
+//                mAdd_AB<3,1>( ustar[fsegip1], K2invResidual, &(xi[0]) );
 
-            }
-			else {	// otherwise, we are at the last segment, and we need to copy the R and p values calculated for xi to xf so that they can be returned
+                for (int j = 0; j < 3; ++j) {
+                    xi[j] = in_u[fsegip1][j];
+                }
+
+            }else {	// otherwise, we are at the last segment, and we need to copy the R and p values calculated for xi to xf so that they can be returned
 				for (int j=0; j<NUM_STATES; j++) {
 					if (j<3) xf[j]=0.0;  // u[0..2] are assigned to zero
 					else xf[j]=xi[j];
 				}
-
 			}
+
 			if (!FinalValueOnly) {
 				// are there any localization markers?  If so, calculate their positions
 				loopcondition = ((NextLocMarker<NUM_LOCALIZATION_MARKERS) && (LocMarkers[NextLocMarker]<=SegBounds[i+1]));
@@ -420,16 +438,15 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 	// Copy the final values of the state x_f to the output
 	mCopy_AB<NUM_STATES>(xf, out_x_N);
 
-    // Calculate the Boundary Value Residual if last segment is flexible
-//    adType deltau[3];
-//    if (!LastSegmentIsRigid) {
-//        // residual = K (u1 - u1star)
-//        mSub_AB<3,1>( &(xf[0]) , ustar[NUM_FLEX_SEG-1], deltau);
-//        mMult_AB<3,3,1>( K[NUM_FLEX_SEG-1], deltau, Residual);
-//    }   // else residual = K1 (u1 - u1star ) - Tb  ; already calculated above
-
     // Copy the residual to the output
-	mCopy_AB<NUM_RESIDUAL>(Residual, out_Residual);
+//	mCopy_AB<NUM_RESIDUAL>(Residual, out_Residual);
+
+    for (int i = 0; i < NUM_FLEX_SEG; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            out_Residual[j+3*i] = Residual[i][j];
+        }
+    }
+
 //    std::cout << "Residual in core: " << Residual[0] << " " << Residual[1] << " " << Residual[2] << std::endl;
 
 }

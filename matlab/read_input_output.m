@@ -1,11 +1,11 @@
-path_to_input = '3D_dynamic_response_data/input_play_files/circle_100_new.txt';
+path_to_input = '3D_dynamic_response_data/input_play_files/circle_50_new.txt';
 fileID = fopen(path_to_input,'r');
 input_data = textscan(fileID,'%d %f %f', 'Delimiter',',');
 fclose(fileID);
-load('3D_dynamic_response_data/output_trajectories/circle100.mat');
+load('3D_dynamic_response_data/output_trajectories/circle50.mat');
 
-circle = circle100;
-Ts = 0.10; %s
+circle = circle50;
+Ts = 0.05; %s
 Ts_camera = 0.0167; %s
 
 index = input_data(1,1);
@@ -66,22 +66,6 @@ time_output = [0:1:data_length-1] * Ts_camera; %time_output - ones(data_length, 
 %%output interpolation
 
 if Ts >= Ts_camera
-%     timer = 0.0; 
-%     currents = zeros(3, data_length);
-%     %interpolate inputs
-%     for i = 1: data_length
-%     
-%         ind_ = floor(timer / Ts)+1; % ind_ starts from 1 not 0
-%     
-%         currents(:,i) = raw_currents(:, ind_);
-%     
-%         timer = timer + Ts_camera;
-%         if timer >= total_time_input
-%             break;
-%         end
-%     end
-%     coil_position_mat = coil_position_mat_raw;
-
     coil_position_mat = [];
     timer = 0.0;
     
@@ -133,29 +117,6 @@ if Ts >= Ts_camera
     plot(t, currents(2,1:data_length), 'k-');
     subplot(3,2,6);
     plot(t, currents(3,1:data_length), 'k-');
-
-
-
-%     figure(12)
-%     subplot(3,1,1)
-%     t = [1:1:data_length]*Ts_camera;
-%     plot(t, currents(1,1:data_length), 'k-');
-%     hold on;
-%     t = [1:1:current_size];
-%     plot(t, raw_currents(1,1:current_size), 'r-'); 
-%     subplot(3,1,2);
-%     t = [1:1:data_length];
-% 
-%     plot(t, currents(2,1:data_length), 'k-');
-%     hold on;
-%     t = [1:1:current_size];
-%     plot(t, raw_currents(2,1:current_size), 'r-'); 
-%     subplot(3,1,3);
-%     t = [1:1:data_length]* Ts;
-%     plot(t, currents(3,1:data_length), 'k-');
-%     hold on;
-%     t = [1:1:current_size];
-%     plot(t, raw_currents(3,1:current_size), 'r-'); 
 end
 
 if Ts < Ts_camera

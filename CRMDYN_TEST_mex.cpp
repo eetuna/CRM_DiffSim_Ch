@@ -31,7 +31,7 @@ public:
         // Outer radii of each of the flexible segments - unit: mm
         /** Retrieve everything from inputs **/
         /** Retrieve x. **/
-        double v_L_pre[NUM_ACT_SET][3], w_L_pre[NUM_ACT_SET][3],  u0_initialguess[3], nL_initialguess[NUM_ACT_SET][3], mL_initialguess[NUM_ACT_SET][3], pL_pre[NUM_ACT_SET][3], RL_pre[NUM_ACT_SET][9];
+        double v_L_pre[NUM_ACT_SET][3], w_L_pre[NUM_ACT_SET][3],  u0_initialguess[NUM_FLEX_SEG][3], nL_initialguess[NUM_ACT_SET][3], mL_initialguess[NUM_ACT_SET][3], pL_pre[NUM_ACT_SET][3], RL_pre[NUM_ACT_SET][9];
         // Define initial guesses to be used when solving boundary value problem
 
 
@@ -41,9 +41,10 @@ public:
                 w_L_pre[i][j] = inputs[1][j+i*3];
             }
         }
-
-        for (int i = 0; i < 3; ++i) {
-            u0_initialguess[i] = inputs[2][i];
+        for (int i = 0; i < NUM_FLEX_SEG; ++i) {
+            for (int j = 0; j < 3; ++j) {
+                u0_initialguess[i][j] = inputs[2][j+3*i];
+            }
         }
 
         for (int i = 0; i < NUM_ACT_SET; ++i) {
@@ -63,7 +64,7 @@ public:
 
         // Declare the output variables for BVP
         // calculated curvature at the catheter base
-        double u0_calc[3];
+        double u0_calc[NUM_FLEX_SEG][3];
         double nL_calc[NUM_ACT_SET][3];
         double mL_calc[NUM_ACT_SET][3];
         // calculated contstraint force at the catheter tip (this will be used when ContactMode == ContactModeType::FIXED_TIP)
@@ -255,7 +256,7 @@ public:
         /** Output report **/
         outputs[0] = factory.createArray<double>({1, 3}, {x_coil[0], x_coil[1], x_coil[2]});
         outputs[1] = factory.createArray<double>({1, 3}, {x_coil[3], x_coil[4], x_coil[5]});
-        outputs[2] = factory.createArray<double>({1, 3}, {u0_calc[0], u0_calc[1], u0_calc[2]});
+        outputs[2] = factory.createArray<double>({1, NUM_FLEX_SEG*3}, {u0_calc[0][0], u0_calc[0][1], u0_calc[0][2], u0_calc[1][0], u0_calc[1][1], u0_calc[1][2]});
         outputs[3] = factory.createArray<double>({1, 3}, {mL_calc[0][0], mL_calc[0][1], mL_calc[0][2]});
         outputs[4] = factory.createArray<double>({1, 3}, {nL_calc[0][0], nL_calc[0][1], nL_calc[0][2]});
         outputs[5] = factory.createArray<double>({1, 3}, {x_coil[6], x_coil[7], x_coil[8]});

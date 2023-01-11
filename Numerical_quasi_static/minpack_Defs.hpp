@@ -436,6 +436,7 @@ void hybrd(int n, adType x[], adType fvec[], double xtol, int maxfev, int ml, in
 	//C     and calculate its norm.
 	//C
 	iflag = 1;
+
 	NLEquation(x, fvec, Params);
 	nfev = 1;
 	if (iflag < 0) {
