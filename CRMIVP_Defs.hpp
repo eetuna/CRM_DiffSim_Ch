@@ -5,7 +5,7 @@ template <typename adType>
 void CRMSolverIVP(	CRMShootingMethodParams<adType> in_Params,
 					adType in_u0[NUM_FLEX_SEG][3], adType in_ftip[3],
                      bool in_FinalValueOnly,
-					adType out_x_N[NUM_STATES], adType out_MomentResidual[NUM_RESIDUAL],  adType Tbcoil[NUM_ACT_SET][3], adType pcoil[NUM_ACT_SET][3], adType Rcoil[NUM_ACT_SET][9],
+					adType out_x_N[NUM_STATES], adType out_MomentResidual[NUM_RESIDUAL], adType pcoil[NUM_ACT_SET][3], adType Rcoil[NUM_ACT_SET][9],
 					double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]){
 
 	adType x_0[NUM_STATES];
@@ -38,7 +38,7 @@ void CRMSolverIVP(	CRMShootingMethodParams<adType> in_Params,
         for (int j = 0; j < 3; j++) u_0[i][j] = in_u0[i][j];
     }
 
-    CRMSolverIVP_Core ( CoreParams, u_0,ftip, out_x_N, out_MomentResidual, Tbcoil, pcoil, Rcoil, out_p_atLocMarkers);
+    CRMSolverIVP_Core ( CoreParams, u_0,ftip, out_x_N, out_MomentResidual, pcoil, Rcoil, out_p_atLocMarkers);
 
 }
 
@@ -217,8 +217,7 @@ void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSiz
 template <typename adType>
 void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 						 adType in_u[NUM_FLEX_SEG][3], adType in_ftip[3],
-						 adType out_x_N[NUM_STATES], adType out_Residual[NUM_RESIDUAL],
-                         adType out_Tbcoil[NUM_ACT_SET][3], adType out_pcoil[NUM_ACT_SET][3], adType out_Rcoil[NUM_ACT_SET][9],
+						 adType out_x_N[NUM_STATES], adType out_Residual[NUM_RESIDUAL], adType out_pcoil[NUM_ACT_SET][3], adType out_Rcoil[NUM_ACT_SET][9],
 						 double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]){
 
 //    std::cout << "in_u: " << in_u[0][0] << " " <<  in_u[0][1] << " " <<  in_u[0][2] << std::endl;
@@ -380,10 +379,6 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
             }
             for (int j = 0; j < 3; ++j) {
                 Residual[fsegi][j] = res[j];
-            }
-
-            for (int j = 0; j < 3; ++j) {
-                out_Tbcoil[actno][j] = Tb[j];
             }
 
             for (int j=0; j<3; j++) {

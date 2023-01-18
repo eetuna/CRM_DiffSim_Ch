@@ -219,7 +219,6 @@ int RunExample(void) {
     double ReportedMarkerPos[NUM_LOCALIZATION_MARKERS][3];
     double xf[NUM_STATES];
 
-    double TBcoil[NUM_ACT_SET][3];
     // Catheter entry point coordinates (in spatial coordinates) - unit: mm
     double pL[NUM_ACT_SET][3] = { 0.0, 0.0, 0.0 };
     // Catheter entry point orientation (3x3 rotation matrix describing catheter entry point frame orientation relative to the spatial frame stored in row major order) - unit: unitless
@@ -241,7 +240,7 @@ int RunExample(void) {
 
 //
 //    // Cosserat Rod Model - Solve the Initial Value Problem to calculate the shape of the catheter
-    CRMSolverIVP(BVPParams, u0_calc, ftip_calc, false, xf, residual,TBcoil, pL, RL, ReportedMarkerPos);
+    CRMSolverIVP(BVPParams, u0_calc, ftip_calc, false, xf, residual, pL, RL, ReportedMarkerPos);
 
 //    std::cout << " ----Initial Configuration under NO actuation------ " << std::endl;
 //    printMatrix(u0_calc, 1, 3, "Calculated curvature at base");

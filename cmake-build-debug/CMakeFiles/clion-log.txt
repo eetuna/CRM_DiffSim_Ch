@@ -1,0 +1,4 @@
+/home/ranhao/Documents/clion-2021.3.2/bin/cmake/linux/bin/cmake -DCMAKE_BUILD_TYPE=Debug -G "CodeBlocks - Unix Makefiles" /home/ranhao/Desktop/CRM_Dynamics
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/ranhao/Desktop/CRM_Dynamics/cmake-build-debug

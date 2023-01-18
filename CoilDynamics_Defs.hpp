@@ -19,10 +19,11 @@
   * @param wdot
   */
 template <typename adType>
-void CoilIntegrad(adType in_twist[6], adType in_n[3], adType g[3], adType R[9], adType actMass, adType actInertia[9], adType damping[6], adType in_tau[3], adType twistdot[6]){
+void CoilIntegrad(adType in_twist[6], adType in_n[3], adType g[3], adType R[9], adType actMass, adType actInertia[9], adType damping[6],
+                  adType in_B0[3], adType in_muhat[9], adType in_mL[3], adType twistdot[6]){
 
-    adType v[3], w[3], n_L[3], tau[3];
-    adType RTg[3], w_v[3], w_hat[9], inertiaw[3], w_inertia_w[3], diff_tau_w[3];
+    adType v[3], w[3], n_L[3], m_L[3], B0[3], muhat[9], Tb[3], tau[3];
+    adType RTg[3], RscTB0[3], w_v[3], w_hat[9], inertiaw[3], w_inertia_w[3], diff_tau_w[3];
     adType vdot[3], wdot[3];
 
      mMult_ATB<3,3,1>(R, g, RTg);
@@ -33,7 +34,12 @@ void CoilIntegrad(adType in_twist[6], adType in_n[3], adType g[3], adType R[9], 
     }
      for (int i = 0; i < 3; ++i) {
          n_L[i] = in_n[i];
-         tau[i] = in_tau[i];
+         B0[i] = in_B0[i];
+         m_L[i] = in_mL[i];
+     }
+
+     for (int i = 0; i < 9; ++i) {
+         muhat[i] = in_muhat[i];
      }
 
      wHat(w,w_hat);
@@ -57,6 +63,10 @@ void CoilIntegrad(adType in_twist[6], adType in_n[3], adType g[3], adType R[9], 
 
      mMult_AB<3,3,1>(actInertia, w, inertiaw);
      mMult_AB<3,3,1>(w_hat, inertiaw, w_inertia_w);
+
+     mMult_ATB<3,3,1>(R,B0,RscTB0);
+     mMult_AB<3,3,1>(muhat,RscTB0,Tb);
+     mSub_AB<3, 1>(Tb, m_L, tau);
 
      mSub_AB<3,1>(tau, w_inertia_w, diff_tau_w);
      mSub_AB<3,1>(diff_tau_w, damping_wec, residual_w);
@@ -92,7 +102,7 @@ void CoilIntegrad(adType in_twist[6], adType in_n[3], adType g[3], adType R[9], 
  */
 template <typename adType>
 void CoilDynamics( adType in_coil_state[NUM_COIL_STATES], adType in_n[3], adType g[3],
-                  adType actMass, adType actInertia[9], adType damping[6], double DELTA_T, adType in_tau[3], adType out_coil_state[NUM_COIL_STATES]){
+                  adType actMass, adType actInertia[9], adType damping[6], double DELTA_T, adType in_B0[3], adType in_muhat[9], adType in_mL[3], adType out_coil_state[NUM_COIL_STATES]){
 
 //    for (int i = 0; i < 3; ++i) {
 //        std::cout << "in_n: " << in_n[i] << std::endl;
@@ -110,10 +120,17 @@ void CoilDynamics( adType in_coil_state[NUM_COIL_STATES], adType in_n[3], adType
     adType xdot_nm2[6];
     adType xdot_nm1[6];
     adType xdot_n[6];
-    adType nL[3], tau[3];
+    adType nL[3], B0[3], muhat[9], mL[3];
 
-    for (int i = 0; i < 3; ++i) nL[i] = in_n[i];
-    for (int i = 0; i < 3; ++i) tau[i] = in_tau[i];
+    for (int i = 0; i < 3; ++i) {
+        nL[i] = in_n[i];
+        B0[i] = in_B0[i];
+        mL[i] = in_mL[i];
+    }
+    for (int i = 0; i < 9; ++i) {
+        muhat[i] = in_muhat[i];
+    }
+
 
     // initialize the iteration items
     for (int i = 0; i < NUM_COIL_STATES; i++) {
@@ -126,11 +143,11 @@ void CoilDynamics( adType in_coil_state[NUM_COIL_STATES], adType in_n[3], adType
     for (int idx=0; idx<N; idx++) {
 
         if (idx<3) {  // RK2 initialization steps
-            RK2_coildyn(x_n, nL, g,  actMass, actInertia, damping,tau, x_np1, xdot_n );
+            RK2_coildyn(x_n, nL, g,  actMass, actInertia, damping, B0, muhat, mL,x_np1, xdot_n );
         }
         else { 		 // ABM4 steps
             ABM4_coildyn(	x_n, xdot_nm1, xdot_nm2, xdot_nm3, x_nm1, x_nm2, x_nm3,
-                             nL, g,  actMass, actInertia, damping, tau,x_np1, xdot_n);
+                             nL, g,  actMass, actInertia, damping, B0, muhat, mL,x_np1, xdot_n);
             if ( isnan(x_n[0]) ) {
                 std::cout << "FLY ME TO THE MOON!! " << std::endl;
 //                exit( 3 );
@@ -163,11 +180,11 @@ void CoilDynamics( adType in_coil_state[NUM_COIL_STATES], adType in_n[3], adType
 
 //[x_np1, xdot_n] = RK2_step(x_n, t_n, h, Integrand)
 template <typename adType>
-void RK2_coildyn(adType in_x_n[NUM_COIL_STATES], adType in_n[3], adType g[3],  adType actMass, adType actInertia[9], adType damping[6], adType in_tau[3],
+void RK2_coildyn(adType in_x_n[NUM_COIL_STATES], adType in_n[3], adType g[3],  adType actMass, adType actInertia[9], adType damping[6], adType in_B0[3], adType in_muhat[9], adType in_mL[3],
                  adType out_x_np1[NUM_COIL_STATES], adType out_xdot_n[6] ) {
 
 
-    adType nL[3], tau[3], twist_n[6];       // from input
+    adType nL[3], B0[3], muhat[9], mL[3], twist_n[6];       // from input
     adType k1[6];
     adType k2oh[6];
     adType x_n_p_k1o2[6];
@@ -180,14 +197,18 @@ void RK2_coildyn(adType in_x_n[NUM_COIL_STATES], adType in_n[3], adType g[3],  a
 
     for (int i = 0; i < 3; ++i) {
         nL[i] = in_n[i];
-        tau[i] = in_tau[i];
+        B0[i] = in_B0[i];
+        mL[i] = in_mL[i];
+    }
+    for (int i = 0; i < 9; ++i) {
+        muhat[i] = in_muhat[i];
     }
 
 //    std::cout << "input v_n: " << twist_n[0] << " " << twist_n[1] << " " << twist_n[2] <<  std::endl;
 //    std::cout << "input w_n: " << twist_n[3] << " " << twist_n[4] << " " << twist_n[5] <<  std::endl;
 
     //RK2_STEP_STEP1:
-    CoilIntegrad(twist_n, nL, g, R_n, actMass, actInertia, damping,tau, xdot_n);
+    CoilIntegrad(twist_n, nL, g, R_n, actMass, actInertia, damping, B0, muhat, mL, xdot_n);
     for (int i=0; i< 6 ; i++) {
         k1[i] 			= t_step * xdot_n[i];
         x_n_p_k1o2[i] 	= twist_n[i] + k1[i] * 0.5;
@@ -202,7 +223,7 @@ void RK2_coildyn(adType in_x_n[NUM_COIL_STATES], adType in_n[3], adType g[3],  a
 #endif
 
     //RK2_STEP_STEP2:
-    CoilIntegrad(x_n_p_k1o2, nL, g, R_np1half, actMass, actInertia, damping,tau, k2oh);
+    CoilIntegrad(x_n_p_k1o2, nL, g, R_np1half, actMass, actInertia, damping,B0, muhat, mL, k2oh);
 
     for (int i = 0; i < 6; i++) {
         out_x_np1[i] = twist_n[i] + t_step * k2oh[i];
@@ -230,7 +251,7 @@ void RK2_coildyn(adType in_x_n[NUM_COIL_STATES], adType in_n[3], adType g[3],  a
 template <typename adType>
 void ABM4_coildyn(	adType in_x_n[NUM_COIL_STATES],adType in_xdot_nm1[6], adType in_xdot_nm2[6], adType in_xdot_nm3[6],
                    adType in_x_nm1[NUM_COIL_STATES], adType in_x_nm2[NUM_COIL_STATES], adType in_x_nm3[NUM_COIL_STATES],
-                   adType in_n[3], adType g[3],  adType actMass, adType actInertia[9], adType damping[6], adType in_tau[3],
+                   adType in_n[3], adType g[3],  adType actMass, adType actInertia[9], adType damping[6], adType in_B0[3], adType in_muhat[9], adType in_mL[3],
                    adType out_x_np1[NUM_COIL_STATES], adType out_xdot_n[6]) {
 
     const double P_COEFF_N=55.0/24.0, P_COEFF_Nm1=-59.0/24.0, P_COEFF_Nm2=37.0/24.0, P_COEFF_Nm3=-9.0/24.0;  // AB4 Predictor Coefficients
@@ -263,15 +284,21 @@ void ABM4_coildyn(	adType in_x_n[NUM_COIL_STATES],adType in_xdot_nm1[6], adType 
     for (int i = 0; i < 9; ++i) R_n[i] = in_x_n[i+9];
     for (int i = 0; i < 6; ++i) twist_n[i] = in_x_n[i];
 
+    adType B0[3], muhat[9], mL[3];
     for (int i = 0; i < 3; ++i) {
         nL[i] = in_n[i];
-        tau[i] = in_tau[i];
+        B0[i] = in_B0[i];
+        mL[i] = in_mL[i];
     }
+    for (int i = 0; i < 9; ++i) {
+        muhat[i] = in_muhat[i];
+    }
+
 
     adType R_np1_hat[9], p_np1_hat[3];
 
     //ABM4_STEP_STEP1:
-    CoilIntegrad(twist_n, nL, g, R_n, actMass, actInertia, damping,tau, xdot_n);
+    CoilIntegrad(twist_n, nL, g, R_n, actMass, actInertia, damping,B0, muhat, mL,xdot_n);
 
     for (int i=0; i<6; i++) {
         x_np1_hat[i]    = twist_n[i] + t_step * ( P_COEFF_N * xdot_n[i] + P_COEFF_Nm1 * xdot_nm1[i] + P_COEFF_Nm2 * xdot_nm2[i] + P_COEFF_Nm3 * xdot_nm3[i] );
@@ -286,7 +313,7 @@ void ABM4_coildyn(	adType in_x_n[NUM_COIL_STATES],adType in_xdot_nm1[6], adType 
 //    for (int i = 0; i < 9; ++i) x_np1_hat[i+9] = R_np1_hat[i];
 #endif
     //ABM4_STEP_STEP2:
-    CoilIntegrad(x_np1_hat, nL, g, R_np1_hat, actMass, actInertia, damping,tau, xdot_np1_hat);
+    CoilIntegrad(x_np1_hat, nL, g, R_np1_hat, actMass, actInertia, damping,B0, muhat, mL,xdot_np1_hat);
 
     for (int i=0; i<6; i++) {
         out_x_np1[i]    = twist_n[i] + t_step * ( C_COEFF_Np1 * xdot_np1_hat[i] + C_COEFF_N * xdot_n[i] + C_COEFF_Nm1 * xdot_nm1[i] + C_COEFF_Nm2 * xdot_nm2[i] );
@@ -411,7 +438,7 @@ void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, ad
         }
     }
 
-    adType xf[NUM_STATES], MomentResidual[NUM_RESIDUAL], Tbcoil[NUM_ACT_SET][3], RL[NUM_ACT_SET][9], pL[NUM_ACT_SET][3], Rcoil[9], x_coil[NUM_COIL_STATES], out_x_coil[NUM_COIL_STATES];
+    adType xf[NUM_STATES], MomentResidual[NUM_RESIDUAL], RL[NUM_ACT_SET][9], pL[NUM_ACT_SET][3], Rcoil[9], x_coil[NUM_COIL_STATES], out_x_coil[NUM_COIL_STATES];
 
     int localmin = 0;
     double u0_calc[NUM_FLEX_SEG][3], out_ftip[3];
@@ -419,8 +446,7 @@ void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, ad
 //    std::cout << "u0_calc dyn: " << u0_calc[0] << " " << u0_calc[1] << " " <<u0_calc[2] << std::endl;
 
     //Solve the Initial Value Problem to calculate the shape of the catheter and Get P and R
-    CRMSolverIVP_Core ( Params, u0_calc, ftip,  xf, MomentResidual,
-                        Tbcoil, pL, RL, p_atLocMarkers);
+    CRMSolverIVP_Core ( Params, u0_calc, ftip,  xf, MomentResidual, pL, RL, p_atLocMarkers);
 
     for (int i = 0; i < NUM_FLEX_SEG; ++i) {
         for (int j = 0; j < 3; ++j) {
@@ -428,7 +454,7 @@ void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, ad
         }
     }
 //    mCopy_AB<3>(u0_calc, out_u0);
-    double actMass, actInertia[9], damping[6], tau[3], residual_per_coil[6], n_L_p[3];
+    double actMass, actInertia[9], damping[6], residual_per_coil[6], n_L_p[3], m_L_p[3], MagMoment[3], muhat[9];
     double v1[3], v2[3], v3[3];
     double RESIDUAL[NUM_DYN_RESIDUAL];
 //    std::cout << "MomentResidual: " << MomentResidual[0] << " " << MomentResidual[1] << " " << MomentResidual[2] <<  std::endl;
@@ -450,14 +476,24 @@ void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, ad
         for (int j = 0; j < 6; ++j) {
             damping[j] = Params.damping[i][j];
         }
+
         for (int j = 0; j < 3; ++j) {
-            tau[j] = Tbcoil[i][j] - m_L[i][j];
+            MagMoment[j] = Params.MagMoment[i][j];
         }
+        wHat(MagMoment,muhat);
+
+//        for (int j = 0; j < 3; ++j) {
+//            tau[j] = Tbcoil[i][j] - m_L[i][j];
+//        }
 
         for (int j = 0; j < 3; ++j) {
             n_L_p[j] = n_L[i][j];
         }
-        CoilDynamics(x_coil, n_L_p, Params.g, actMass, actInertia, damping, Params.DELTA_T, tau, out_x_coil);
+        for (int j = 0; j < 3; ++j) {
+            m_L_p[j] = m_L[i][j];
+        }
+
+        CoilDynamics(x_coil, n_L_p, Params.g, actMass, actInertia, damping, Params.DELTA_T, Params.B0, muhat,  m_L_p,out_x_coil);
 
         for (int j = 0; j < 3; ++j) {
             residual_per_coil[j] = pL[i][j] - out_x_coil[j+6];
@@ -708,9 +744,10 @@ void DYNSolverIVP(	CRMShootingMethodParams<adType> in_Params, adType in_u0[NUM_F
                       in_Params.v_L_pre, in_Params.w_L_pre, in_Params.p_pre, in_Params.R_pre,
                       m_L, n_L, true, in_FinalValueOnly,CoreParams);
 
-    adType Tbcoil[NUM_ACT_SET][3], pcoil[NUM_ACT_SET][3], Rcoil[NUM_ACT_SET][9], MomentResidual[3], x_coil[NUM_COIL_STATES];
+    adType pcoil[NUM_ACT_SET][3], Rcoil[NUM_ACT_SET][9], MomentResidual[3], x_coil[NUM_COIL_STATES];
+    adType MagMoment[3] ,muhat[9];
 
-    CRMSolverIVP_Core ( CoreParams, u_0, ftip, out_x_N, MomentResidual, Tbcoil, pcoil, Rcoil, out_p_atLocMarkers);
+    CRMSolverIVP_Core ( CoreParams, u_0, ftip, out_x_N, MomentResidual, pcoil, Rcoil, out_p_atLocMarkers);
 
     for (int i = 0; i < 3; ++i) {
         x_coil[i] = CoreParams.v_L_pre[0][i];
@@ -731,12 +768,17 @@ void DYNSolverIVP(	CRMShootingMethodParams<adType> in_Params, adType in_u0[NUM_F
         damping[i] = CoreParams.damping[0][i];
     }
 
-    double tau[3];
-    for (int i = 0; i < 3; ++i) {
-        tau[i] = Tbcoil[0][i] - m_L[0][i];
+//    double tau[3];
+//    for (int i = 0; i < 3; ++i) {
+//        tau[i] = Tbcoil[0][i] - m_L[0][i];
+//    }
+    for (int i = 0; i <3 ; ++i) {
+        MagMoment[i] = CoreParams.MagMoment[0][i];
     }
+    wHat(MagMoment,muhat);
 
-    CoilDynamics(x_coil, n_L[0], CoreParams.g, actMass, actInertia, damping, CoreParams.DELTA_T, tau, out_coil_state);
+
+    CoilDynamics(x_coil, n_L[0], CoreParams.g, actMass, actInertia, damping, CoreParams.DELTA_T, in_Params.B0, muhat, m_L[0], out_coil_state);
 
 }
 

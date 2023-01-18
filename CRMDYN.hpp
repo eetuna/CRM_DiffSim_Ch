@@ -158,7 +158,7 @@ template <typename adType>
 void CRMSolverIVP(	CRMShootingMethodParams<adType> in_Params,
                       adType in_u0[NUM_FLEX_SEG][3], adType in_ftip[3],
                       bool in_FinalValueOnly,
-                      adType out_x_N[NUM_STATES], adType out_MomentResidual[NUM_RESIDUAL],  adType Tbcoil[NUM_ACT_SET][3], adType pcoil[NUM_ACT_SET][3], adType Rcoil[NUM_ACT_SET][9],
+                      adType out_x_N[NUM_STATES], adType out_MomentResidual[NUM_RESIDUAL], adType pcoil[NUM_ACT_SET][3], adType Rcoil[NUM_ACT_SET][9],
                       double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]);
 
 
@@ -237,7 +237,7 @@ template <typename adType>
 void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
                          adType in_u[NUM_FLEX_SEG][3], adType in_ftip[3],
                          adType out_x_N[NUM_STATES], adType out_Residual[NUM_RESIDUAL],
-                         adType out_Tbcoil[NUM_ACT_SET][3], adType out_pcoil[NUM_ACT_SET][3], adType out_Rcoil[NUM_ACT_SET][9],
+                         adType out_pcoil[NUM_ACT_SET][3], adType out_Rcoil[NUM_ACT_SET][9],
                          double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]);
 
 
@@ -347,22 +347,23 @@ void CRMShootingMethodBVP_DYN(	NLEqnParams<adType> in_Params, adType out_u0[NUM_
 
 template <typename adType>
 void CoilDynamics( adType in_coil_state[NUM_COIL_STATES], adType in_n[3], adType g[3],
-                   adType actMass, adType actInertia[9], adType damping[6], double DELTA_T, adType in_tau[3], adType out_coil_state[NUM_COIL_STATES]);
+                   adType actMass, adType actInertia[9], adType damping[6], double DELTA_T, adType in_B0[3], adType in_muhat[9], adType in_mL[3], adType out_coil_state[NUM_COIL_STATES]);
 
 template <typename adType>
-void CoilIntegrad(adType in_twist[6], adType in_n[3], adType g[3], adType R[9], adType actMass, adType actInertia[9], adType damping[6], adType in_tau[3], adType twistdot[6]);
+void CoilIntegrad(adType in_twist[6], adType in_n[3], adType g[3], adType R[9], adType actMass, adType actInertia[9], adType damping[6],
+                  adType in_B0[3], adType in_muhat[9], adType in_mL[3], adType twistdot[6]);
 
 template <typename adType>
 void SE3_TimeSpace(adType in_R_n[9], adType in_p_n[3], adType h, adType in_twist_n[6], adType out_R_np1[9], adType out_p_np1[3]) ;
 
 template <typename adType>
-void RK2_coildyn(adType in_x_n[NUM_COIL_STATES], adType in_n[3], adType g[3],  adType actMass, adType actInertia[9], adType damping[6], adType in_tau[3],
+void RK2_coildyn(adType in_x_n[NUM_COIL_STATES], adType in_n[3], adType g[3],  adType actMass, adType actInertia[9], adType damping[6],adType in_B0[3], adType in_muhat[9], adType in_mL[3],
                  adType out_x_np1[NUM_COIL_STATES], adType out_xdot_n[6] ) ;
 
 template <typename adType>
 void ABM4_coildyn(	adType in_x_n[NUM_COIL_STATES],adType in_xdot_nm1[6], adType in_xdot_nm2[6], adType in_xdot_nm3[6],
                       adType in_x_nm1[NUM_COIL_STATES], adType in_x_nm2[NUM_COIL_STATES], adType in_x_nm3[NUM_COIL_STATES],
-                      adType in_n[3], adType g[3],  adType actMass, adType actInertia[9], adType damping[6], adType in_tau[3],
+                      adType in_n[3], adType g[3],  adType actMass, adType actInertia[9], adType damping[6], adType in_B0[3], adType in_muhat[9], adType in_mL[3],
                       adType out_x_np1[NUM_COIL_STATES], adType out_xdot_n[6]);
 
 template <typename adType>

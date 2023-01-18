@@ -139,13 +139,11 @@ void NLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params) {
     }
 
 
-    adType Tbcoil[NUM_ACT_SET][3], pcoil[NUM_ACT_SET][3], Rcoil[NUM_ACT_SET][9];
-//    auto* Tbcoil = new adType [3];
-//    auto* pcoil = new adType [3];
-//    auto* Rcoil = new adType [9];
+    adType pcoil[NUM_ACT_SET][3], Rcoil[NUM_ACT_SET][9];
+
 
     // We will only call the IVP_Core, since preprocessing is already done
-    CRMSolverIVP_Core(Params, u_0, ftip, x_N, OutResidual, Tbcoil, pcoil, Rcoil, p_atLocMarkers );
+    CRMSolverIVP_Core(Params, u_0, ftip, x_N, OutResidual, pcoil, Rcoil, p_atLocMarkers );
 
     // don't forget to scale parameters before returning to the nonlinear equation solver
     if (Params.ContactMode == ContactModeType::FREE_TIP) {
@@ -157,9 +155,6 @@ void NLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params) {
     delete[] x_N;
     delete[] p_atLocMarkers;
     delete[] OutResidual;
-//    delete[] Tbcoil;
-//    delete[] pcoil;
-//    delete[] Rcoil;
 
 }
 

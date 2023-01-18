@@ -197,37 +197,7 @@ public:
         // moment residual at the catheter tip - this should converge to {0,0,0} if the catheter is at its equilibrium configuration
         double residual[NUM_RESIDUAL];
 
-//        CRMConstructShootingMethodParamSet<double>(CathParams, CathConfig, InsertedLength, ActuationCurrents, ContactMode,
-//                                                   TipConstraintPoint, TipForce, IntegrationStepSize,
-//                                                   v_L_pre, w_L_pre, p0,  R0, damping_, Delta_T,
-//                                                   BVPParams);
-//
-//
-//        // Cosserat Rod Model - Solve the Boundary Value Problem to calculate the equilibrium configuration of the catheter
-//        CRMShootingMethodBVP(BVPParams, u0_initialguess, ftip_initialguess, u0_calc, ftip_calc, localmin);
-//
-//
-//        // spatial coordinates of the localization markers
-//        double ReportedMarkerPos[NUM_LOCALIZATION_MARKERS][3];
-//
-//        // output for time advance, not used in BVP, just placeholders
-//        double pL_[3], RL_[9], TBcoil[3];
-//
-//        // Cosserat Rod Model - Solve the Initial Value Problem to calculate the shape of the catheter
-//        CRMSolverIVP(BVPParams, u0_calc, ftip_calc, false, xf, residual,TBcoil, pL_, RL_, ReportedMarkerPos);
-
-
-//        std::cout << "DELTA_T! " << Delta_T << std::endl;
-//        std::cout << "t_step! " << t_step << std::endl;
-
         std::cout << "ActuationCurrents: " << ActuationCurrents[0][0] << " " << ActuationCurrents[0][1] << " " << ActuationCurrents[0][2] <<  std::endl;
-
-
-//        std::cout << "pL_pre: " << pL_pre[0] << " " << pL_pre[1] << " " << pL_pre[2] <<  std::endl;
-//        std::cout << "RL: " << std::endl;
-//        std::cout <<  RL_pre[0] << " " << RL_pre[1] << " " << RL_pre[2] <<  std::endl;
-//        std::cout <<  RL_pre[3] << " " << RL_pre[4] << " " << RL_pre[5] <<  std::endl;
-//        std::cout <<  RL_pre[6] << " " << RL_pre[7] << " " << RL_pre[8] <<  std::endl;
 
         double InsertedLength =  0.0;//98.5; // u[NUM_CONTROL -1 ];
         for (int i = 0; i < NUM_SEGMENTS; ++i) {
