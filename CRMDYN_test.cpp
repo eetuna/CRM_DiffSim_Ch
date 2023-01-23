@@ -199,7 +199,6 @@ int RunExample(void) {
     /**
      * Initial BVP
      */
-
     // Actuation currents for each of the coils for each of the coil sets - unit: A
     double ActuationCurrents[NUM_ACT_SET][3] = {0.0, 0.0, 0.0};// { {0.100, 0.100, 0.100}};
 //    InsertedLength = 98.5;
@@ -260,12 +259,21 @@ int RunExample(void) {
 //    for (int i = 0; i < 9; ++i) {
 //        RL[i] = RL_[i];
 //    }
+
+
+    std::cout << "pL: " << pL[0][0] << " " << pL[0][1] << " " << pL[0][2] <<  std::endl;
+    std::cout << "RL: " << std::endl;
+    std::cout <<  RL[0][0] << " " << RL[0][1] << " " << RL[0][2] <<  std::endl;
+    std::cout <<  RL[0][3] << " " << RL[0][4] << " " << RL[0][5] <<  std::endl;
+    std::cout <<  RL[0][6] << " " << RL[0][7] << " " << RL[0][8] <<  std::endl;
+
+
     /**
      * TEST DYN
      */
     // Actuation currents for each of the coils for each of the coil sets - unit: A
 
-    ActuationCurrents[0][2] = 0.031;
+    ActuationCurrents[0][2] = 0.02;
 
     std::cout << "ActuationCurrents: " << ActuationCurrents[0][0] << " " << ActuationCurrents[0][1] << " " << ActuationCurrents[0][2] <<  std::endl;
 
@@ -282,9 +290,13 @@ int RunExample(void) {
     DynamicsBVP(BVPParams, u0_initialguess, mL_initialguess, nL_initialguess, ftip_initialguess,
                    out_u0, out_mL, out_nL, ftip_calc, localmin);
 
-//        std::cout << "out_u0: " << out_u0[0] << " " << out_u0[1] << " " << out_u0[2] <<  std::endl;
-//        std::cout << "out_mL: " << out_mL[0] << " " << out_mL[1] << " " << out_mL[2] <<  std::endl;
-//        std::cout << "out_nL: " << out_nL[0] << " " << out_nL[1] << " " << out_nL[2] <<  std::endl;
+
+    std::cout << "out_u0 0: " << out_u0[0][0] << " " << out_u0[0][1] << " " << out_u0[0][2] <<  std::endl;
+    std::cout << "out_u0 1: " << out_u0[1][0] << " " << out_u0[1][1] << " " << out_u0[1][2] <<  std::endl;
+
+//    std::cout << "out_mL: " << out_mL[0] << " " << out_mL[1] << " " << out_mL[2] <<  std::endl;
+//    std::cout << "out_nL: " << out_nL[0] << " " << out_nL[1] << " " << out_nL[2] <<  std::endl;
+
 
 
     double x_coil[NUM_COIL_STATES];
@@ -303,9 +315,9 @@ int RunExample(void) {
     }
 	// Print outputs
     std::cout << " *********TEST DYN Configuration********* " << std::endl;
-    printMatrix(out_u0, 1, 3, "Calculated curvature at base");
-    printMatrix(out_nL, 1, 3, "Calculated internal force at L");
-    printMatrix(out_mL, 1, 3, "Calculated internal moment force at L");
+//    printMatrix(&(out_u0[0]), 1, 3, "Calculated curvature at base");
+//    printMatrix(&(out_nL[0]), 1, 3, "Calculated internal force at L");
+//    printMatrix(&(out_mL[0]), 1, 3, "Calculated internal moment force at L");
 
     printMatrix(ftip_calc, 1, 3, "Calculated Tip Force");
 	printMatrix(&(xf[12]), 1, 3, "Catheter Tip Position");

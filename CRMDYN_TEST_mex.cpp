@@ -34,7 +34,6 @@ public:
         double v_L_pre[NUM_ACT_SET][3], w_L_pre[NUM_ACT_SET][3],  u0_initialguess[NUM_FLEX_SEG][3], nL_initialguess[NUM_ACT_SET][3], mL_initialguess[NUM_ACT_SET][3], pL_pre[NUM_ACT_SET][3], RL_pre[NUM_ACT_SET][9];
         // Define initial guesses to be used when solving boundary value problem
 
-
         for (int i = 0; i < NUM_ACT_SET; ++i) {
             for (int j = 0; j < 3; ++j) {
                 v_L_pre[i][j] = inputs[0][j+i*3];
