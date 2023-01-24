@@ -231,7 +231,8 @@ int RunExample(void) {
 
 
     // Cosserat Rod Model - Solve the Boundary Value Problem to calculate the equilibrium configuration of the catheter
-	CRMShootingMethodBVP(BVPParams, u0_initialguess, u0_calc, ftip_calc, localmin);
+	CRMShootingMethodBVP(BVPParams, u0_initialguess, ftip_initialguess, u0_calc, ftip_calc, localmin);
+
 
 //
 //    // output for time advance, not used in BVP, just placeholders

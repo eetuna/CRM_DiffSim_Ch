@@ -36,14 +36,16 @@ mL = [0;0;0];
 % mass_ =[5.3516e-5];% [5.7736e-5];
 
 
-load('optimized_parameter_40ms.mat');
+load('optimized_parameter_40ms_full_moment.mat');
 damping = nlgr_model.Parameters(1).Value;
 
+% damping = [10.1712; 43.1342;0.0681;0.0143];
 radius_ = [1.5875;0.9906];
 E_ = nlgr_model.Parameters(4).Value;
 Coil_align = nlgr_model.Parameters(5).Value; %[-0.0871, -0.3934]
 Coil_turnarea = nlgr_model.Parameters(6).Value;%[1.3851;1.44;1.60];% [1.44;1.3851;1.60];
 mass_ =nlgr_model.Parameters(7).Value;% [5.7736e-5];
+
 
 %test with varying freq data
 load('output_currents.mat');
@@ -53,13 +55,15 @@ currents = output_currents;
 coil_position_mat = output_coil_traj;
 tip_position_mat = output_tip_traj;
 
+
 Ts = 0.04;
 
 load('init_2.mat');% at 621
-ind_start = 1; % 228 622;
-test_length = 1000; % 3000; %167
+ind_start = 1;% 228 622;
+test_length = 3000; %167
 p_mat = [];
 p_tip_mat = [];
+
 for i = ind_start:ind_start+test_length-1
 
     u = currents(:,i);
@@ -69,8 +73,9 @@ for i = ind_start:ind_start+test_length-1
     [vL, wL, u0, mL, nL, pL, RL, p_tip] = CRMDYN_TEST_mex(vL, wL, u0, mL, nL, pL, RL, u, damping, Ts, radius_, E_,...
         Coil_align, Coil_turnarea, mass_);
        
-    p_mat = [p_mat, pL'];
+    p_mat = [p_mat,pL'];
     p_tip_mat = [p_tip_mat, p_tip']; 
+
     pL
     RL
     i
@@ -79,10 +84,10 @@ end
 
 % save('init.mat','vL','wL','u0','mL','nL','pL','RL');
 
+figure(1);
+x = 1:test_length;
 
-
-figure(1); %test tip position
-title('Coil Positions');
+title('Positions');
 ind_start = 1; %142; % 171;500;
 subplot(3,1,1);
 x = [1:test_length];
@@ -98,6 +103,7 @@ subplot(3,1,3);
 plot(x,p_mat(3, 1:test_length), 'k');
 hold on;
 plot(x,coil_position_mat(3,ind_start:ind_start + test_length-1), 'r');
+
 
 figure(2);
 x = 1:test_length;
@@ -117,8 +123,6 @@ subplot(3,1,3);
 plot(x,p_tip_mat(3, 1:test_length), 'k');
 hold on;
 plot(x,tip_position_mat(3,ind_start:ind_start + test_length-1), 'r');
-
-
 
 % figure(2);
 % pt_r = p_mat(:,1);
@@ -187,9 +191,7 @@ Parameters = {damping; Ts;radius_;E_;Coil_align;Coil_turnarea;mass_};
 load('init_2.mat');
 InitialStates = [vL,wL,u0,mL,nL,pL,RL]';
 
-
 Order = [3, 3, length(InitialStates)]; %[Ny, Nu, Nx]
-
 
 % InitialStates = [vL;wL;u0;mL;nL;pL;RL];
 nlgr = idnlgrey('CRMDYN_c', Order, Parameters, InitialStates, Ts);
@@ -209,18 +211,17 @@ opt = nlgreyestOptions;
 opt.GradientOptions.DifferencingScheme =   'Backward approximation'; 
 
 ind_y = 1; %142; %171;
+
 raw_y = [coil_position_mat(:,ind_y:ind_y + test_length-1)];%, normal_mat(:,ind_start:ind_start + test_length-1)'];
 dy_init = coil_position_mat(:,ind_y) - p_mat(:,1);
 raw_y = raw_y - repmat(dy_init, [1 test_length]);
 y = raw_y';
-% y = p_mat';
 
 figure(3);
 x = 1:test_length;
 
-
+title('Positions');
 subplot(3,1,1);
-title('Coil Positions');
 plot(x,p_mat(1, 1:test_length), 'k');
 hold on;
 plot(x,raw_y(1,1:1 + test_length-1), 'r');
@@ -232,31 +233,6 @@ subplot(3,1,3);
 plot(x,p_mat(3, 1:test_length), 'k');
 hold on;
 plot(x,raw_y(3,1:1 + test_length-1), 'r');
-
-
-
-raw_TIP = [tip_position_mat(:,ind_y:ind_y + test_length-1)];%, normal_mat(:,ind_start:ind_start + test_length-1)'];
-dy_init = tip_position_mat(:,ind_y) - p_tip_mat(:,1);
-raw_TIP = raw_TIP - repmat(dy_init, [1 test_length]);
-figure(4);
-x = 1:test_length;
-subplot(3,1,1);
-title('Tip Positions');
-
-plot(x,p_tip_mat(1, 1:test_length), 'k');
-hold on;
-plot(x,raw_TIP(1,1:1 + test_length-1), 'r');
-subplot(3,1,2);
-plot(x,p_tip_mat(2, 1:test_length), 'k');
-hold on;
-plot(x,raw_TIP(2,1:1 + test_length-1), 'r');
-subplot(3,1,3);
-plot(x,p_tip_mat(3, 1:test_length), 'k');
-hold on;
-plot(x,raw_TIP(3,1:1 + test_length-1), 'r');
-
-
-
 
 % figure(4);
 % pt_r = p_mat(:,1);

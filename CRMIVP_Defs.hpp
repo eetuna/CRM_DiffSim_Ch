@@ -69,6 +69,7 @@ void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSiz
 
 	auto & SegBounds = out_CoreParams.SegBounds;
 	auto & SegSteps = out_CoreParams.SegSteps;
+    auto & h0 = out_CoreParams.h0;
 
 	auto & InsertedLength = out_CoreParams.InsertedLength;
 	auto & dlambdainv = out_CoreParams.dlambdainv;
@@ -125,6 +126,7 @@ void CRMSolverIVP_Prep ( adType in_x_0[NUM_STATES], double in_IntegrationStepSiz
 	for (int i=0; i<NUM_FLEX_SEG; i++) { 		// flexible catheter segment
 		// Calculate the number of integration steps based on the given IntegrationStepSize
 		SegSteps[i]=int(ceil( dVal(SegBounds[2*i+1]-SegBounds[2*i])*DeltaSInv ));
+        h0[i] = dVal((SegBounds[2*i+1]-SegBounds[2*i]))/(SegSteps[i]*1.0);
     }
 
     NextLocMarker=NUM_LOCALIZATION_MARKERS;
@@ -246,7 +248,6 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
     adType xi[NUM_STATES];  			//  Initial value of the state for the next segment to be integrated
 	adType xf[NUM_STATES];			//  Final value of the state for the last segment integrated
 	double p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3];	// States at markers (ordered proximal to distal)
-    double h;						// integration stepsize
 
 	bool loopcondition;				//  local variable for calculating a loop condition
 
@@ -277,6 +278,7 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 	// for others, we will create aliases
 	auto & SegBounds = in_params.SegBounds;
 	auto & SegSteps = in_params.SegSteps;
+    auto & h0 = in_params.h0;
 
 	auto & InsertedLength = in_params.InsertedLength;
 	auto & dlambdainv = in_params.dlambdainv;
@@ -326,10 +328,9 @@ void CRMSolverIVP_Core ( CRMIVPCoreParams<adType> in_params,
 			LastSegmentIsRigid=false;
 			// Prepare the CRMIntegrand Parameters
 			fsegno=i>>1; // i/2, flexible segment no
-            h=(SegBounds[i+1]-SegBounds[i])/(SegSteps[fsegno]*1.0);
 
             // Integrate
-            ABM4( 	xi, SegBounds[i], SegSteps[fsegno], h,
+            ABM4( 	xi, SegBounds[i], SegSteps[fsegno], h0[fsegno],
                      InsertedLength, dlambdainv, K[fsegno], Kinv[fsegno], l_zero, ustar[fsegno], n_L[fsegno],
                      fcumlambda, ftip,
                      FinalValueOnly, LocMarkers, &NextLocMarker,
@@ -895,128 +896,6 @@ void SE3_Analytical_Step(adType in_R_n[9], adType in_p_n[3], adType in_u_n[3], d
 }
 
 #undef EPS
-
-
-
-template <typename adType>
-void CRMFlexible_IVP ( int SegmentIndex, double in_p[3], double in_R[9],  CRMIVPCoreParams<adType> in_params,
-                         double in_u[3], double in_m_L[3], double in_n_L[3],
-                         adType out_x_N[NUM_STATES], adType out_Residual[3], double out_pcoil[3], double out_Rcoil[9]){
-
-//    std::cout << "in_u: " << in_u[0][0] << " " <<  in_u[0][1] << " " <<  in_u[0][2] << std::endl;
-//    std::cout << "in_u: " << in_u[1][0] << " " <<  in_u[1][1] << " " <<  in_u[1][2] << std::endl;
-
-    adType xi[NUM_STATES];  			//  Initial value of the state for the next segment to be integrated
-    adType xf[NUM_STATES];			//  Final value of the state for the last segment integrated
-    adType h;
-
-    double l_zero[3]={0.0,0.0,0.0};
-    adType RigidSegmentLength;		// Length of the rigid segment - intermediate variable
-    adType deltau1[3], K1deltau1[3]; // intermediate variables
-    adType tempadType;				// intermediate variables
-    adType Residual[3];				// Residual at the catheter tip -- will be returned
-
-    int   fsegno; 					// flexible segment no
-
-    for (int i = 0; i < NUM_STATES; i++) {
-        if (i < 3) {
-            xi[i] = in_u[i];
-        }
-        else if (i < 12) {
-            xi[i] = in_R[i - 3];
-        }
-        else if (i < 15) {
-            xi[i] = in_p[i - 12];
-        }
-    }
-
-
-    // we need to copy in_ftip to local variable
-    adType ftip[3] = {0.0,0.0,0.0}; //placeholder
-    // we will copy anything we will access more than once (or write to) to local variables
-    int	  NextLocMarker=in_params.NextLocMarker;
-    int	  InitialLocMarker=NextLocMarker;
-    // for others, we will create aliases
-    auto & SegBounds = in_params.SegBounds;
-    auto & SegSteps = in_params.SegSteps;
-
-    auto & InsertedLength = in_params.InsertedLength;
-    auto & dlambdainv = in_params.dlambdainv;
-    auto & K = in_params.K;
-    auto & Kinv = in_params.Kinv;
-    auto & ustar = in_params.ustar;
-    auto & fcumlambda = in_params.fcumlambda;
-    auto & FinalValueOnly = in_params.FinalValueOnly;
-    auto & LocMarkers = in_params.LocMarkers;
-
-    double p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3];	// Positions at markers (ordered proximal to distal)
-    // we will also copy the already filled entries of p_atLocMarkers from params
-    for (int i = 0; i < InitialLocMarker; i++) {
-        for (int j = 0; j < 3; j++) {
-            p_atLocMarkers[i][j] = in_params.p_atLocMarkers[i][j];
-        }
-    }
-
-    // IMPORTANT NOTE: most proximal segment is assumed to be always flexible
-    //    and the flexible and rigid segments are assumed to be alternating
-    //    most distal segment can be flexible or rigid
-
-    // Flexible Segment
-    // Prepare the CRMIntegrand Parameters
-    fsegno=SegmentIndex>>1; // i/2, flexible segment no
-    h=(SegBounds[SegmentIndex+1]-SegBounds[SegmentIndex])/(SegSteps[fsegno]*1.0);
-
-    // Integrate
-    ABM4( 	xi, SegBounds[SegmentIndex], SegSteps[fsegno], h,
-             InsertedLength, dlambdainv, K[fsegno], Kinv[fsegno], l_zero, ustar[fsegno], in_n_L,
-             fcumlambda, ftip,
-             FinalValueOnly, LocMarkers, &NextLocMarker,
-             xf, p_atLocMarkers);
-
-    // u2=u2star + ( K2inv K1 (u1 - u1star ) - K2inv Tb )
-    mSub_AB<3,1>( &(xf[0]) , ustar[fsegno], deltau1);
-    mMult_AB<3,3,1>( K[fsegno], deltau1, K1deltau1 );
-
-
-    RigidSegmentLength=(SegBounds[SegmentIndex+2]-SegBounds[SegmentIndex+1]); // need the index of the next actuator
-
-    if (SegmentIndex == NUM_SEGMENTS-1){ // last flexible segment
-        for (int j = 0; j < 3; ++j) {
-            Residual[j] = K1deltau1[j];
-        }
-        for (int j=0; j < 3; j++) {
-            out_pcoil[j]=xf[3+9+j]; // no rigid segment behind
-        }
-        for (int j = 0; j < 9; ++j) {
-            out_Rcoil[j] = xf[j+3];
-        }
-
-    }else{
-
-        mSub_AB<3,1>( in_m_L, K1deltau1 , Residual); // for the bvp residual
-        for (int j=0; j<3; j++) {
-            out_pcoil[j]=xf[3+9+j]+xf[3+j*3+2]*RigidSegmentLength * 0.5;
-        }
-        for (int j = 0; j < 9; ++j) {
-            out_Rcoil[j] = xf[j+3];
-        }
-
-    }
-
-
-
-    // Copy the final values of the state x_f to the output
-    mCopy_AB<NUM_STATES>(xf, out_x_N);
-    // Copy the residual to the output
-	mCopy_AB<3>(Residual, out_Residual);
-
-//    std::cout << "Residual in core: " << Residual[0] << " " << Residual[1] << " " << Residual[2] << std::endl;
-
-}
-
-
-
-
 
 //
 //

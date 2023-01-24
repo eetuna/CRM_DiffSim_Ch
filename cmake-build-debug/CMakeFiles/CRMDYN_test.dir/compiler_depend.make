@@ -407,19 +407,15 @@ CMakeFiles/CRMDYN_test.dir/CRMDYN_test.cpp.o: ../CRMDYN_test.cpp \
   /usr/include/c++/9/stdlib.h \
   ../CRMIVP_Defs.hpp \
   ../CRMBVP_Defs.hpp \
-  ../Numerical_methods/minpack.hpp \
-  ../Numerical_methods/minpack_Defs.hpp \
+  ../Numerical_quasi_static/minpack.hpp \
+  ../Numerical_quasi_static/minpack_Defs.hpp \
   ../CRMDynamics.hpp \
   ../CoilDynamics_Defs.hpp \
-  ../Numerical_methods/minpack_DYN.hpp \
-  ../Numerical_methods/minpack_DYN_Defs.hpp \
-  ../Numerical_methods/minpack_DYN_flexible.hpp \
-  ../Numerical_methods/minpack_DYN_flexible_Defs.hpp
+  ../minpack_DYN.hpp \
+  ../minpack_DYN_Defs.hpp
 
 
-../Numerical_methods/minpack_DYN_flexible_Defs.hpp:
-
-../Numerical_methods/minpack_DYN_flexible.hpp:
+../minpack_DYN_Defs.hpp:
 
 ../CRMDynamics.hpp:
 
@@ -535,6 +531,8 @@ CMakeFiles/CRMDYN_test.dir/CRMDYN_test.cpp.o: ../CRMDYN_test.cpp \
 
 /usr/include/endian.h:
 
+../minpack_DYN.hpp:
+
 /usr/include/c++/9/bits/stream_iterator.h:
 
 /usr/include/x86_64-linux-gnu/bits/waitstatus.h:
@@ -570,8 +568,6 @@ CMakeFiles/CRMDYN_test.dir/CRMDYN_test.cpp.o: ../CRMDYN_test.cpp \
 /usr/include/libintl.h:
 
 /usr/include/c++/9/limits:
-
-../Numerical_methods/minpack_DYN_Defs.hpp:
 
 /usr/include/c++/9/system_error:
 
@@ -684,8 +680,6 @@ CMakeFiles/CRMDYN_test.dir/CRMDYN_test.cpp.o: ../CRMDYN_test.cpp \
 /usr/include/x86_64-linux-gnu/sys/select.h:
 
 /usr/include/x86_64-linux-gnu/bits/stdlib-float.h:
-
-/usr/include/x86_64-linux-gnu/c++/9/bits/atomic_word.h:
 
 /usr/include/c++/9/csetjmp:
 
@@ -897,8 +891,6 @@ CMakeFiles/CRMDYN_test.dir/CRMDYN_test.cpp.o: ../CRMDYN_test.cpp \
 
 /usr/include/x86_64-linux-gnu/c++/9/bits/c++io.h:
 
-../Numerical_methods/minpack_Defs.hpp:
-
 /usr/include/c++/9/bits/stl_queue.h:
 
 /usr/include/sched.h:
@@ -986,8 +978,6 @@ CMakeFiles/CRMDYN_test.dir/CRMDYN_test.cpp.o: ../CRMDYN_test.cpp \
 ../CRMIVP_Defs.hpp:
 
 /usr/include/c++/9/thread:
-
-../Numerical_methods/minpack_DYN.hpp:
 
 /usr/include/c++/9/ext/aligned_buffer.h:
 
@@ -1243,4 +1233,8 @@ CMakeFiles/CRMDYN_test.dir/CRMDYN_test.cpp.o: ../CRMDYN_test.cpp \
 
 ../CRMBVP_Defs.hpp:
 
-../Numerical_methods/minpack.hpp:
+/usr/include/x86_64-linux-gnu/c++/9/bits/atomic_word.h:
+
+../Numerical_quasi_static/minpack.hpp:
+
+../Numerical_quasi_static/minpack_Defs.hpp:

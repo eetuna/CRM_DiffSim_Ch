@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cmath>
 #include <chrono> 
+#include "CRMTest.h"
 #include "CRMDYN.hpp"
 using namespace std::chrono;
 
