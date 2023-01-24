@@ -4,7 +4,6 @@
 
 #include <cmath>
 #include "CRMDYN.hpp"
-#include "minpack_DYN.hpp"
 
 #define M_PI 3.14159265358979323846
 #define _USE_MATH_DEFINES
@@ -183,10 +182,8 @@ public:
             h0[i] = dVal((SegEnds[2*i+1]-SegEnds[2*i]))/(SegSteps[i]*1.0);
         }
 
-
         /** Compute next state **/
         CRMShootingMethodParams<double> BVPParams{};
-
 
 
         // Declare output variables
@@ -203,12 +200,10 @@ public:
             InsertedLength += SegmentLengths[i]; // we are not controlling this now
         }
 
-
         CRMConstructShootingMethodParamSet<double>(CathParams, CathConfig, InsertedLength, ActuationCurrents, ContactMode,
                                                    TipConstraintPoint, TipForce, IntegrationStepSize,
                                                    v_L_pre, w_L_pre, pL_pre,  RL_pre, damping_, Delta_T,
                                                    BVPParams);
-
 
         DynamicsBVP(BVPParams, u0_initialguess, mL_initialguess, nL_initialguess, ftip_initialguess,
                     u0_calc, mL_calc, nL_calc, ftip_calc, localmin);
@@ -222,6 +217,10 @@ public:
         DYNSolverIVP(BVPParams, u0_calc, mL_calc, nL_calc, ftip_calc,
                      true, xf, x_coil,out_ReportedMarkerPos);
 
+        double p_tip[3];
+        for (int i = 0; i < 3; ++i) {
+            p_tip[i] = xf[i+12];
+        }
         /** Output report **/
         outputs[0] = factory.createArray<double>({1, 3}, {x_coil[0], x_coil[1], x_coil[2]});
         outputs[1] = factory.createArray<double>({1, 3}, {x_coil[3], x_coil[4], x_coil[5]});
@@ -230,7 +229,7 @@ public:
         outputs[4] = factory.createArray<double>({1, 3}, {nL_calc[0][0], nL_calc[0][1], nL_calc[0][2]});
         outputs[5] = factory.createArray<double>({1, 3}, {x_coil[6], x_coil[7], x_coil[8]});
         outputs[6] = factory.createArray<double>({1, 9}, {x_coil[9], x_coil[10], x_coil[11],x_coil[12], x_coil[13], x_coil[14],x_coil[15], x_coil[16], x_coil[17]});
-
+        outputs[7] = factory.createArray<double>({1, 3}, {p_tip[0], p_tip[1], p_tip[2]});
     }
 
 };

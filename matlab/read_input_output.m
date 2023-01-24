@@ -39,6 +39,11 @@ coil_position_mat_raw = coil_position_mat_raw' * 10^3;
 normal_mat = circle(cutoff_i : end,9:11)';
 
 
+tip_position_mat_raw = circle(cutoff_i : end,12:14) - circle(cutoff_i : end,3:5) ;
+tip_position_mat_raw = tip_position_mat_raw' * 10^3;
+
+
+
 time_output = circle(cutoff_i : end,1);
 data_length = length(time_output);
 time_output = [0:1:data_length-1] * Ts_camera; %time_output - ones(data_length, 1) *  time_output(1,1);
@@ -65,8 +70,25 @@ time_output = [0:1:data_length-1] * Ts_camera; %time_output - ones(data_length, 
 
 %%output interpolation
 
-if Ts >= Ts_camera
+
+%     timer = 0.0; 
+%     currents = zeros(3, data_length);
+%     %interpolate inputs
+%     for i = 1: data_length
+%     
+%         ind_ = floor(timer / Ts)+1; % ind_ starts from 1 not 0
+%     
+%         currents(:,i) = raw_currents(:, ind_);
+%     
+%         timer = timer + Ts_camera;
+%         if timer >= total_time_input
+%             break;
+%         end
+%     end
+%     coil_position_mat = coil_position_mat_raw;
+
     coil_position_mat = [];
+    tip_position_mat = [];
     timer = 0.0;
     
     for i = 1: current_size
@@ -76,101 +98,93 @@ if Ts >= Ts_camera
             - coil_position_mat_raw(:,ind_down)) / Ts_camera + coil_position_mat_raw(:,ind_down);
     
         coil_position_mat = [coil_position_mat, interpolated_pts];
+
+        interpolated_pts_tip = (timer - time_output(ind_down)) * (tip_position_mat_raw(:,ind_up)...
+            - tip_position_mat_raw(:,ind_down)) / Ts_camera + tip_position_mat_raw(:,ind_down);
+    
+        tip_position_mat = [tip_position_mat, interpolated_pts_tip];
+
         timer = timer + Ts;
         if timer >= time_output(data_length)
             break;
         end
     end
-    data_length = current_size;
-    currents = raw_currents(:, 1:current_size);
 
-    figure(12)
-    subplot(3,2,1);
-    length_ = size(coil_position_mat,2);
-    t = [1:1:length_] ;
-    plot(t, coil_position_mat(1,1:length_), 'r-');
-    hold on;
-    length_ = size(coil_position_mat_raw,2);
-    t = [1:1:length_] * Ts_camera;
-    plot(t, coil_position_mat_raw(1,1:length_), 'b-');
-    subplot(3,2,3);
-    length_ = size(coil_position_mat,2);
-    t = [1:1:length_]* Ts;
-    plot(t, coil_position_mat(2,1:length_), 'r-');
-    hold on;
-    length_ = size(coil_position_mat_raw,2);
-    t = [1:1:length_]* Ts_camera;
-    plot(t, coil_position_mat_raw(2,1:length_), 'b-');
-    subplot(3,2,5);
-     length_ = size(coil_position_mat,2);
-    t = [1:1:length_]* Ts;
-    plot(t, coil_position_mat(3,1:length_), 'r-');
-    hold on;
-    length_ = size(coil_position_mat_raw,2);
-    t = [1:1:length_]* Ts_camera;
-    plot(t, coil_position_mat_raw(3,1:length_), 'b-');
-    
-    subplot(3,2,2);
-    t = [1:1:data_length];
-    plot(t, currents(1,1:data_length), 'k-');
-    subplot(3,2,4);
-    plot(t, currents(2,1:data_length), 'k-');
-    subplot(3,2,6);
-    plot(t, currents(3,1:data_length), 'k-');
+
+if Ts >= Ts_camera
+    data_length = current_size;
+else
+    data_length = size(coil_position_mat, 2);
+
 end
 
-if Ts < Ts_camera
-
-    coil_position_mat = [];
-    timer = 0.0;
-    
-    for i = 1: data_length
-        ind_up = ceil(timer / Ts_camera)+1;
-        ind_down = floor(timer / Ts_camera)+1;
-        interpolated_pts = (timer - time_output(ind_down)) * (coil_position_mat_raw(:,ind_up)...
-            - coil_position_mat_raw(:,ind_down)) / Ts_camera + coil_position_mat_raw(:,ind_down);
-    
-        coil_position_mat = [coil_position_mat, interpolated_pts];
-        timer = timer + Ts;
-        if timer >= time_output(data_length)
-            break;
-        end
-    end
-    
-    data_length = size(coil_position_mat, 2);
     currents = raw_currents(:, 1:data_length);
 
-    figure(12)
-    length_ = size(coil_position_mat,2);
-    subplot(3,2,1);
-    t = [1:1:length_];
-    plot(t, coil_position_mat(1,1:length_), 'r-');
-    hold on;
-    length_ = size(coil_position_mat_raw,2);
-    t = [1:1:length_] * Ts_camera;
-    plot(t, coil_position_mat_raw(1,1:length_), 'b-');
-    subplot(3,2,3);
-    t = [1:1:length_]* Ts;
-    plot(t, coil_position_mat(2,1:length_), 'r-');
-    hold on;
-    length_ = size(coil_position_mat_raw,2);
-    t = [1:1:length_]* Ts_camera;
-    plot(t, coil_position_mat_raw(2,1:length_), 'b-');
-    subplot(3,2,5);
-    t = [1:1:length_]* Ts;
-    plot(t, coil_position_mat(3,1:length_), 'r-');
-    hold on;
-    length_ = size(coil_position_mat_raw,2);
-    t = [1:1:length_]* Ts_camera;
-    plot(t, coil_position_mat_raw(3,1:length_), 'b-');
-    
-    subplot(3,2,2);
-    t = [1:1:data_length];
-    plot(t, currents(1,1:data_length), 'k-');
-    subplot(3,2,4);
-    plot(t, currents(2,1:data_length), 'k-');
-    subplot(3,2,6);
-    plot(t, currents(3,1:data_length), 'k-');
-
-
-end
+%     figure(12)
+%     subplot(3,2,1);
+%     length_ = size(coil_position_mat,2);
+%     t = [1:1:length_] ;
+%     plot(t, coil_position_mat(1,1:length_), 'r-');
+%     hold on;
+%     length_ = size(coil_position_mat_raw,2);
+%     t = [1:1:length_] * Ts_camera;
+%     plot(t, coil_position_mat_raw(1,1:length_), 'b-');
+%     subplot(3,2,3);
+%     length_ = size(coil_position_mat,2);
+%     t = [1:1:length_]* Ts;
+%     plot(t, coil_position_mat(2,1:length_), 'r-');
+%     hold on;
+%     length_ = size(coil_position_mat_raw,2);
+%     t = [1:1:length_]* Ts_camera;
+%     plot(t, coil_position_mat_raw(2,1:length_), 'b-');
+%     subplot(3,2,5);
+%      length_ = size(coil_position_mat,2);
+%     t = [1:1:length_]* Ts;
+%     plot(t, coil_position_mat(3,1:length_), 'r-');
+%     hold on;
+%     length_ = size(coil_position_mat_raw,2);
+%     t = [1:1:length_]* Ts_camera;
+%     plot(t, coil_position_mat_raw(3,1:length_), 'b-');
+%     
+%     subplot(3,2,2);
+%     t = [1:1:data_length];
+%     plot(t, currents(1,1:data_length), 'k-');
+%     subplot(3,2,4);
+%     plot(t, currents(2,1:data_length), 'k-');
+%     subplot(3,2,6);
+%     plot(t, currents(3,1:data_length), 'k-');
+% 
+% 
+%    figure(13)
+%     subplot(3,2,1);
+%     length_ = size(tip_position_mat,2);
+%     t = [1:1:length_] ;
+%     plot(t, tip_position_mat(1,1:length_), 'r-');
+%     hold on;
+%     length_ = size(tip_position_mat_raw,2);
+%     t = [1:1:length_] * Ts_camera;
+%     plot(t, tip_position_mat_raw(1,1:length_), 'b-');
+%     subplot(3,2,3);
+%     length_ = size(tip_position_mat,2);
+%     t = [1:1:length_]* Ts;
+%     plot(t, tip_position_mat(2,1:length_), 'r-');
+%     hold on;
+%     length_ = size(tip_position_mat_raw,2);
+%     t = [1:1:length_]* Ts_camera;
+%     plot(t, tip_position_mat_raw(2,1:length_), 'b-');
+%     subplot(3,2,5);
+%      length_ = size(tip_position_mat,2);
+%     t = [1:1:length_]* Ts;
+%     plot(t, tip_position_mat(3,1:length_), 'r-');
+%     hold on;
+%     length_ = size(tip_position_mat_raw,2);
+%     t = [1:1:length_]* Ts_camera;
+%     plot(t, tip_position_mat_raw(3,1:length_), 'b-');
+%     
+%     subplot(3,2,2);
+%     t = [1:1:data_length];
+%     plot(t, currents(1,1:data_length), 'k-');
+%     subplot(3,2,4);
+%     plot(t, currents(2,1:data_length), 'k-');
+%     subplot(3,2,6);
+%     plot(t, currents(3,1:data_length), 'k-');

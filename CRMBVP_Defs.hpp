@@ -1,19 +1,18 @@
 #pragma once
 #include <cmath>
-#include "Numerical_quasi_static/minpack.hpp"
+#include "Numerical_methods/minpack.hpp"
 
 #define M_PI 3.14159265358979323846
 
 
 template <typename adType>
 void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params, 
-							const double in_u0_initialguess[NUM_FLEX_SEG][3], const double in_ftip_initialguess[3],
+							const double in_u0_initialguess[NUM_FLEX_SEG][3],
 							adType out_u0[NUM_FLEX_SEG][3], adType out_ftip[3], int& out_localmin) {
 
 	ContactModeType ContactMode = in_Params.ContactMode;
 	int NLEq_Dim;  // Dimension of the Nonlinear Equation to Solve
     NLEq_Dim = NUM_RESIDUAL;
-
 
 	// Call CRMSolverIVP_Prep, to pre-process parameters
 	adType x_0[NUM_STATES];
@@ -48,7 +47,7 @@ void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params,
 	// Scale parameters and call the nonlinear equation solver
 	const double uscaleinv = 1.0 / IVALUE_SCALE_U;
 
-    const double fscaleinv = 1.0 / IVALUE_SCALE_F;
+//    const double fscaleinv = 1.0 / IVALUE_SCALE_F;
 	auto* initialguessscaled = new double [NLEq_Dim];
 	auto* returnedparamscaled = new adType [NLEq_Dim];
 
@@ -138,9 +137,7 @@ void NLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params) {
         }
     }
 
-
     adType pcoil[NUM_ACT_SET][3], Rcoil[NUM_ACT_SET][9];
-
 
     // We will only call the IVP_Core, since preprocessing is already done
     CRMSolverIVP_Core(Params, u_0, ftip, x_N, OutResidual, pcoil, Rcoil, p_atLocMarkers );

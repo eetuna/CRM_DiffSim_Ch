@@ -194,7 +194,6 @@ struct CRMIVPCoreParams {
     double w_L_pre[NUM_ACT_SET][3];                                  // The angular velocity at the coil (L) at the previous time period
     double actMass[NUM_ACT_SET];
     double actInertia[NUM_ACT_SET][9];
-    double h0[NUM_FLEX_SEG];  //step size for numerical methods
 
     double p_pre[NUM_ACT_SET][3];
     double R_pre[NUM_ACT_SET][9];
@@ -279,7 +278,7 @@ void CRMIntegrand (	adType s, adType x[NUM_STATES], adType Li, double dlambdainv
 //              when in_ContactMode == ContactModeType::FREE_TIP  in_ftip_initialguess[] will not be used, and out_ftip[] will be set to inParams.TipForce[]
 template <typename adType>
 void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params,
-                              const double in_u0_initialguess[NUM_FLEX_SEG][3], const double in_ftip_initialguess[3],
+                              const double in_u0_initialguess[NUM_FLEX_SEG][3],
                               adType out_u0[NUM_FLEX_SEG][3], adType out_ftip[3], int& out_localmin);
 //
 
@@ -341,9 +340,9 @@ struct CRMDynamicsParams {
     double	(*ReportedMarkerPos)[NUM_LOCALIZATION_MARKERS][3];  // output
 };
 
-
 template <typename adType>
-void CRMShootingMethodBVP_DYN(	NLEqnParams<adType> in_Params, adType out_u0[NUM_FLEX_SEG][3], adType out_ftip[3], int& out_localmin);
+void CRMShootingMethodBVP_DYN(int SegmentIndex, double in_p[3], double in_R[9], double in_u[3], double in_m_L[3], double in_n_L[3],
+                              NLEqnParams<adType> in_Params, adType out_u0[3], adType out_ftip[3], int& out_localmin);
 
 template <typename adType>
 void CoilDynamics( adType in_coil_state[NUM_COIL_STATES], adType in_n[3], adType g[3],
@@ -380,6 +379,16 @@ void DYNSolverIVP(	CRMShootingMethodParams<adType> in_Params, adType in_u0[NUM_F
                          bool in_FinalValueOnly,
                          adType out_x_N[NUM_STATES], adType out_coil_state[NUM_COIL_STATES],
                          double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]);
+
+
+template <typename adType>
+void CRMFlexible_IVP ( int SegmentIndex, double in_p[3], double in_R[9],  CRMIVPCoreParams<adType> in_params,
+                       double in_u[3], double in_m_L[3], double in_n_L[3],
+                       adType out_x_N[NUM_STATES], adType out_Residual[3], double out_pcoil[3], double out_Rcoil[9]);
+
+template <typename adType>
+void NLEquation_Flexible(adType in_x[], adType out_y[], int SegmentIndex, double in_p[3], double in_R[9],
+                         double in_m_L[3], double in_n_L[3], NLEqnParams<adType> Params);
 
 /**
  *  The update function: runs inside the Dynamic functions to pass dynamic data (parameters) that are updated during the loop to the shooting method

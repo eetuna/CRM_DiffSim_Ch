@@ -64,7 +64,7 @@
 
 
 //#include "CRMDYN.hpp"
-#include "Numerical_quasi_static/minpack.hpp"
+#include "minpack.hpp"
 
 template <typename adType>
 void TrustRegionDogleg_dyn(	int n, adType x[], adType fvec[], double tol, int& info, adType wa[], int lwa, NLEqnParams<adType> Params, adType out_u0[NUM_FLEX_SEG*3]);

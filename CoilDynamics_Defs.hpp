@@ -1,7 +1,8 @@
 #pragma once
 #include "CRMBVP_Defs.hpp"
 #include "CRMIVP_Defs.hpp"
-#include "minpack_DYN.hpp"
+#include "Numerical_methods/minpack_DYN.hpp"
+#include "Numerical_methods/minpack_DYN_flexible.hpp"
 
 #define t_step 0.0005
 
@@ -408,116 +409,154 @@ void SE3_TimeSpace(adType in_R_n[9], adType in_p_n[3], adType h, adType in_twist
 template <typename adType>
 void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, adType out_u0[NUM_FLEX_SEG*3]) {
 
-    double p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3];
+//    double p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3];
 
     // output for time advance, not used in BVP, just placeholders
-    adType m_L[NUM_ACT_SET][3], n_L[NUM_ACT_SET][3], ftip[3];
+    adType m_L[NUM_FLEX_SEG][3], n_L[NUM_FLEX_SEG][3], ftip[3];
     // don't forget to scale parameters before passing to the CRMSolverIVP
-    if (Params.ContactMode == ContactModeType::FREE_TIP) {
-        for (int i = 0; i < NUM_ACT_SET; ++i) {
-            for (int j = 0; j < 3; ++j) {
-                m_L[i][j] = IVALUE_SCALE_M * in_x[j+ 6*i];
-                n_L[i][j] = IVALUE_SCALE_N * in_x[j+3 + 6*i];
-            }
-        }
-        for (int i = 0; i < 3; i++) {
-            ftip[i] = Params.TipForce[i];  // for free-tip, this parameter is not given by the nonlinear equation solver, and hence, does not need to be scaled
-        }
-    }
-
-//    std::cout << "m_L dyn: " << m_L[0] << " " << m_L[1] << " " <<m_L[2] << std::endl;
-//    std::cout << "n_L dyn: " << n_L[0] << " " << n_L[1] << " " <<n_L[2] << std::endl;
-
-    auto & update_m_L = Params.m_L;
-    auto & update_n_L = Params.n_L;
-
-    for (int i = 0; i < NUM_ACT_SET; ++i) {
+    for (int i = 0; i < NUM_ACT_SET; ++i) { // NUM_ACT_SET <= NUM_FLEX_SEG
         for (int j = 0; j < 3; ++j) {
-            update_m_L[i][j] = m_L[i][j];
-            update_n_L[i][j] = n_L[i][j];
+            m_L[i][j] = IVALUE_SCALE_M * in_x[j+ 6*i];
+            n_L[i][j] = IVALUE_SCALE_N * in_x[j+3 + 6*i];
         }
     }
-
-    adType xf[NUM_STATES], MomentResidual[NUM_RESIDUAL], RL[NUM_ACT_SET][9], pL[NUM_ACT_SET][3], Rcoil[9], x_coil[NUM_COIL_STATES], out_x_coil[NUM_COIL_STATES];
-
-    int localmin = 0;
-    double u0_calc[NUM_FLEX_SEG][3], out_ftip[3];
-    CRMShootingMethodBVP_DYN(Params, u0_calc, out_ftip, localmin);
-//    std::cout << "u0_calc dyn: " << u0_calc[0] << " " << u0_calc[1] << " " <<u0_calc[2] << std::endl;
-
-    //Solve the Initial Value Problem to calculate the shape of the catheter and Get P and R
-    CRMSolverIVP_Core ( Params, u0_calc, ftip,  xf, MomentResidual, pL, RL, p_atLocMarkers);
-
-    for (int i = 0; i < NUM_FLEX_SEG; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            out_u0[j+3*i] = u0_calc[i][j];
+    if ( NUM_ACT_SET < NUM_FLEX_SEG){ // last segment is flexible
+        for (int i = 0; i < 3; ++i) {
+            m_L[NUM_FLEX_SEG-1][i] = 0.0;
+            n_L[NUM_FLEX_SEG-1][i] = 0.0;
         }
     }
-//    mCopy_AB<3>(u0_calc, out_u0);
+    for (int i = 0; i < 3; i++) {
+        ftip[i] = Params.TipForce[i];  // for free-tip, this parameter is not given by the nonlinear equation solver, and hence, does not need to be scaled
+    }
+
+
+    adType xf[NUM_STATES], MomentResidual[3], RL[9], pL[3],  x_coil[NUM_COIL_STATES], out_x_coil[NUM_COIL_STATES];
+
     double actMass, actInertia[9], damping[6], residual_per_coil[6], n_L_p[3], m_L_p[3], MagMoment[3], muhat[9];
     double v1[3], v2[3], v3[3];
     double RESIDUAL[NUM_DYN_RESIDUAL];
-//    std::cout << "MomentResidual: " << MomentResidual[0] << " " << MomentResidual[1] << " " << MomentResidual[2] <<  std::endl;
-    for (int i = 0; i < NUM_ACT_SET; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            x_coil[j] = Params.v_L_pre[i][j];
-            x_coil[j+3] = Params.w_L_pre[i][j];
-            x_coil[j+6] = Params.p_pre[i][j];
-        }
-        for (int j = 0; j < 9; ++j) {
-            x_coil[j+9] = Params.R_pre[i][j];
-        }
 
-        actMass = Params.actMass[i];
-        for (int j = 0; j < 9; ++j) {
-            actInertia[j] = Params.actInertia[i][j];
-        }
-    //    std::cout << "in x_coil PL: " << x_coil[6] << " " << x_coil[7] << " " << x_coil[8] <<  std::endl;
-        for (int j = 0; j < 6; ++j) {
-            damping[j] = Params.damping[i][j];
-        }
+    int   actno;	// actuator no, flexible segment before, flexible segment after
+    int  fsegno;
+    double RigidSegmentLength;
+    int localmin = 0;
+    double u0_initialguess[3], u0_flexible[3], out_ftip[3];
+    double p0[3], R0[9], mL[3], nL[3], Rcoil[9];
 
-        for (int j = 0; j < 3; ++j) {
-            MagMoment[j] = Params.MagMoment[i][j];
-        }
-        wHat(MagMoment,muhat);
+    for (int i = 0; i < 3; ++i) {
+        p0[i] = Params.xi[i+12];
+    }
+    for (int i = 0; i < 9; ++i) {
+        R0[i] = Params.xi[i+3];
+    }
+    auto & SegBounds = Params.SegBounds;
+    int StartSegmentIndex=Params.StartSegmentIndex;
 
-//        for (int j = 0; j < 3; ++j) {
-//            tau[j] = Tbcoil[i][j] - m_L[i][j];
-//        }
+    for (int ind=StartSegmentIndex; ind< NUM_SEGMENTS; ind++) {
+        if ( ind%2 == 0 ) {  // Flexible Segment
+            fsegno=ind>>1; // i/2, flexible segment no
+            for (int j = 0; j < 3; j++) {
+                u0_initialguess[j] = Params.u0_initialguess[fsegno][j];
+                mL[j] = m_L[fsegno][j];
+                nL[j] = n_L[fsegno][j];
+            }
+            CRMShootingMethodBVP_DYN( ind, p0, R0,  u0_initialguess, mL,  nL,Params, u0_flexible, out_ftip, localmin);
 
-        for (int j = 0; j < 3; ++j) {
-            n_L_p[j] = n_L[i][j];
-        }
-        for (int j = 0; j < 3; ++j) {
-            m_L_p[j] = m_L[i][j];
-        }
+            CRMFlexible_IVP ( ind, p0, R0,  Params, u0_flexible, mL,  nL,
+                                   xf, MomentResidual, pL, RL);
 
-        CoilDynamics(x_coil, n_L_p, Params.g, actMass, actInertia, damping, Params.DELTA_T, Params.B0, muhat,  m_L_p,out_x_coil);
+            for (int j = 0; j < 3; ++j) {
+                out_u0[j+3*fsegno] = u0_flexible[j];
+            }
 
-        for (int j = 0; j < 3; ++j) {
-            residual_per_coil[j] = pL[i][j] - out_x_coil[j+6];
-        }
+        }else{
+            actno=(ind-1)>>1;		// actuator no
 
-        for (int j = 0; j < 9; ++j) {
-            Rcoil[j] = out_x_coil[j+9];
-        }
-        for (int j = 0; j < 3; ++j) {
-            v1[j] = Rcoil[j*3] - RL[i][j*3];
-            v2[j] = Rcoil[1+j*3] - RL[i][1+ j*3];
-            v3[j] = Rcoil[2+j*3] - RL[i][2 + j*3];
-        }
-        residual_per_coil[3] = vNormSq<3>(v1);
-        residual_per_coil[4] = vNormSq<3>(v2);
-        residual_per_coil[5] = vNormSq<3>(v3);
-        for (int j = 0; j < 3; ++j) residual_per_coil[j+3] = sqrt(residual_per_coil[j+3]);
+            for (int j = 0; j < 3; ++j) {
+                x_coil[j] = Params.v_L_pre[actno][j];
+                x_coil[j+3] = Params.w_L_pre[actno][j];
+                x_coil[j+6] = Params.p_pre[actno][j];
+            }
+            for (int j = 0; j < 9; ++j) {
+                x_coil[j+9] = Params.R_pre[actno][j];
+            }
 
-        for (int j = 0; j < 3; ++j) {
-            RESIDUAL[j + i*6] = residual_per_coil[j];
-            RESIDUAL[j + 3+ i*6] = residual_per_coil[j+3];
+            actMass = Params.actMass[actno];
+            for (int j = 0; j < 9; ++j) {
+                actInertia[j] = Params.actInertia[actno][j];
+            }
+            //    std::cout << "in x_coil PL: " << x_coil[6] << " " << x_coil[7] << " " << x_coil[8] <<  std::endl;
+            for (int j = 0; j < 6; ++j) {
+                damping[j] = Params.damping[actno][j];
+            }
+
+            for (int j = 0; j < 3; ++j) {
+                MagMoment[j] = Params.MagMoment[actno][j];
+            }
+            wHat(MagMoment,muhat);
+
+            for (int j = 0; j < 3; ++j) {
+                n_L_p[j] = n_L[actno][j];
+            }
+            for (int j = 0; j < 3; ++j) {
+                m_L_p[j] = m_L[actno][j];
+            }
+
+            CoilDynamics(x_coil, n_L_p, Params.g, actMass, actInertia, damping, Params.DELTA_T, Params.B0, muhat,  m_L_p,out_x_coil);
+
+            for (int j = 0; j < 3; ++j) {
+                residual_per_coil[j] = pL[j] - out_x_coil[j+6];
+            }
+
+            for (int j = 0; j < 9; ++j) {
+                Rcoil[j] = out_x_coil[j+9];
+            }
+            for (int j = 0; j < 3; ++j) {
+                v1[j] = Rcoil[j*3] - RL[j*3];
+                v2[j] = Rcoil[1+j*3] - RL[1+ j*3];
+                v3[j] = Rcoil[2+j*3] - RL[2 + j*3];
+            }
+            residual_per_coil[3] = vNormSq<3>(v1);
+            residual_per_coil[4] = vNormSq<3>(v2);
+            residual_per_coil[5] = vNormSq<3>(v3);
+            for (int j = 0; j < 3; ++j) residual_per_coil[j+3] = sqrt(residual_per_coil[j+3]);
+
+            for (int j = 0; j < 3; ++j) {
+                RESIDUAL[j + actno*6] = residual_per_coil[j];
+                RESIDUAL[j + 3+ actno*6] = residual_per_coil[j+3];
+            }
+
+            RigidSegmentLength=(SegBounds[ind+1]-SegBounds[ind]);
+
+            if (ind < (NUM_SEGMENTS-1)) {	// we want to make sure that we are not at the last segment
+                for (int j = 0; j < 9; ++j) {
+                    R0[j] = Rcoil[j];
+                }
+                for (int j = 0; j < 3; ++j) {
+                    p0[j] = out_x_coil[j+6] + Rcoil[j*3+2] * RigidSegmentLength * 0.5;
+                }
+            }
+
+//            std::cout << " here "<< std::endl;
+
         }
     }
 
+
+
+//    std::cout << "u0_calc dyn: " << u0_calc[0] << " " << u0_calc[1] << " " <<u0_calc[2] << std::endl;
+
+    //Solve the Initial Value Problem to calculate the shape of the catheter and Get P and R
+//    CRMSolverIVP_Core ( Params, u0_calc, ftip,  xf, MomentResidual, pL, RL, p_atLocMarkers);
+//    for (int i = 0; i < NUM_FLEX_SEG; ++i) {
+//        for (int j = 0; j < 3; ++j) {
+//            out_u0[j+3*i] = u0_calc[i][j];
+//        }
+//    }
+//    mCopy_AB<3>(u0_calc, out_u0);
+
+//    std::cout << "MomentResidual: " << MomentResidual[0] << " " << MomentResidual[1] << " " << MomentResidual[2] <<  std::endl;
     for (int i = 0; i < NUM_ACT_SET; ++i) {
         for (int j = 0; j < 3; ++j) {
             out_y[j+ 6*i] = RESIDUAL_SCALE_P * RESIDUAL[j+ 6*i]; // RESIDUAL_SCALE_F * WrenchResidual[i] ;
@@ -530,28 +569,33 @@ void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, ad
 
 
 template <typename adType>
-void CRMShootingMethodBVP_DYN(	NLEqnParams<adType> in_Params, adType out_u0[NUM_FLEX_SEG][3], adType out_ftip[3], int& out_localmin) {
+void CRMShootingMethodBVP_DYN(int SegmentIndex, double in_p[3], double in_R[9], double in_u[3], double in_m_L[3], double in_n_L[3],
+                              NLEqnParams<adType> in_Params, adType out_u0[3], adType out_ftip[3], int& out_localmin) {
 
 //    ContactModeType ContactMode = in_Params.ContactMode;
-    int NLEq_Dim = NUM_RESIDUAL;
+    int NLEq_Dim = 3;
     // Scale parameters and call the nonlinear equation solver
     const double uscaleinv = 1.0 / IVALUE_SCALE_U;
-    const double fscaleinv = 1.0 / IVALUE_SCALE_F;
+//    const double fscaleinv = 1.0 / IVALUE_SCALE_F;
     auto* initialguessscaled = new double [NLEq_Dim];
     auto* returnedparamscaled = new adType [NLEq_Dim];
 
-    if (in_Params.ContactMode == ContactModeType::FREE_TIP) {
-        for (int i = 0; i < NUM_FLEX_SEG; ++i) {
-            for (int j = 0; j < 3; ++j) {
-                initialguessscaled[j+3*i] = uscaleinv * in_Params.u0_initialguess[i][j];
-            }
-        }
-        for (int i = 0; i < 3; i++) {
-            in_Params.TipForce[i] = in_Params.TipForce[i];  // if the catheter is not in contact, the tip force specified within in_Params needs to be used; this would not be scaled as it is not changed by the solver
-        }
+    for (int i = 0; i < 3; i++) {
+        initialguessscaled[i] = uscaleinv * in_u[i];
+        in_Params.TipForce[i] = in_Params.TipForce[i];  // if the catheter is not in contact, the tip force specified within in_Params needs to be used; this would not be scaled as it is not changed by the solver
     }
 
-    int localmin = 0, errorcode = 0;
+    adType p[3], R[9], m_L[3], n_L[3];
+    for (int i = 0; i < 3; ++i) {
+        p[i] = in_p[i];
+        m_L[i] = in_m_L[i];
+        n_L[i] = in_n_L[i];
+    }
+    for (int i = 0; i < 9; ++i) {
+        R[i] = in_R[i];
+    }
+
+    int localmin = 0;//, errorcode = 0;
 
     adType* x = new adType[NLEq_Dim]; // we will create a new variable here and not use initial guess scaled since truss-region-dogleg algorithm uses the same variable for both input and output
     adType* residual = new adType[NLEq_Dim];
@@ -561,7 +605,7 @@ void CRMShootingMethodBVP_DYN(	NLEqnParams<adType> in_Params, adType out_u0[NUM_
     adType* wa = new adType [lwa];
     for (int i = 0; i < NLEq_Dim; i++) x[i] = initialguessscaled[i];
 #if defined( TRUSTREGION )
-    TrustRegionDogleg(NLEq_Dim, x, residual, tol, info, wa, lwa, in_Params);
+    TrustRegionDogleg_flexible(NLEq_Dim, x, residual, tol, info, wa, lwa, SegmentIndex, p, R, m_L, n_L,in_Params);
 #else // undefined
     exit(1);
 #endif
@@ -572,20 +616,66 @@ void CRMShootingMethodBVP_DYN(	NLEqnParams<adType> in_Params, adType out_u0[NUM_
     delete[] wa;
 
     if (in_Params.ContactMode == ContactModeType::FREE_TIP) {
-        for (int i = 0; i < NUM_FLEX_SEG; ++i) {
-            for (int j = 0; j < 3; ++j) {
-                out_u0[i][j] = IVALUE_SCALE_U * returnedparamscaled[j+3*i];
-            }
-        }
         for (int i = 0; i < 3; i++) {
+            out_u0[i] = IVALUE_SCALE_U * returnedparamscaled[i];
             out_ftip[i] = in_Params.TipForce[i];  // if it is free-tip, return the tip force specified within in_Params
         }
     }
 
-
     out_localmin = localmin;
     delete[] initialguessscaled;
     delete[] returnedparamscaled;
+
+}
+
+
+template <typename adType>
+void NLEquation_Flexible(adType in_x[], adType out_y[], int SegmentIndex, double in_p[3], double in_R[9],
+                         double in_m_L[3], double in_n_L[3], NLEqnParams<adType> Params) {
+
+
+    auto* x_N = new adType [NUM_STATES];
+    auto* p_atLocMarkers = new adType [NUM_LOCALIZATION_MARKERS][3];
+    auto* OutResidual = new adType [3];
+
+    // output for time advance, not used in BVP, just placeholders
+    adType u_0[3], ftip[3], p[3], R[9], m_L[3], n_L[3];
+
+    for (int i = 0; i < 3; ++i) {
+        p[i] = in_p[i];
+        m_L[i] = in_m_L[i];
+        n_L[i] = in_n_L[i];
+    }
+    for (int i = 0; i < 9; ++i) {
+        R[i] = in_R[i];
+    }
+
+    // don't forget to scale parameters before passing to the CRMSolverIVP
+    if (Params.ContactMode == ContactModeType::FREE_TIP) {
+        for (int i = 0; i < 3; i++) {
+            u_0[i] = IVALUE_SCALE_U * in_x[i];
+            ftip[i] = Params.TipForce[i];  // for free-tip, this parameter is not given by the nonlinear equation solver, and hence, does not need to be scaled
+        }
+    }
+
+    adType pcoil[3], Rcoil[9];
+
+    // We will only call the IVP_Core, since preprocessing is already done
+//    CRMSolverIVP_Core(Params, u_0, ftip, x_N, OutResidual, pcoil, Rcoil, p_atLocMarkers );
+
+    CRMFlexible_IVP ( SegmentIndex, p, R,  Params, u_0, m_L, n_L,
+            x_N, OutResidual, pcoil, Rcoil);
+
+    // don't forget to scale parameters before returning to the nonlinear equation solver
+    if (Params.ContactMode == ContactModeType::FREE_TIP) {
+        for (int i = 0; i < 3; i++) {
+            out_y[i] = RESIDUAL_SCALE_M * OutResidual[i];// RESIDUAL_SCALE_F * WrenchResidual[i] ;
+        }
+    }
+
+    delete[] x_N;
+    delete[] p_atLocMarkers;
+    delete[] OutResidual;
 
 }
 
@@ -599,7 +689,6 @@ void DynamicsBVP(	CRMShootingMethodParams<adType> in_Params, double in_u0_initia
     NLEq_Dim = NUM_DYN_RESIDUAL;
 
     // Call CRMSolverIVP_Prep, to pre-process parameters
-//    adType x_0[NUM_STATES], u0_calc[NUM_FLEX_SEG*3];
 
     auto* x_0 = new adType[NUM_STATES];
     auto* u0_calc = new adType[NUM_FLEX_SEG*3];
@@ -631,7 +720,6 @@ void DynamicsBVP(	CRMShootingMethodParams<adType> in_Params, double in_u0_initia
     mCopy_AB<3>(in_Params.TipConstraintPoint, DYNNLEParams.TipConstraintPoint);
     mCopy_AB<3>(in_ftip_initialguess, DYNNLEParams.ftip_initialguess);
 
-//    mCopy_AB<3>(in_u0_initialguess, DYNNLEParams.u0_initialguess);
     for (int i = 0; i < NUM_FLEX_SEG; ++i) {
         for (int j = 0; j < 3; ++j) {
             DYNNLEParams.u0_initialguess[i][j] = in_u0_initialguess[i][j];
@@ -639,11 +727,10 @@ void DynamicsBVP(	CRMShootingMethodParams<adType> in_Params, double in_u0_initia
     }
 
     // Scale parameters and call the nonlinear equation solver
-//    const double uscaleinv = 1.0 / IVALUE_SCALE_U;
     const double nscaleinv = 1.0 / IVALUE_SCALE_N;
     const double mscaleinv = 1.0 / IVALUE_SCALE_M;
 
-    const double fscaleinv = 1.0 / IVALUE_SCALE_F;
+//    const double fscaleinv = 1.0 / IVALUE_SCALE_F;
     auto* initialguessscaled = new double [NLEq_Dim];
     auto* returnedparamscaled = new adType [NLEq_Dim];
 
@@ -659,8 +746,6 @@ void DynamicsBVP(	CRMShootingMethodParams<adType> in_Params, double in_u0_initia
         }
     }
 
-    int localmin = 0;
-
     adType* x = new adType[NLEq_Dim]; // we will create a new variable here and not use initial guess scaled since truss-region-dogleg algorithm uses the same variable for both input and output
 
     adType* residual = new adType[NLEq_Dim];
@@ -674,7 +759,7 @@ void DynamicsBVP(	CRMShootingMethodParams<adType> in_Params, double in_u0_initia
 #else // undefined
     exit(1);
 #endif
-    localmin = (info == 1) ? 0 : (info - 1);
+    int localmin = (info == 1) ? 0 : (info - 1);
     for (int i = 0; i < NLEq_Dim; i++) returnedparamscaled[i] = x[i];
     delete[] residual;
     delete[] x;
@@ -695,7 +780,6 @@ void DynamicsBVP(	CRMShootingMethodParams<adType> in_Params, double in_u0_initia
             out_u0[i][j] = u0_calc[j+ 3*i];
         }
     }
-
 
     delete[] x_0;
     delete[] u0_calc;
