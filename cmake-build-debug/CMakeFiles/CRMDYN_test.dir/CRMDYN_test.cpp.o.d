@@ -303,9 +303,9 @@ CMakeFiles/CRMDYN_test.dir/CRMDYN_test.cpp.o: \
  /usr/include/c++/9/math.h /usr/include/c++/9/stdlib.h \
  /home/ranhao/Desktop/CRM_Dynamics/CRMIVP_Defs.hpp \
  /home/ranhao/Desktop/CRM_Dynamics/CRMBVP_Defs.hpp \
- /home/ranhao/Desktop/CRM_Dynamics/Numerical_quasi_static/minpack.hpp \
- /home/ranhao/Desktop/CRM_Dynamics/Numerical_quasi_static/minpack_Defs.hpp \
+ /home/ranhao/Desktop/CRM_Dynamics/Numerical_methods/minpack.hpp \
+ /home/ranhao/Desktop/CRM_Dynamics/Numerical_methods/minpack_Defs.hpp \
  /home/ranhao/Desktop/CRM_Dynamics/CRMDynamics.hpp \
  /home/ranhao/Desktop/CRM_Dynamics/CoilDynamics_Defs.hpp \
- /home/ranhao/Desktop/CRM_Dynamics/minpack_DYN.hpp \
- /home/ranhao/Desktop/CRM_Dynamics/minpack_DYN_Defs.hpp
+ /home/ranhao/Desktop/CRM_Dynamics/Numerical_methods/minpack_DYN.hpp \
+ /home/ranhao/Desktop/CRM_Dynamics/Numerical_methods/minpack_DYN_Defs.hpp

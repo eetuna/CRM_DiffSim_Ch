@@ -1,6 +1,6 @@
 #pragma once
 #include <cmath>
-#include "Numerical_quasi_static/minpack.hpp"
+#include "Numerical_methods/minpack.hpp"
 
 #define M_PI 3.14159265358979323846
 

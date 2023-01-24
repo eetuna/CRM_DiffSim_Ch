@@ -1,7 +1,7 @@
 #pragma once
 #include "CRMBVP_Defs.hpp"
 #include "CRMIVP_Defs.hpp"
-#include "minpack_DYN.hpp"
+#include "Numerical_methods/minpack_DYN.hpp"
 
 #define t_step 0.0005
 

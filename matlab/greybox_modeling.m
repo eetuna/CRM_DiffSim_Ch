@@ -45,22 +45,20 @@ E_ = nlgr_model.Parameters(4).Value;
 Coil_align = nlgr_model.Parameters(5).Value; %[-0.0871, -0.3934]
 Coil_turnarea = nlgr_model.Parameters(6).Value;%[1.3851;1.44;1.60];% [1.44;1.3851;1.60];
 mass_ =nlgr_model.Parameters(7).Value;% [5.7736e-5];
-
-
-%test with varying freq data
-load('output_currents.mat');
-load('output_coil_traj.mat');
-load('output_tip_traj.mat');
-currents = output_currents;
-coil_position_mat = output_coil_traj;
-tip_position_mat = output_tip_traj;
-
-
-Ts = 0.04;
+% 
+% 
+% %test with varying freq data
+% load('output_currents.mat');
+% load('output_coil_traj.mat');
+% load('output_tip_traj.mat');
+% currents = output_currents;
+% coil_position_mat = output_coil_traj;
+% tip_position_mat = output_tip_traj;
+% Ts = 0.04;
 
 load('init_2.mat');% at 621
 ind_start = 1;% 228 622;
-test_length = 3000; %167
+test_length = 800; %167
 p_mat = [];
 p_tip_mat = [];
 
