@@ -4,6 +4,11 @@
 #include <math.h>
 #include <stdlib.h>
 
+#include <chrono>
+
+using namespace std::chrono;
+
+
 #define NUM_STATES 15   // u[0..2],R[0..9],p[0..2]
 #define ANALYTICAL_SE3_STEP
 #ifdef ANALYTICAL_SE3_STEP
@@ -279,7 +284,7 @@ void CRMIntegrand (	adType s, adType x[NUM_STATES], adType Li, double dlambdainv
 //              when in_ContactMode == ContactModeType::FREE_TIP  in_ftip_initialguess[] will not be used, and out_ftip[] will be set to inParams.TipForce[]
 template <typename adType>
 void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params,
-                              const double in_u0_initialguess[NUM_FLEX_SEG][3], const double in_ftip_initialguess[3],
+                              const double in_u0_initialguess[NUM_FLEX_SEG][3],
                               adType out_u0[NUM_FLEX_SEG][3], adType out_ftip[3], int& out_localmin);
 //
 

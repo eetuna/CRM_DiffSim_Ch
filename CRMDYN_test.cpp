@@ -231,7 +231,7 @@ int RunExample(void) {
 
 
     // Cosserat Rod Model - Solve the Boundary Value Problem to calculate the equilibrium configuration of the catheter
-	CRMShootingMethodBVP(BVPParams, u0_initialguess, ftip_initialguess, u0_calc, ftip_calc, localmin);
+	CRMShootingMethodBVP(BVPParams, u0_initialguess, u0_calc, ftip_calc, localmin);
 
 
 //
@@ -283,8 +283,6 @@ int RunExample(void) {
                                                TipConstraintPoint, TipForce, IntegrationStepSize,
                                                v_L_pre, w_L_pre, pL,  RL, damping, DELTA_T,
                                                BVPParams);
-
-//    std::cout << "u0_calc: " << u0_calc[0] << " " << u0_calc[1] << " " << u0_calc[2] <<  std::endl;
 
     double out_u0[NUM_FLEX_SEG][3], out_nL[NUM_ACT_SET][3], out_mL[NUM_ACT_SET][3];
     DynamicsBVP(BVPParams, u0_initialguess, mL_initialguess, nL_initialguess, ftip_initialguess,

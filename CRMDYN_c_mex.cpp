@@ -1,26 +1,25 @@
-#include <iostream>
+#pragma once
+#include "mexAdapter.hpp"
+#include "mex.hpp"
+
 #include <cmath>
-#include <chrono> 
-#include "CRMTest.h"
 #include "CRMDYN.hpp"
-using namespace std::chrono;
 
-#define EPS 1e-5
-#define NUM_DYN_STATE  (NUM_ACT_SET*6 + NUM_FLEX_SEG*3 + NUM_ACT_SET*6 + NUM_ACT_SET* (3+9) )    // (v, w, u, n, m, p, R)
+#define M_PI 3.14159265358979323846
+#define _USE_MATH_DEFINES
 
-/*   Copyright 2005-2015 The MathWorks, Inc. */
-/*   Written by Peter Lindskog. */
 
-/* Include libraries. */
-#include "/usr/local/MATLAB/R2022b/extern/include/mex.h"
+using matlab::mex::ArgumentList; // added
+using namespace matlab::data;	 // added
 
-/* Specify the number of outputs here. */
-#define NY 3
 
+//#define MIN(a, b) (((a) < (b)) ? (a) : (b))
+//#define POW4(a) ((a) * (a) * (a) * (a))
+
+#define Nx (NUM_ACT_SET*15 + NUM_FLEX_SEG*3 + NUM_ACT_SET*9)
 
 /* State equations. */
-void compute_dx(double *dx, double t, double *x, double *u, double **p,
-                const mxArray *auxvar)
+void compute_dx(double *dx, double t, double *x, double *u, double **p)
 {
 
     /** Retrieve x. **/
@@ -84,9 +83,7 @@ void compute_dx(double *dx, double t, double *x, double *u, double **p,
 
     /** Retrieve model parameters. **/
     double damping_[NUM_ACT_SET][6];
-//    for (int i = 0; i < 6; ++i) {
-//        damping_[i] = p[0][i];
-//    }
+
     for (int i = 0; i < NUM_ACT_SET; ++i) {
         damping_[i][0] = damping_[i][1] = p[0][0 +i*4];
         damping_[i][2] = p[0][1+i*4];
@@ -94,8 +91,7 @@ void compute_dx(double *dx, double t, double *x, double *u, double **p,
         damping_[i][5] = p[0][3+i*4];
     }
 
-//    std::cout <<"damping_ v : " << damping_[0] << " " << damping_[1] << " " << damping_[2] << std::endl;
-//    std::cout <<"damping_ w: " << damping_[3] << " " << damping_[4] << " " << damping_[5] << std::endl;
+
     double Delta_T = p[1][0];
 
     // Declare the output variables for BVP
@@ -108,8 +104,6 @@ void compute_dx(double *dx, double t, double *x, double *u, double **p,
     // numerical nonlinear equation solver diagnostic outputs
     int localmin;
 
-//    std::cout <<" damping_: " << damping_[0] << " " << damping_[1] << " " << damping_[2] << " " << damping_[3] << " " << damping_[4] << " " << damping_[5] << std::endl;
-//    std::cout <<" Delta_T: " << Delta_T << std::endl;
 
     double oRlist[NUM_FLEX_SEG] = { p[2][0], p[2][0]}; //{ 1.5875, 1.5875 };
     // Inner radii of each of the flexible segments - unit: mm
@@ -299,85 +293,103 @@ void compute_dx(double *dx, double t, double *x, double *u, double **p,
 }
 
 
-/** Output equation. **/
-void compute_y(double *y, double t, double *x, double *u, double **p,
-               const mxArray *auxvar)
-{
+class MexFunction : public matlab::mex::Function {
+    ArrayFactory factory;
 
-    for (int i = 0; i < 3; ++i) {
-        y[i] = x[i + 15]; //p
+public:
+    void operator()(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs)
+    {
+        // *** Physical Description of the Catheter
+        // IMPORTANT NOTE: For now, most proximal segment is assumed to be always flexible
+        //    and the flexible and rigid segments are assumed to be alternating
+        //    most distal segment can be flexible or rigid
+        // Items are listed in distal-to-proximal order (starting from the tip of the catheter towards the base)
+        // Outer radii of each of the flexible segments - unit: mm
+        /** Retrieve everything from inputs **/
+        /** Retrieve x. **/
+        double v_L_pre[NUM_ACT_SET][3], w_L_pre[NUM_ACT_SET][3],  u0_initialguess[NUM_FLEX_SEG][3], nL_initialguess[NUM_ACT_SET][3], mL_initialguess[NUM_ACT_SET][3], pL_pre[NUM_ACT_SET][3], RL_pre[NUM_ACT_SET][9];
+        // Define initial guesses to be used when solving boundary value problem
+
+        double x[Nx];
+        for (int i = 0; i < NUM_ACT_SET; ++i) {
+            for (int j = 0; j < 3; ++j) {
+                x[j + 3*i] = inputs[0][j+i*3];
+            }
+        }
+        for (int i = 0; i < NUM_ACT_SET; ++i) {
+            for (int j = 0; j < 3; ++j) {
+                x[ NUM_ACT_SET * 3 + j + 3*i] = inputs[1][j+i*3];
+            }
+        }
+
+        for (int i = 0; i < NUM_FLEX_SEG; ++i) {
+            for (int j = 0; j < 3; ++j) {
+                x[ NUM_ACT_SET * 6 + j + 3*i] = inputs[2][j+3*i];
+            }
+        }
+
+        for (int i = 0; i < NUM_ACT_SET; ++i) {
+            for (int j = 0; j < 3; ++j) {
+                x[ NUM_ACT_SET * 6 + NUM_FLEX_SEG * 3 + j + 3*i] = inputs[3][j+3*i];
+            }
+        }
+
+        for (int i = 0; i < NUM_ACT_SET; ++i) {
+            for (int j = 0; j < 3; ++j) {
+                x[ NUM_ACT_SET * 9 + NUM_FLEX_SEG * 3 + j + 3*i]  = inputs[4][j+3*i];
+            }
+        }
+
+        for (int i = 0; i < NUM_ACT_SET; ++i) {
+            for (int j = 0; j < 3; ++j) {
+                x[ NUM_ACT_SET * 12 + NUM_FLEX_SEG * 3 + j + 3*i]  = inputs[5][j+i*3];
+            }
+        }
+
+        for (int i = 0; i < NUM_ACT_SET; ++i) {
+            for (int j = 0; j < 9; ++j) {
+                x[ NUM_ACT_SET * 15 + NUM_FLEX_SEG * 3 + j + 9*i]  = inputs[6][j+i*9];
+            }
+        }
+
+        double u[NUM_ACT_SET*3];
+        for (int i = 0; i < NUM_ACT_SET; ++i) {
+            for (int j = 0; j < 3; ++j) {
+                u[j + i*3] = inputs[7][i * 3 + j];
+            }
+        }
+
+
+        double    p_damping[NUM_ACT_SET*4];
+        for (int i = 0; i < NUM_ACT_SET; ++i) {
+            for (int j = 0; j < 4; ++j) {
+                p_damping[j +i*4] = inputs[8][j+i*4];
+            }
+        }
+        double    p_Ts[1] = {inputs[9][0]};
+        double    p_raduis[2] = {inputs[10][0], inputs[10][1]};
+        double    p_E[2] = {inputs[11][0], inputs[11][1]};
+        double p_CoilAlignmentAngles[2] = {inputs[12][0], inputs[12][1]};
+        double p_CoilTurnAreaMat[3] = {inputs[13][0], inputs[13][1], inputs[13][2]};
+        double p_mass[1] = {inputs[14][0]};
+        double *p[7] = {p_damping, p_Ts, p_raduis, p_E, p_CoilAlignmentAngles, p_CoilTurnAreaMat, p_mass};
+
+
+        double dx[Nx];
+        double t = 0.05;
+
+        compute_dx(dx, t, x, u, p);
+
+//        compute_dx(dx)
+        /** Output report **/
+        outputs[0] = factory.createArray<double>({1, 3}, {dx[0], dx[1], dx[2]});
+        outputs[1] = factory.createArray<double>({1, 3}, {dx[3], dx[4], dx[5]});
+        outputs[2] = factory.createArray<double>({1, NUM_FLEX_SEG*3}, {dx[6], dx[7], dx[8], dx[9], dx[10], dx[11]});
+        outputs[3] = factory.createArray<double>({1, 3}, {dx[12], dx[13], dx[14]});
+        outputs[4] = factory.createArray<double>({1, 3}, {dx[15], dx[16], dx[17]});
+        outputs[5] = factory.createArray<double>({1, 3}, {dx[18], dx[19], dx[20]});
+        outputs[6] = factory.createArray<double>({1, 9}, {dx[21], dx[22], dx[23], dx[24], dx[25], dx[26], dx[27], dx[28], dx[29]});
     }
 
-//    for (int i = 0; i < 3; ++i) {
-//        y[i+3] = x[i + 24]; //Rz
-//    }
+};
 
-}
-
-
-void mexFunction(int nlhs, mxArray *plhs[],
-                 int nrhs, const mxArray *prhs[])
-{
-    /* Declaration of input and output arguments. */
-    double *x, *u, **p, *dx, *y, *t;
-    int     i, np;
-    size_t  nu, nx;
-    const mxArray *auxvar = NULL; /* Cell array of additional data. */
-
-    if (nrhs < 3) {
-        mexErrMsgIdAndTxt("IDNLGREY:ODE_FILE:InvalidSyntax",
-                          "At least 3 inputs expected (t, u, x).");
-    }
-
-    /* Determine if auxiliary variables were passed as last input.  */
-    if ((nrhs > 3) && (mxIsCell(prhs[nrhs-1]))) {
-        /* Auxiliary variables were passed as input. */
-        auxvar = prhs[nrhs-1];
-        np = nrhs - 4; /* Number of parameters (could be 0). */
-    } else {
-        /* Auxiliary variables were not passed. */
-        np = nrhs - 3; /* Number of parameters. */
-    }
-
-    /* Determine number of inputs and states. */
-    nx = mxGetNumberOfElements(prhs[1]); /* Number of states. */
-    nu = mxGetNumberOfElements(prhs[2]); /* Number of inputs. */
-
-    /* Obtain double data pointers from mxArrays. */
-    t = mxGetPr(prhs[0]);  /* Current time value (scalar). */
-    x = mxGetPr(prhs[1]);  /* States at time t. */
-    u = mxGetPr(prhs[2]);  /* Inputs at time t. */
-
-    p = static_cast<double **>(mxCalloc(np, sizeof(double*)));
-    for (i = 0; i < np; i++) {
-        p[i] = mxGetPr(prhs[3+i]); /* Parameter arrays. */
-    }
-
-    /* Create matrix for the return arguments. */
-    plhs[0] = mxCreateDoubleMatrix(nx, 1, mxREAL);
-    plhs[1] = mxCreateDoubleMatrix(NY, 1, mxREAL);
-    dx      = mxGetPr(plhs[0]); /* State derivative values. */
-    y       = mxGetPr(plhs[1]); /* Output values. */
-
-    /*
-      Call the state and output update functions.
-
-      Note: You may also pass other inputs that you might need,
-      such as number of states (nx) and number of parameters (np).
-      You may also omit unused inputs (such as auxvar).
-
-      For example, you may want to use orders nx and nu, but not time (t)
-      or auxiliary data (auxvar). You may write these functions as:
-          compute_dx(dx, nx, nu, x, u, p);
-          compute_y(y, nx, nu, x, u, p);
-    */
-
-    /* Call function for state derivative update. */
-    compute_dx(dx, t[0], x, u, p, auxvar);
-
-    /* Call function for output update. */
-    compute_y(y, t[0], x, u, p, auxvar);
-
-    /* Clean up. */
-    mxFree(p);
-}

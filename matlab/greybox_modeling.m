@@ -1,7 +1,7 @@
 close all;
 clear;
 
-
+set(0,'defaultfigurecolor','w');
 %% input output
 
 read_input_output;
@@ -36,7 +36,8 @@ mL = [0;0;0];
 % mass_ =[5.3516e-5];% [5.7736e-5];
 
 
-load('optimized_parameter_40ms_full_moment.mat');
+% load('optimized_parameter_40ms_full_moment.mat');
+load('optimized_parameter.mat')
 damping = nlgr_model.Parameters(1).Value;
 
 % damping = [10.1712; 43.1342;0.0681;0.0143];
@@ -45,20 +46,20 @@ E_ = nlgr_model.Parameters(4).Value;
 Coil_align = nlgr_model.Parameters(5).Value; %[-0.0871, -0.3934]
 Coil_turnarea = nlgr_model.Parameters(6).Value;%[1.3851;1.44;1.60];% [1.44;1.3851;1.60];
 mass_ =nlgr_model.Parameters(7).Value;% [5.7736e-5];
-% 
-% 
-% %test with varying freq data
-% load('output_currents.mat');
-% load('output_coil_traj.mat');
-% load('output_tip_traj.mat');
-% currents = output_currents;
-% coil_position_mat = output_coil_traj;
-% tip_position_mat = output_tip_traj;
+
+
+%test with varying freq data
+load('output_currents.mat');
+load('output_coil_traj.mat');
+load('output_tip_traj.mat');
+currents = output_currents;
+coil_position_mat = output_coil_traj;
+tip_position_mat = output_tip_traj;
 % Ts = 0.04;
 
 load('init_2.mat');% at 621
 ind_start = 1;% 228 622;
-test_length = 800; %167
+test_length = 3000; %167
 p_mat = [];
 p_tip_mat = [];
 
@@ -68,11 +69,14 @@ for i = ind_start:ind_start+test_length-1
     u(3) = -u(3);
     u(2) = -u(2);
 
-    [vL, wL, u0, mL, nL, pL, RL, p_tip] = CRMDYN_TEST_mex(vL, wL, u0, mL, nL, pL, RL, u, damping, Ts, radius_, E_,...
-        Coil_align, Coil_turnarea, mass_);
+%     [vL, wL, u0, mL, nL, pL, RL, p_tip] = CRMDYN_TEST_mex(vL, wL, u0, mL, nL, pL, RL, u, damping, Ts, radius_, E_,...
+%         Coil_align, Coil_turnarea, mass_);
        
+    [vL, wL, u0, mL, nL, pL, RL] = CRMDYN_TEST_mex(vL, wL, u0, mL, nL, pL, RL, u, damping, Ts, radius_, E_,...
+        Coil_align, Coil_turnarea, mass_);
+
     p_mat = [p_mat,pL'];
-    p_tip_mat = [p_tip_mat, p_tip']; 
+%     p_tip_mat = [p_tip_mat, p_tip']; 
 
     pL
     RL
@@ -102,25 +106,25 @@ plot(x,p_mat(3, 1:test_length), 'k');
 hold on;
 plot(x,coil_position_mat(3,ind_start:ind_start + test_length-1), 'r');
 
-
-figure(2);
-x = 1:test_length;
-title('Tip Positions');
-ind_start = 1; %142; % 171;500;
-subplot(3,1,1);
-x = [1:test_length];
-plot(x,p_tip_mat(1, 1:test_length), 'k');
-hold on;
-x = [1:test_length] ;
-plot(x,tip_position_mat(1,ind_start:ind_start + test_length-1), 'r');
-subplot(3,1,2);
-plot(x,p_tip_mat(2, 1:test_length), 'k');
-hold on;
-plot(x,tip_position_mat(2,ind_start:ind_start + test_length-1), 'r');
-subplot(3,1,3);
-plot(x,p_tip_mat(3, 1:test_length), 'k');
-hold on;
-plot(x,tip_position_mat(3,ind_start:ind_start + test_length-1), 'r');
+% show tip position trajectory
+% figure(2);
+% x = 1:test_length;
+% title('Tip Positions');
+% ind_start = 1; %142; % 171;500;
+% subplot(3,1,1);
+% x = [1:test_length];
+% plot(x,p_tip_mat(1, 1:test_length), 'k');
+% hold on;
+% x = [1:test_length] ;
+% plot(x,tip_position_mat(1,ind_start:ind_start + test_length-1), 'r');
+% subplot(3,1,2);
+% plot(x,p_tip_mat(2, 1:test_length), 'k');
+% hold on;
+% plot(x,tip_position_mat(2,ind_start:ind_start + test_length-1), 'r');
+% subplot(3,1,3);
+% plot(x,p_tip_mat(3, 1:test_length), 'k');
+% hold on;
+% plot(x,tip_position_mat(3,ind_start:ind_start + test_length-1), 'r');
 
 % figure(2);
 % pt_r = p_mat(:,1);
@@ -167,22 +171,22 @@ plot(x,tip_position_mat(3,ind_start:ind_start + test_length-1), 'r');
 % mass_ =[5.3516e-5];% [5.7736e-5];
 
 
-% load('optimized_parameter.mat');
-% damping = nlgr_model.Parameters(1).Value;
-% 
-% radius_ = [1.5875;0.9906];
-% E_ = nlgr_model.Parameters(4).Value;
-% Coil_align = nlgr_model.Parameters(5).Value; %[-0.0871, -0.3934]
-% Coil_turnarea = nlgr_model.Parameters(6).Value;%[1.3851;1.44;1.60];% [1.44;1.3851;1.60];
-% mass_ =nlgr_model.Parameters(7).Value;% [5.7736e-5];
+load('optimized_parameter_40ms.mat');
+damping = nlgr_model.Parameters(1).Value;
 
-damping = [10;20;0.1;0.051]; 
 radius_ = [1.5875;0.9906];
-E_ = [5.9232;1.9114]; %[4.9105; 1.6545] 
-Coil_align = [-0.0653;-3.0378]; %[-0.0871, -0.3934]
-Coil_turnarea =[1.4;1.9005;1.2914];% [1.44;1.3851;1.60];
-mass_ =[5.3516e-5];% [5.7736e-5];
+E_ = nlgr_model.Parameters(4).Value;
+Coil_align = nlgr_model.Parameters(5).Value; %[-0.0871, -0.3934]
+Coil_turnarea = nlgr_model.Parameters(6).Value;%[1.3851;1.44;1.60];% [1.44;1.3851;1.60];
+mass_ =nlgr_model.Parameters(7).Value;% [5.7736e-5];
 
+% damping = [10;20;0.1;0.051]; 
+% radius_ = [1.5875;0.9906];
+% E_ = [5.9232;1.9114]; %[4.9105; 1.6545] 
+% Coil_align = [-0.0653;-3.0378]; %[-0.0871, -0.3934]
+% Coil_turnarea =[1.4;1.9005;1.2914];% [1.44;1.3851;1.60];
+% mass_ =[5.3516e-5];% [5.7736e-5];
+% 
 
 Parameters = {damping; Ts;radius_;E_;Coil_align;Coil_turnarea;mass_};
 
@@ -201,11 +205,14 @@ nlgr.Parameters(5).Fixed = false;
 nlgr.Parameters(6).Fixed = false;
 nlgr.Parameters(7).Fixed = false;
 
-opt = nlgreyestOptions;
-% opt.Display = 'on';
-% opt.SearchOptions.MaxIterations = 2;
-% opt.Advanced.ErrorThreshold=0.0001;
+opt = nlgreyestOptions; 
+opt.Display = 'on';
+opt.SearchOptions.MaxIterations = 30;
+% opt.Advanced.ErrorThreshold= 10;
 % opt.GradientOptions.Type = 'Basic';
+opt.SearchOptions.FunctionTolerance = 0.1;
+opt.SearchMethod = 'lsqnonlin';
+nlgr.TimeUnit = 's';
 opt.GradientOptions.DifferencingScheme =   'Backward approximation'; 
 
 ind_y = 1; %142; %171;

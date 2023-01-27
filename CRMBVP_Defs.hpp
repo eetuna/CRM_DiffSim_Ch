@@ -7,7 +7,7 @@
 
 template <typename adType>
 void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params, 
-							const double in_u0_initialguess[NUM_FLEX_SEG][3], const double in_ftip_initialguess[3],
+							const double in_u0_initialguess[NUM_FLEX_SEG][3],
 							adType out_u0[NUM_FLEX_SEG][3], adType out_ftip[3], int& out_localmin) {
 
 	ContactModeType ContactMode = in_Params.ContactMode;
@@ -48,7 +48,7 @@ void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params,
 	// Scale parameters and call the nonlinear equation solver
 	const double uscaleinv = 1.0 / IVALUE_SCALE_U;
 
-    const double fscaleinv = 1.0 / IVALUE_SCALE_F;
+//    const double fscaleinv = 1.0 / IVALUE_SCALE_F;
 	auto* initialguessscaled = new double [NLEq_Dim];
 	auto* returnedparamscaled = new adType [NLEq_Dim];
 
@@ -63,7 +63,7 @@ void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params,
 		}
 	}
 
-    int localmin = 0, errorcode = 0;
+    int localmin = 0;// errorcode = 0;
 
 	auto* x = new adType[NLEq_Dim]; // we will create a new variable here and not use initial guess scaled since truss-region-dogleg algorithm uses the same variable for both input and output
 
@@ -84,19 +84,7 @@ void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params,
 	delete[] x;
 	delete[] wa;
 
-
-	/*
-	// AUTODIFF TEST CODE
-	using Eigen::MatrixXd;
-	VectorXadType u(NLEq_Dim), y(NLEq_Dim);
-	for (int i=0;i<NLEq_Dim;i++) u(i)=x[i];
-	MatrixXd J = jacobian(NLEquationAD, wrt(u), at(u, NLEParams), y);
-	std::cout << "y = \n" << y << std::endl;    // print the evaluated output vector F
-	std::cout << "J = \n" << J << std::endl;    // print the evaluated Jacobian matrix dF/dx
-	*/
-
-	if (ContactMode == ContactModeType::FREE_TIP) {
-        for (int i = 0; i < NUM_FLEX_SEG; ++i) {
+     for (int i = 0; i < NUM_FLEX_SEG; ++i) {
             for (int j = 0; j < 3; ++j) {
                 out_u0[i][j] = IVALUE_SCALE_U * returnedparamscaled[j+3*i];
             }
@@ -104,8 +92,6 @@ void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params,
 		for (int i = 0; i < 3; i++) {
             out_ftip[i] = in_Params.TipForce[i];  // if it is free-tip, return the tip force specified within in_Params
 		}
-	}
-
 
 	out_localmin = localmin;
 	delete[] initialguessscaled;

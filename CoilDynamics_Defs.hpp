@@ -677,6 +677,7 @@ void DynamicsBVP(	CRMShootingMethodParams<adType> in_Params, double in_u0_initia
     double tol = 0.00001;
     adType* wa = new adType [lwa];
     for (int i = 0; i < NLEq_Dim; i++) x[i] = initialguessscaled[i];
+
 #if defined( TRUSTREGION )
     TrustRegionDogleg_dyn(NLEq_Dim, x, residual, tol, info, wa, lwa, DYNNLEParams, u0_calc);
 #else // undefined
