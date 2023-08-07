@@ -1,6 +1,6 @@
 #pragma once
-#include "mexAdapter.hpp"
-#include "mex.hpp"
+#include "/usr/local/MATLAB/R2022b/extern/include/mexAdapter.hpp"
+#include "/usr/local/MATLAB/R2022b/extern/include/mex.hpp"
 
 #include <cmath>
 #include "CRMDYN.hpp"
@@ -16,87 +16,57 @@ using namespace matlab::data;	 // added
 //#define MIN(a, b) (((a) < (b)) ? (a) : (b))
 //#define POW4(a) ((a) * (a) * (a) * (a))
 
-#define Nx (NUM_ACT_SET*15 + NUM_FLEX_SEG*3 + NUM_ACT_SET*9)
+#define Nx (3*6+9 + NUM_STATES)
 
+#define Ncoilstate (NUM_ACT_SET * (6+6+3+9))
 /* State equations. */
 void compute_dx(double *dx, double t, double *x, double *u, double **p)
 {
-
     /** Retrieve x. **/
-    double v_L_pre[NUM_ACT_SET][3], w_L_pre[NUM_ACT_SET][3],  u0_initialguess[NUM_FLEX_SEG][3], nL_initialguess[NUM_ACT_SET][3], mL_initialguess[NUM_ACT_SET][3], pL_pre[NUM_ACT_SET][3], RL_pre[NUM_ACT_SET][9];
+    double v_L_pre[NUM_ACT_SET][3], w_L_pre[NUM_ACT_SET][3], nL_initialguess[NUM_ACT_SET][3], mL_initialguess[NUM_ACT_SET][3], pL_pre[NUM_ACT_SET][3], RL_pre[NUM_ACT_SET][9], xf_pre[NUM_STATES];
     // Define initial guesses to be used when solving boundary value problem
-    for (int i = 0; i < NUM_ACT_SET; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            v_L_pre[i][j] = x[j+i*3];
+    for (int j = 0; j < NUM_ACT_SET; ++j) {
+        for (int i = 0; i < 3; ++i) {
+            v_L_pre[j][i] = x[i + j*3];
+            w_L_pre[j][i] = x[NUM_ACT_SET*3 + i + j*3];
+            mL_initialguess[j][i] = x[NUM_ACT_SET*6 + i + j*3];
+            nL_initialguess[j][i] = x[NUM_ACT_SET*9 + i + j*3];
+            pL_pre[j][i] = x[NUM_ACT_SET* 12 + i + j*3];
         }
+        for (int i = 0; i < 9; ++i) {
+            RL_pre[j][i] = x[NUM_ACT_SET *15 +i + j*9];
+        }
+
     }
 
-    for (int i = 0; i < NUM_ACT_SET; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            w_L_pre[i][j] = x[NUM_ACT_SET * 3 + j+i*3];
-        }
+    for (int i = 0; i < NUM_STATES; ++i) {
+        xf_pre[i] = x[i+Ncoilstate];
     }
-
-    for (int i = 0; i < NUM_FLEX_SEG; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            u0_initialguess[i][j] = x[NUM_ACT_SET*6 + j + 3*i];
-
-        }
-    }
-
-
-    for (int i = 0; i < NUM_ACT_SET; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            mL_initialguess[i][j] = x[NUM_ACT_SET*6 + NUM_FLEX_SEG*3 + j+ 3*i];
-        }
-    }
-
-    for (int i = 0; i < NUM_ACT_SET; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            nL_initialguess[i][j] = x[NUM_ACT_SET*9 + NUM_FLEX_SEG*3 + j+ 3*i];
-        }
-    }
-    for (int i = 0; i < NUM_ACT_SET; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            pL_pre[i][j] = x[NUM_ACT_SET*12 + NUM_FLEX_SEG*3 + j+i*3];
-        }
-    }
-
-//    int ind_r = NUM_ACT_SET*15 + 3;
-    for (int i = 0; i < NUM_ACT_SET; ++i) {
-        for (int j = 0; j < 9; ++j) {
-            RL_pre[i][j] = x[NUM_ACT_SET*15 + NUM_FLEX_SEG*3 + j+i*9];
-        }
-    }
-
-//    std::cout <<" v_L_pre : " << v_L_pre[0] << " " << v_L_pre[1] << " " << v_L_pre[2] << std::endl;
-//    std::cout <<" w_L_pre: " << w_L_pre[0] << " " << w_L_pre[1] << " " << w_L_pre[2] << std::endl;
-//
-////    std::cout << "u0_initialguess: " << u0_initialguess[0] << " " << u0_initialguess[1] << " " << u0_initialguess[2] <<  std::endl;
-//    std::cout << "pL_pre: " << pL_pre[0] << " " << pL_pre[1] << " " << pL_pre[2] <<  std::endl;
-//
-//
     /** Retrieve u. **/
     double ActuationCurrents[NUM_ACT_SET][3];
     for (int i = 0; i < NUM_ACT_SET; i++)	for (int j = 0; j < 3; j++)	ActuationCurrents[i][j] = u[i * 3 + j];
 //    std::cout << "ActuationCurrents: " << ActuationCurrents[0][0] << " " << ActuationCurrents[0][1] << " " << ActuationCurrents[0][2] <<  std::endl;
 
+    double InsertedLength = u[NUM_ACT_SET*3];
     /** Retrieve model parameters. **/
     double damping_[NUM_ACT_SET][6];
 
     for (int i = 0; i < NUM_ACT_SET; ++i) {
-        damping_[i][0] = damping_[i][1] = p[0][0 +i*4];
-        damping_[i][2] = p[0][1+i*4];
-        damping_[i][3] = damping_[i][4] = p[0][2+i*4];
-        damping_[i][5] = p[0][3+i*4];
+        damping_[i][0] = damping_[i][1] = p[0][0 + i*4];
+        damping_[i][2] = p[0][1 + i*4];
+        damping_[i][3] = damping_[i][4] = p[0][2 + i*4];
+        damping_[i][5] = p[0][3 + i*4];
     }
+
+//    std::cout <<"damping_ v : " << damping_[0] << " " << damping_[1] << " " << damping_[2] << std::endl;
+//    std::cout <<"damping_ w: " << damping_[3] << " " << damping_[4] << " " << damping_[5] << std::endl;
 
 
     double Delta_T = p[1][0];
 
     // Declare the output variables for BVP
     // calculated curvature at the catheter base
-    double u0_calc[NUM_FLEX_SEG][3];
+    double u0_calc[3];
     double nL_calc[NUM_ACT_SET][3];
     double mL_calc[NUM_ACT_SET][3];
     // calculated contstraint force at the catheter tip (this will be used when ContactMode == ContactModeType::FIXED_TIP)
@@ -104,6 +74,8 @@ void compute_dx(double *dx, double t, double *x, double *u, double **p)
     // numerical nonlinear equation solver diagnostic outputs
     int localmin;
 
+//    std::cout <<" damping_: " << damping_[0] << " " << damping_[1] << " " << damping_[2] << " " << damping_[3] << " " << damping_[4] << " " << damping_[5] << std::endl;
+//    std::cout <<" Delta_T: " << Delta_T << std::endl;
 
     double oRlist[NUM_FLEX_SEG] = { p[2][0], p[2][0]}; //{ 1.5875, 1.5875 };
     // Inner radii of each of the flexible segments - unit: mm
@@ -213,6 +185,9 @@ void compute_dx(double *dx, double t, double *x, double *u, double **p)
     // catheter shape state at the entry point of the catheter
     //   states are packed u[0..2], R[0..8], p[0..2](R: 3x3 matrix stored in row major order R11 R12 R13 R21 R22 R23 R31 R32 R33)
     double xf[NUM_STATES];
+    for (int i = 0; i < NUM_STATES; ++i) {
+        xf[i] = 0.0;
+    }
     // moment residual at the catheter tip - this should converge to {0,0,0} if the catheter is at its equilibrium configuration
 //    std::cout << "ActuationCurrents: " << ActuationCurrents[0][0] << " " << ActuationCurrents[0][1] << " " << ActuationCurrents[0][2] <<  std::endl;
 //
@@ -223,72 +198,43 @@ void compute_dx(double *dx, double t, double *x, double *u, double **p)
 //    std::cout <<  RL_pre[3] << " " << RL_pre[4] << " " << RL_pre[5] <<  std::endl;
 //    std::cout <<  RL_pre[6] << " " << RL_pre[7] << " " << RL_pre[8] <<  std::endl;
 
-    double InsertedLength =  0.0;//98.5; // u[NUM_CONTROL -1 ];
-    for (int i = 0; i < NUM_SEGMENTS; ++i) {
-        InsertedLength += SegmentLengths[i]; // we are not controlling this now
-    }
+//    double InsertedLength =  0.0;//98.5; // u[NUM_CONTROL -1 ];
+//    for (int i = 0; i < NUM_SEGMENTS; ++i) {
+//        InsertedLength += SegmentLengths[i]; // we are not controlling this now
+//    }
+//
 
-
-//        ActuationCurrents[0][2] = 0.2;
     CRMConstructShootingMethodParamSet<double>(CathParams, CathConfig, InsertedLength, ActuationCurrents, ContactMode,
                                                TipConstraintPoint, TipForce, IntegrationStepSize,
                                                v_L_pre, w_L_pre, pL_pre,  RL_pre, damping_, Delta_T,
                                                BVPParams);
 
 
-    DynamicsBVP(BVPParams, u0_initialguess, mL_initialguess, nL_initialguess, ftip_initialguess,
+    DynamicsBVP(BVPParams, xf_pre, mL_initialguess, nL_initialguess, ftip_initialguess,
                 u0_calc, mL_calc, nL_calc, ftip_calc, localmin);
 
-    double out_ReportedMarkerPos[NUM_LOCALIZATION_MARKERS][3], x_coil[NUM_COIL_STATES];
+    double out_ReportedMarkerPos[NUM_LOCALIZATION_MARKERS][3], x_coil[NUM_ACT_SET][NUM_COIL_STATES];
 
     DYNSolverIVP(BVPParams, u0_calc, mL_calc, nL_calc, ftip_calc,
                  true, xf, x_coil,out_ReportedMarkerPos);
 
     /** Output report **/
-//    for (int i = 0; i < NUM_DYN_STATE; ++i) {
-//        if(i < 6){   dx[i] = x_coil[i]; } //v, w
-//        else if (i < 9) dx[i] = u0_calc[i - 6];
-//        else if (i < 12) dx[i] = mL_calc[0][i - 9];
-//        else if (i < 15) dx[i] = nL_calc[0][i - 12];
-//        else if (i < 18) dx[i] = x_coil[i - 9]; //p
-//        else dx[i] = x_coil[i - 9];//R
-//    }
-
-    for (int i = 0; i < 6; ++i) {
-        dx[i] = x_coil[i];
-    }
-    for (int i = 0; i < NUM_FLEX_SEG; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            dx[6 + j + 3*i] = u0_calc[i][j];
+    for (int j = 0; j < NUM_ACT_SET; ++j) {
+        for (int i = 0; i < 3; ++i) {
+            dx[i + j*3] = x_coil[j][i]; //vL
+            dx[NUM_ACT_SET*3 + i + j*3]= x_coil[j][i+3]; //wL
+            dx[NUM_ACT_SET*6 + i + j*3] = mL_calc[j][i]; //mL
+            dx[NUM_ACT_SET*9 + i + j*3] = nL_calc[j][i]; //nL
+            dx[NUM_ACT_SET* 12 + i + j*3] = x_coil[j][i+6];
+        }
+        for (int i = 0; i < 9; ++i) {
+            dx[NUM_ACT_SET *15 +i + j*9] = x_coil[j][i+9];
         }
     }
-    for (int i = 0; i < 3; ++i) {
-        dx[6 + NUM_FLEX_SEG*3 +i ]= mL_calc[0][i];
-    }
-    for (int i = 0; i < 3; ++i) {
-        dx[6 + NUM_FLEX_SEG*3 + 3 + i ]= nL_calc[0][i];
-    }
-    for (int i = 0; i < 3; ++i) {
-        dx[6 + NUM_FLEX_SEG*3 + 6 + i ]= x_coil[i+6];
-    }
-    for (int i = 0; i < 9; ++i) {
-        dx[6 + NUM_FLEX_SEG*3 + 9 + i ]= x_coil[i+9];
-    }
 
-
-
-//    std::cout << "-------------------------------" << std::endl;
-//        std::cout << "ActuationCurrents: " << ActuationCurrents[0][0] << " " << ActuationCurrents[0][1] << " " << ActuationCurrents[0][2] <<  std::endl;
-//
-//    std::cout <<" v : " << x_coil[0] << " " << x_coil[1] << " " << x_coil[2] << std::endl;
-//    std::cout <<" w: " << x_coil[3] << " " << x_coil[4] << " " << x_coil[5] << std::endl;
-//
-//        std::cout << "pL_pre: " << x_coil[6] << " " << x_coil[7] << " " << x_coil[8] <<  std::endl;
-//        std::cout << "RL: " << std::endl;
-//        std::cout <<  x_coil[9] << " " <<x_coil[10] << " " << x_coil[11] <<  std::endl;
-//        std::cout <<  x_coil[12] << " " << x_coil[13] << " " << x_coil[14] <<  std::endl;
-//        std::cout <<  x_coil[15] << " " << x_coil[16] << " " << x_coil[17] <<  std::endl;
-
+    for (int i = 0; i < NUM_STATES; ++i) {
+        dx[i+Ncoilstate] = xf[i]; //tip position
+    }
 
 }
 
@@ -305,90 +251,77 @@ public:
         //    most distal segment can be flexible or rigid
         // Items are listed in distal-to-proximal order (starting from the tip of the catheter towards the base)
         // Outer radii of each of the flexible segments - unit: mm
-        /** Retrieve everything from inputs **/
-        /** Retrieve x. **/
-        double v_L_pre[NUM_ACT_SET][3], w_L_pre[NUM_ACT_SET][3],  u0_initialguess[NUM_FLEX_SEG][3], nL_initialguess[NUM_ACT_SET][3], mL_initialguess[NUM_ACT_SET][3], pL_pre[NUM_ACT_SET][3], RL_pre[NUM_ACT_SET][9];
+        double v_L_pre[3], w_L_pre[3],  nL_initialguess[3], mL_initialguess[3], pL_pre[3], RL_pre[9];
         // Define initial guesses to be used when solving boundary value problem
+        for (int i = 0; i < 3; ++i) {
+            v_L_pre[i] = inputs[0][i];
+            w_L_pre[i] = inputs[1][i];
+            mL_initialguess[i] = inputs[2][i];
+            nL_initialguess[i] = inputs[3][i];
+            pL_pre[i] = inputs[4][i];
+        }
+        for (int i = 0; i < 9; ++i) {
+            RL_pre[i] = inputs[5][i];
+        }
+
+        double xf_pre[NUM_STATES];
+        for (int i = 0; i < NUM_STATES; ++i) {
+            xf_pre[i] = inputs[6][i];
+        }
 
         double x[Nx];
-        for (int i = 0; i < NUM_ACT_SET; ++i) {
-            for (int j = 0; j < 3; ++j) {
-                x[j + 3*i] = inputs[0][j+i*3];
-            }
-        }
-        for (int i = 0; i < NUM_ACT_SET; ++i) {
-            for (int j = 0; j < 3; ++j) {
-                x[ NUM_ACT_SET * 3 + j + 3*i] = inputs[1][j+i*3];
-            }
-        }
 
-        for (int i = 0; i < NUM_FLEX_SEG; ++i) {
-            for (int j = 0; j < 3; ++j) {
-                x[ NUM_ACT_SET * 6 + j + 3*i] = inputs[2][j+3*i];
-            }
+        for (int i = 0; i < 3; ++i) {
+         x[i] = v_L_pre[i];
         }
-
-        for (int i = 0; i < NUM_ACT_SET; ++i) {
-            for (int j = 0; j < 3; ++j) {
-                x[ NUM_ACT_SET * 6 + NUM_FLEX_SEG * 3 + j + 3*i] = inputs[3][j+3*i];
-            }
+        for (int i = 0; i < 3; ++i) {
+            x[i+3] = w_L_pre[i];
         }
-
-        for (int i = 0; i < NUM_ACT_SET; ++i) {
-            for (int j = 0; j < 3; ++j) {
-                x[ NUM_ACT_SET * 9 + NUM_FLEX_SEG * 3 + j + 3*i]  = inputs[4][j+3*i];
-            }
+        for (int i = 0; i < 3; ++i) {
+            x[i+6] = mL_initialguess[i];
         }
-
-        for (int i = 0; i < NUM_ACT_SET; ++i) {
-            for (int j = 0; j < 3; ++j) {
-                x[ NUM_ACT_SET * 12 + NUM_FLEX_SEG * 3 + j + 3*i]  = inputs[5][j+i*3];
-            }
+        for (int i = 0; i < 3; ++i) {
+            x[i+9] = nL_initialguess[i];
         }
-
-        for (int i = 0; i < NUM_ACT_SET; ++i) {
-            for (int j = 0; j < 9; ++j) {
-                x[ NUM_ACT_SET * 15 + NUM_FLEX_SEG * 3 + j + 9*i]  = inputs[6][j+i*9];
-            }
+        for (int i = 0; i < 3; ++i) {
+            x[i+12] = pL_pre[i];
         }
-
-        double u[NUM_ACT_SET*3];
-        for (int i = 0; i < NUM_ACT_SET; ++i) {
-            for (int j = 0; j < 3; ++j) {
-                u[j + i*3] = inputs[7][i * 3 + j];
-            }
+        for (int i = 0; i < 9; ++i) {
+            x[i+15] = RL_pre[i];
+        }
+        for (int i = 0; i < NUM_STATES; ++i) {
+            x[i+15+9] = xf_pre[i];
         }
 
 
-        double    p_damping[NUM_ACT_SET*4];
-        for (int i = 0; i < NUM_ACT_SET; ++i) {
-            for (int j = 0; j < 4; ++j) {
-                p_damping[j +i*4] = inputs[8][j+i*4];
-            }
-        }
+
+        double    p_damping[4] = {inputs[8][0], inputs[8][1], inputs[8][2], inputs[8][3]};
         double    p_Ts[1] = {inputs[9][0]};
         double    p_raduis[2] = {inputs[10][0], inputs[10][1]};
         double    p_E[2] = {inputs[11][0], inputs[11][1]};
         double p_CoilAlignmentAngles[2] = {inputs[12][0], inputs[12][1]};
         double p_CoilTurnAreaMat[3] = {inputs[13][0], inputs[13][1], inputs[13][2]};
         double p_mass[1] = {inputs[14][0]};
+
         double *p[7] = {p_damping, p_Ts, p_raduis, p_E, p_CoilAlignmentAngles, p_CoilTurnAreaMat, p_mass};
 
+        double u[4] = {inputs[7][0], inputs[7][1],inputs[7][2], inputs[7][3]};
 
         double dx[Nx];
         double t = 0.05;
 
         compute_dx(dx, t, x, u, p);
 
-//        compute_dx(dx)
+
         /** Output report **/
         outputs[0] = factory.createArray<double>({1, 3}, {dx[0], dx[1], dx[2]});
         outputs[1] = factory.createArray<double>({1, 3}, {dx[3], dx[4], dx[5]});
-        outputs[2] = factory.createArray<double>({1, NUM_FLEX_SEG*3}, {dx[6], dx[7], dx[8], dx[9], dx[10], dx[11]});
-        outputs[3] = factory.createArray<double>({1, 3}, {dx[12], dx[13], dx[14]});
-        outputs[4] = factory.createArray<double>({1, 3}, {dx[15], dx[16], dx[17]});
-        outputs[5] = factory.createArray<double>({1, 3}, {dx[18], dx[19], dx[20]});
-        outputs[6] = factory.createArray<double>({1, 9}, {dx[21], dx[22], dx[23], dx[24], dx[25], dx[26], dx[27], dx[28], dx[29]});
+        outputs[2] = factory.createArray<double>({1, 3}, {dx[6], dx[7], dx[8]}); //mL
+        outputs[3] = factory.createArray<double>({1, 3}, {dx[9], dx[10], dx[11]}); //nL
+        outputs[4] = factory.createArray<double>({1, 3}, {dx[12], dx[13], dx[14]}); // pL
+        outputs[5] = factory.createArray<double>({1, 9}, {dx[15], dx[16], dx[17],dx[18], dx[19],dx[20],dx[21],dx[22],dx[23] }); //RL
+        outputs[6] = factory.createArray<double>({1, NUM_STATES}, {dx[24],dx[25],dx[26] , dx[27], dx[28],dx[29],dx[30],dx[31],dx[32],
+                                                          dx[33],dx[34],dx[35],dx[36],dx[37],dx[38]}); //number of flexible segments
     }
 
 };

@@ -1,7 +1,7 @@
 #pragma once
 #include "CRMBVP_Defs.hpp"
 #include "CRMIVP_Defs.hpp"
-#include "Numerical_methods/minpack_DYN.hpp"
+#include "Numerical/minpack_DYN.hpp"
 
 #define t_step 0.0005
 
@@ -23,7 +23,7 @@ void CoilIntegrad(adType in_twist[6], adType in_n[3], adType g[3], adType R[9], 
                   adType in_B0[3], adType in_muhat[9], adType in_mL[3], adType twistdot[6]){
 
     adType v[3], w[3], n_L[3], m_L[3], B0[3], muhat[9], Tb[3], tau[3];
-    adType RTg[3], RscTB0[3], w_v[3], w_hat[9], inertiaw[3], w_inertia_w[3], diff_tau_w[3];
+    adType RscTB0[3], RTg[3], w_v[3], w_hat[9], inertiaw[3], w_inertia_w[3], diff_tau_w[3];
     adType vdot[3], wdot[3];
 
      mMult_ATB<3,3,1>(R, g, RTg);
@@ -41,7 +41,6 @@ void CoilIntegrad(adType in_twist[6], adType in_n[3], adType g[3], adType R[9], 
      for (int i = 0; i < 9; ++i) {
          muhat[i] = in_muhat[i];
      }
-
      wHat(w,w_hat);
      mMult_AB<3,3,1>(w_hat, v, w_v);
 
@@ -68,6 +67,7 @@ void CoilIntegrad(adType in_twist[6], adType in_n[3], adType g[3], adType R[9], 
      mMult_AB<3,3,1>(muhat,RscTB0,Tb);
      mSub_AB<3, 1>(Tb, m_L, tau);
 
+
      mSub_AB<3,1>(tau, w_inertia_w, diff_tau_w);
      mSub_AB<3,1>(diff_tau_w, damping_wec, residual_w);
 
@@ -81,7 +81,7 @@ void CoilIntegrad(adType in_twist[6], adType in_n[3], adType g[3], adType R[9], 
          twistdot[i+3] = wdot[i];
      }
 
-}
+ }
 
 
 /**
@@ -102,7 +102,8 @@ void CoilIntegrad(adType in_twist[6], adType in_n[3], adType g[3], adType R[9], 
  */
 template <typename adType>
 void CoilDynamics( adType in_coil_state[NUM_COIL_STATES], adType in_n[3], adType g[3],
-                  adType actMass, adType actInertia[9], adType damping[6], double DELTA_T, adType in_B0[3], adType in_muhat[9], adType in_mL[3], adType out_coil_state[NUM_COIL_STATES]){
+                  adType actMass, adType actInertia[9], adType damping[6], double DELTA_T, adType in_B0[3], adType in_muhat[9],
+                  adType in_mL[3], adType out_coil_state[NUM_COIL_STATES], adType out_xdot_n[6]){
 
 //    for (int i = 0; i < 3; ++i) {
 //        std::cout << "in_n: " << in_n[i] << std::endl;
@@ -127,10 +128,10 @@ void CoilDynamics( adType in_coil_state[NUM_COIL_STATES], adType in_n[3], adType
         B0[i] = in_B0[i];
         mL[i] = in_mL[i];
     }
+
     for (int i = 0; i < 9; ++i) {
         muhat[i] = in_muhat[i];
     }
-
 
     // initialize the iteration items
     for (int i = 0; i < NUM_COIL_STATES; i++) {
@@ -143,13 +144,13 @@ void CoilDynamics( adType in_coil_state[NUM_COIL_STATES], adType in_n[3], adType
     for (int idx=0; idx<N; idx++) {
 
         if (idx<3) {  // RK2 initialization steps
-            RK2_coildyn(x_n, nL, g,  actMass, actInertia, damping, B0, muhat, mL,x_np1, xdot_n );
+            RK2_coildyn(x_n, nL, g,  actMass, actInertia, damping, B0, muhat, mL, x_np1, xdot_n );
         }
         else { 		 // ABM4 steps
             ABM4_coildyn(	x_n, xdot_nm1, xdot_nm2, xdot_nm3, x_nm1, x_nm2, x_nm3,
-                             nL, g,  actMass, actInertia, damping, B0, muhat, mL,x_np1, xdot_n);
+                             nL, g,  actMass, actInertia, damping,  B0, muhat, mL,x_np1, xdot_n);
             if ( isnan(x_n[0]) ) {
-                std::cout << "FLY ME TO THE MOON!! " << std::endl;
+                std::cout << "Coil integration Unbounded!! " << std::endl;
 //                exit( 3 );
             }
         }
@@ -173,6 +174,9 @@ void CoilDynamics( adType in_coil_state[NUM_COIL_STATES], adType in_n[3], adType
     for (int i=0; i<NUM_COIL_STATES; i++) {
         out_coil_state[i]=x_n[i];
     }
+    for (int i = 0; i < 6; ++i) {
+        out_xdot_n[i] = xdot_n[i];
+    }
 
 }
 
@@ -184,7 +188,7 @@ void RK2_coildyn(adType in_x_n[NUM_COIL_STATES], adType in_n[3], adType g[3],  a
                  adType out_x_np1[NUM_COIL_STATES], adType out_xdot_n[6] ) {
 
 
-    adType nL[3], B0[3], muhat[9], mL[3], twist_n[6];       // from input
+    adType nL[3], B0[3], muhat[9], mL[3],  twist_n[6];       // from input
     adType k1[6];
     adType k2oh[6];
     adType x_n_p_k1o2[6];
@@ -208,7 +212,7 @@ void RK2_coildyn(adType in_x_n[NUM_COIL_STATES], adType in_n[3], adType g[3],  a
 //    std::cout << "input w_n: " << twist_n[3] << " " << twist_n[4] << " " << twist_n[5] <<  std::endl;
 
     //RK2_STEP_STEP1:
-    CoilIntegrad(twist_n, nL, g, R_n, actMass, actInertia, damping, B0, muhat, mL, xdot_n);
+    CoilIntegrad(twist_n, nL, g, R_n, actMass, actInertia, damping,B0, muhat, mL, xdot_n);
     for (int i=0; i< 6 ; i++) {
         k1[i] 			= t_step * xdot_n[i];
         x_n_p_k1o2[i] 	= twist_n[i] + k1[i] * 0.5;
@@ -223,7 +227,7 @@ void RK2_coildyn(adType in_x_n[NUM_COIL_STATES], adType in_n[3], adType g[3],  a
 #endif
 
     //RK2_STEP_STEP2:
-    CoilIntegrad(x_n_p_k1o2, nL, g, R_np1half, actMass, actInertia, damping,B0, muhat, mL, k2oh);
+    CoilIntegrad(x_n_p_k1o2, nL, g, R_np1half, actMass, actInertia, damping,B0, muhat, mL,  k2oh);
 
     for (int i = 0; i < 6; i++) {
         out_x_np1[i] = twist_n[i] + t_step * k2oh[i];
@@ -260,7 +264,7 @@ void ABM4_coildyn(	adType in_x_n[NUM_COIL_STATES],adType in_xdot_nm1[6], adType 
     adType twist_nm1[6];       				// from input
     adType twist_nm2[6];       				// from input
     adType twist_nm3[6];       				// from input
-    adType twist_n[6], R_n[9], p_n[3], nL[3], tau[3];				// variables used in analytical calculation
+    adType twist_n[6], R_n[9], p_n[3], nL[3];				// variables used in analytical calculation
     adType x_np1_hat[6];    			// intermediate twist
     adType xdot_np1_hat[6];	// intermediate
     adType xdot_n[6];  		// for output
@@ -298,7 +302,7 @@ void ABM4_coildyn(	adType in_x_n[NUM_COIL_STATES],adType in_xdot_nm1[6], adType 
     adType R_np1_hat[9], p_np1_hat[3];
 
     //ABM4_STEP_STEP1:
-    CoilIntegrad(twist_n, nL, g, R_n, actMass, actInertia, damping,B0, muhat, mL,xdot_n);
+    CoilIntegrad(twist_n, nL, g, R_n, actMass, actInertia, damping,B0, muhat, mL, xdot_n);
 
     for (int i=0; i<6; i++) {
         x_np1_hat[i]    = twist_n[i] + t_step * ( P_COEFF_N * xdot_n[i] + P_COEFF_Nm1 * xdot_nm1[i] + P_COEFF_Nm2 * xdot_nm2[i] + P_COEFF_Nm3 * xdot_nm3[i] );
@@ -313,7 +317,7 @@ void ABM4_coildyn(	adType in_x_n[NUM_COIL_STATES],adType in_xdot_nm1[6], adType 
 //    for (int i = 0; i < 9; ++i) x_np1_hat[i+9] = R_np1_hat[i];
 #endif
     //ABM4_STEP_STEP2:
-    CoilIntegrad(x_np1_hat, nL, g, R_np1_hat, actMass, actInertia, damping,B0, muhat, mL,xdot_np1_hat);
+    CoilIntegrad(x_np1_hat, nL, g, R_np1_hat, actMass, actInertia, damping,B0, muhat, mL, xdot_np1_hat);
 
     for (int i=0; i<6; i++) {
         out_x_np1[i]    = twist_n[i] + t_step * ( C_COEFF_Np1 * xdot_np1_hat[i] + C_COEFF_N * xdot_n[i] + C_COEFF_Nm1 * xdot_nm1[i] + C_COEFF_Nm2 * xdot_nm2[i] );
@@ -406,215 +410,384 @@ void SE3_TimeSpace(adType in_R_n[9], adType in_p_n[3], adType h, adType in_twist
 #undef EPS
 
 template <typename adType>
-void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, adType out_u0[NUM_FLEX_SEG*3]) {
-
-    double p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3];
+void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, adType out_u0[3]) {
 
     // output for time advance, not used in BVP, just placeholders
-    adType m_L[NUM_ACT_SET][3], n_L[NUM_ACT_SET][3], ftip[3];
+    adType m_L[NUM_ACT_SET][3], n_L[NUM_ACT_SET][3], n_0[3];
     // don't forget to scale parameters before passing to the CRMSolverIVP
-    if (Params.ContactMode == ContactModeType::FREE_TIP) {
-        for (int i = 0; i < NUM_ACT_SET; ++i) {
-            for (int j = 0; j < 3; ++j) {
-                m_L[i][j] = IVALUE_SCALE_M * in_x[j+ 6*i];
-                n_L[i][j] = IVALUE_SCALE_N * in_x[j+3 + 6*i];
-            }
-        }
+    for (int j= 0; j < NUM_ACT_SET; ++j) {
         for (int i = 0; i < 3; i++) {
-            ftip[i] = Params.TipForce[i];  // for free-tip, this parameter is not given by the nonlinear equation solver, and hence, does not need to be scaled
+            m_L[j][i] = IVALUE_SCALE_M * in_x[i + j*6];
+            n_L[j][i] = IVALUE_SCALE_N * in_x[i+ j*6 + 3];
         }
     }
 
-//    std::cout << "m_L dyn: " << m_L[0] << " " << m_L[1] << " " <<m_L[2] << std::endl;
-//    std::cout << "n_L dyn: " << n_L[0] << " " << n_L[1] << " " <<n_L[2] << std::endl;
+    for (int i = 0; i < 3; i++) {
+        n_0[i] = Params.TipForce[i];  // for free-tip, this parameter is not given by the nonlinear equation solver, and hence, does not need to be scaled
+    }
 
-    auto & update_m_L = Params.m_L;
-    auto & update_n_L = Params.n_L;
+//    for (int i = 0; i < NUM_ACT_SET; ++i) {
+//        std::cout << "m_L dyn: " << m_L[i][0] << " " << m_L[i][1] << " " <<m_L[i][2] << std::endl;
+//        std::cout << "n_L dyn: " << n_L[i][0] << " " << n_L[i][1] << " " <<n_L[i][2] << std::endl;
+//    }
 
-    for (int i = 0; i < NUM_ACT_SET; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            update_m_L[i][j] = m_L[i][j];
-            update_n_L[i][j] = n_L[i][j];
+    adType x_coil[NUM_ACT_SET][NUM_COIL_STATES], out_x_coil[NUM_ACT_SET][NUM_COIL_STATES];
+    adType MagMoment[NUM_ACT_SET][3], muhat[NUM_ACT_SET][9], actMass[NUM_ACT_SET], actInertia[NUM_ACT_SET][9];
+
+    double mu[3], muhattemp[9];
+
+    for (int j = 0; j < NUM_ACT_SET; ++j) {
+        for (int i = 0; i < 3; ++i) {
+            x_coil[j][i] = Params.v_L_pre[j][i];
+            x_coil[j][i+3] = Params.w_L_pre[j][i];
+            x_coil[j][i+6] = Params.p_pre[j][i];
+        }
+        for (int i = 0; i < 9; ++i) {
+            x_coil[j][i+9] = Params.R_pre[j][i];
+        }
+
+        actMass[j] = Params.actMass[j];
+        for (int i = 0; i < 9; ++i) {
+            actInertia[j][i] = Params.actInertia[j][i];
+        }
+
+        for (int i = 0; i <3 ; ++i) {
+            MagMoment[j][i] = Params.MagMoment[j][i];
+        }
+        for (int i = 0; i < 3; ++i) {
+            mu[i] =  MagMoment[j][i];
+        }
+        wHat(mu,muhattemp);
+        for (int i = 0; i < 9; ++i) {
+            muhat[j][i] = muhattemp[i];
         }
     }
 
-    adType xf[NUM_STATES], MomentResidual[NUM_RESIDUAL], RL[NUM_ACT_SET][9], pL[NUM_ACT_SET][3], x_coil[NUM_COIL_STATES], out_x_coil[NUM_COIL_STATES];
 
-    double tau[NUM_ACT_SET][3], deltau1[3], K1deltau1[3];// The moment upper flexible segment applied on the rigid segment
-    auto & ustar = Params.ustar;
     auto & K = Params.K;
+    auto & Kinv = Params.Kinv;
+    auto & ustar = Params.ustar;
+    auto & SegBounds = Params.SegBounds;
 
-    int localmin = 0;
-    double u0_calc[NUM_FLEX_SEG][3], out_ftip[3];
-    CRMShootingMethodBVP_DYN(Params, u0_calc, out_ftip, localmin);
-//    std::cout << "u0_calc dyn: " << u0_calc[0] << " " << u0_calc[1] << " " <<u0_calc[2] << std::endl;
+    double net_mL[3], tau[3], K2invResidual[3], u_t[3], du[3];
+//    double n_0[3] = {0,0,0}; //
 
-    //Solve the Initial Value Problem to calculate the shape of the catheter and Get P and R
-    CRMSolverIVP_Core ( Params, u0_calc, ftip,  xf, MomentResidual, pL, RL, p_atLocMarkers);
+    double tau_0[3] = {0.0,0.0,0.0};
+    double p_t[3], R_t[9], u_tau[3], p_[3], R_[9];
+    int fsegi, actno, actseg, actno_mn;
+    double u_L[3], u_f[3], p_f[3], R_f[9];
+    double out_xdot[6], residual[NUM_ACT_SET][6];
 
-    for (int i = 0; i < NUM_FLEX_SEG; ++i) {
+    double p_L[3], R_L[9];
+    double v1[3], v2[3], v3[3], v_val[3];
+
+    // root configurations for residual
+    double p_d[3], R_d[9];
+    for (int i = 0; i < 3; ++i) {
+        p_d[i] = Params.xi[3+9+i];
+    }
+    for (int i = 0; i < 9; ++i) {
+        R_d[i] = Params.xi[3+i];
+    }
+
+
+    for (int segi = NUM_SEGMENTS-1; segi >=0; --segi) { // starting from the last segment
+        if ( segi%2 == 0 ) {
+            fsegi = segi>>1;
+
+            if(segi == NUM_SEGMENTS-1){ //last segment is flexible
+                // assume free tip no torque tau_0 = [0,0,0]
+                mMult_AB<3,3,1>( Kinv[fsegi], tau_0, K2invResidual );
+                mAdd_AB<3,1>( ustar[fsegi], K2invResidual, u_t );
+
+                for (int i = 0; i < 3; ++i) {
+                    p_t[i] = Params.xf[3+9+i];
+                }
+                for (int i = 0; i < 9; ++i) {
+                    R_t[i] = Params.xf[3+i];
+                }
+                CRMFlexible_IVP_Back ( segi, p_t, R_t, Params,u_t , n_0,
+                                       u_tau, p_, R_);
+
+                mSub_AB<3,1>( u_tau, ustar[fsegi], du);
+                mMult_AB<3,3,1>( K[fsegi], du, tau ); // moment at upper side of the coil
+
+                actno = fsegi - 1;
+
+                mSub_AB<3,1>( m_L[actno], tau, net_mL);  // the net torque applied to the downwards coil
+
+            }else{ // the non-free tip flexible segments with coils on top
+
+                actno = fsegi;
+                mMult_AB<3,3,1>( Kinv[fsegi], m_L[actno], K2invResidual );
+                mAdd_AB<3,1>( ustar[fsegi], K2invResidual, u_L );
+
+                actseg = segi + 1; //should be the upper actuator
+
+                //calculate starting positios and roations given last coil states
+                double RigidSegmentLength	=	SegBounds[actseg+1]-SegBounds[actseg];	// how far we need to move along the length of the rigid segment to reach the next flexible segment
+                for (int i = 0; i < 9; ++i) {
+                    R_L[i] = out_x_coil[actno][i+9];
+                }
+                for (int i = 0; i < 3; ++i) {
+                    p_L[i] = out_x_coil[actno][i+6] - R_L[ i*3 +2 ]*RigidSegmentLength * 0.5;
+                }
+
+                CRMFlexible_IVP_Back ( segi, p_L, R_L, Params,u_L , n_L[actno],
+                                       u_f, p_f, R_f);
+                actno = fsegi - 1;
+//                std::cout << "u_f: " << u_f[0] << " " << u_f[1] << " " << u_f[2] <<  std::endl;
+//                std::cout << "p_f: " << p_f[0] << " " << p_f[1] << " " << p_f[2] <<  std::endl;
+
+                if(actno > -1){ //if there is a coil linked below, we need to calculate the net torque again
+                    mSub_AB<3,1>( u_f, ustar[fsegi], du);
+                    mMult_AB<3,3,1>( K[fsegi], du, tau ); // calculate moment at upper side of the coil
+
+                    mSub_AB<3,1>( m_L[actno], tau, net_mL); // net torque applied at the downwards coil
+                }
+
+            }
+        }
+        else{
+
+            actno = (segi -1 )>>1;
+            CoilDynamics(x_coil[actno], n_L[actno], Params.g, actMass[actno], actInertia[actno],
+                         Params.damping[actno], Params.DELTA_T, Params.B0,
+                         muhat[actno], net_mL, out_x_coil[actno], out_xdot);
+
+            // compute the residual against the last flexible segment above
+            if(actno<NUM_ACT_SET-1){
+                double RigidSegmentLength	=	SegBounds[segi+1]-SegBounds[segi];	// how far we need to move along the length of the rigid segment to reach the next flexible segment
+
+                //indices for the residual
+                actno_mn = actno + 1;
+
+                for (int i = 0; i < 9; ++i) {
+                    R_L[i] = out_x_coil[actno][i+9];
+                }
+                for (int i = 0; i < 3; ++i) {
+                    p_L[i] = out_x_coil[actno][i+6] + R_L[ i*3 +2 ]*RigidSegmentLength * 0.5;
+                }
+                for (int i = 0; i < 3; ++i) {
+                    residual[actno_mn][i] = p_f[i] - p_L[i];
+                }
+                for (int i = 0; i < 3; ++i) {
+                    v1[i] = R_f[i*3] - R_L[i*3];
+                    v2[i] = R_f[1+ i*3] - R_L[1+ i*3];
+                    v3[i] = R_f[2 + i*3]  - R_L[2 + i*3];
+                }
+
+                v_val[0] = vNormSq<3>(v1);
+                v_val[1] = vNormSq<3>(v2);
+                v_val[2] = vNormSq<3>(v3);
+                for (int i = 0; i < 3; ++i) residual[actno_mn][i+3] = sqrt(v_val[i]);
+            }
+
+        }
+
+    }
+
+    mCopy_AB<3>(u_f, out_u0);
+
+    // last segment
+    actno = 0;
+    for (int i = 0; i < 3; ++i) {
+        residual[actno][i] = p_f[i] - p_d[i];
+    }
+    // calculate vector norm of the rotation matrices
+    for (int i = 0; i < 3; ++i) {
+        v1[i] = R_f[i*3] - R_d[i*3];
+        v2[i] = R_f[1+ i*3] - R_d[1+ i*3];
+        v3[i] = R_f[2 + i*3]  - R_d[2 + i*3];
+    }
+
+    v_val[0] = vNormSq<3>(v1);
+    v_val[1] = vNormSq<3>(v2);
+    v_val[2] = vNormSq<3>(v3);
+    for (int i = 0; i < 3; ++i) residual[actno][i+3] = sqrt(v_val[i]);
+
+//    for (int i = 0; i < NUM_ACT_SET; ++i) {
+//        std::cout << "residual p: " << residual[i][0] << " " << residual[i][1] << " " <<residual[i][2] << std::endl;
+//        std::cout << "residual R: " << residual[i][3] << " " << residual[i][4] << " " <<residual[i][5] << std::endl;
+//    }
+//
+
+    for (int i = 0; i < NUM_ACT_SET; ++i) {
         for (int j = 0; j < 3; ++j) {
-            out_u0[j+3*i] = u0_calc[i][j];
+            out_y[j + i*6] = RESIDUAL_SCALE_P * residual[i][j];
+        }
+        for (int j = 3; j < 6; ++j) {
+            out_y[j + i*6] = RESIDUAL_SCALE_R * residual[i][j]; // 10000000000
+        }
+    }
+//
+//    std::cout << "out_y: " << out_y[0] << " " << out_y[1] << " " << out_y[2] <<  std::endl;
+//    std::cout << "out_y: " << out_y[3] << " " << out_y[4] << " " << out_y[5] <<  std::endl;
+//    std::cout << "out_y: " << out_y[6] << " " << out_y[7] << " " << out_y[8] <<  std::endl;
+//    std::cout << "out_y: " << out_y[9] << " " << out_y[10] << " " << out_y[11] <<  std::endl;
+}
+
+void CRMIVP_DYN(	 CRMIVPCoreParams<double> CoreParams, const double in_u0[3], const double in_p0[3], const double in_R0[9],
+                     const double in_mL[NUM_ACT_SET][3], const double in_nL[NUM_ACT_SET][3], const double in_ftip[3],
+                     double out_coil_state[NUM_ACT_SET][NUM_COIL_STATES],  double out_u_new[3], double out_p_new[3], double out_R_new[9],
+                     double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]) {
+
+    double x_coil[NUM_ACT_SET][NUM_COIL_STATES];
+    double MagMoment[NUM_ACT_SET][3], muhat[NUM_ACT_SET][9], actMass[NUM_ACT_SET], actInertia[NUM_ACT_SET][9];
+
+    double mu[3], muhattemp[9];
+    for (int j = 0; j < NUM_ACT_SET; ++j) {
+        for (int i = 0; i < 3; ++i) {
+            x_coil[j][i] = CoreParams.v_L_pre[j][i];
+            x_coil[j][i+3] = CoreParams.w_L_pre[j][i];
+            x_coil[j][i+6] = CoreParams.p_pre[j][i];
+        }
+        for (int i = 0; i < 9; ++i) {
+            x_coil[j][i+9] = CoreParams.R_pre[j][i];
+        }
+
+        actMass[j] = CoreParams.actMass[j];
+        for (int i = 0; i < 9; ++i) {
+            actInertia[j][i] = CoreParams.actInertia[j][i];
+        }
+
+        for (int i = 0; i <3 ; ++i) {
+            MagMoment[j][i] = CoreParams.MagMoment[j][i];
+        }
+        for (int i = 0; i < 3; ++i) {
+            mu[i] =  MagMoment[j][i];
+        }
+        wHat(mu,muhattemp);
+        for (int i = 0; i < 9; ++i) {
+            muhat[j][i] = muhattemp[i];
         }
     }
 
-    // compute the upper flexible segment moment
-    if (NUM_FLEX_SEG > 1){
-        for (int i = 1; i < NUM_FLEX_SEG; ++i) { // not the first flexible segment, 1 to N-1 flexible segment
-            mSub_AB<3,1>( u0_calc[i] , ustar[i], deltau1);
-            mMult_AB<3,3,1>( K[i], deltau1, K1deltau1 );
-            if(i-1 < NUM_SEGMENTS-1){ // actno = i-1, there is an upper flexible segment
-                for (int j = 0; j < 3; ++j) { tau[i-1][j] = K1deltau1[j]; }//pass to the lower rigid segment
-            }else{ for (int j = 0; j < 3; ++j) { tau[i-1][j] = 0.0; }  }
-        }
-    }else{ for (int j = 0; j < 3; ++j) {   tau[0][j] = 0.0; }  } // only one flexible, one actuator case
+    double u_new[3], p_new[3], R_new[9];
 
+    int   actno, fsegip1;	// actuator no, flexible segment before, flexible segment after
+    double RscTB0[3], Tb[3], Residual[3], inertiaw[3];
+    auto & K = CoreParams.K;
+    auto & Kinv = CoreParams.Kinv;
+    auto & ustar = CoreParams.ustar;
+    auto & B0 = CoreParams.B0;
+    auto & SegBounds = CoreParams.SegBounds;
+    double w[3], w_dot[3], w_hat[9], w_inertia_w[3], inertia_wdot[3], out_xdot[6], w_terms[3], Tb_ml[3], K2invResidual[3];
 
-    double actMass, actInertia[9], damping[6], residual_per_coil[6], MagMoment[3], muhat[9];
-    double v1[3], v2[3], v3[3];
-    double RESIDUAL[NUM_DYN_RESIDUAL];
-    double net_m_L[3], net_n_L[3];
-//    std::cout << "MomentResidual: " << MomentResidual[0] << " " << MomentResidual[1] << " " << MomentResidual[2] <<  std::endl;
-    for (int i = 0; i < NUM_ACT_SET; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            x_coil[j] = Params.v_L_pre[i][j];
-            x_coil[j+3] = Params.w_L_pre[i][j];
-            x_coil[j+6] = Params.p_pre[i][j];
-        }
-        for (int j = 0; j < 9; ++j) {
-            x_coil[j+9] = Params.R_pre[i][j];
-        }
+    double u_0[3], p0[3], R0[9], n_L[NUM_ACT_SET][3], m_L[NUM_ACT_SET][3];
 
-        actMass = Params.actMass[i];
-        for (int j = 0; j < 9; ++j) {
-            actInertia[j] = Params.actInertia[i][j];
-        }
-    //    std::cout << "in x_coil PL: " << x_coil[6] << " " << x_coil[7] << " " << x_coil[8] <<  std::endl;
-        for (int j = 0; j < 6; ++j) {
-            damping[j] = Params.damping[i][j];
-        }
+    mCopy_AB<NUM_ACT_SET, 3>(in_nL, n_L);
+    mCopy_AB<NUM_ACT_SET, 3>(in_mL, m_L);
 
-        for (int j = 0; j < 3; ++j) {
-            MagMoment[j] = Params.MagMoment[i][j];
-        }
-        wHat(MagMoment,muhat);
+    for (int i = 0; i < 3; ++i) {
+        u_0[i] = in_u0[i];
+        p0[i] = in_p0[i];
+    }
+    for (int i = 0; i < 9; ++i) {
+        R0[i] = in_R0[i];
+    }
 
-        for (int j = 0; j < 3; ++j) {
-            net_n_L[j] = n_L[i][j];
-            net_m_L[j] = m_L[i][j] - tau[i][j];
-        }
+    double RigidSegmentLength;
 
-        CoilDynamics(x_coil, net_n_L, Params.g, actMass, actInertia, damping, Params.DELTA_T, Params.B0, muhat,  net_m_L,out_x_coil);
+    double n_f[3];
 
-        for (int j = 0; j < 3; ++j) { residual_per_coil[j] = pL[i][j] - out_x_coil[j+6]; }
+    double p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3];
+    double update_coil_state[NUM_COIL_STATES];
+    //forward pass
+    for (int SegmentIndex = 0; SegmentIndex < NUM_SEGMENTS; ++SegmentIndex) {
+        if(SegmentIndex %2 == 0){
 
-//        double Rcoil[9];
-//        for (int j = 0; j < 9; ++j) { Rcoil[j] = out_x_coil[j+9]; }
-        for (int j = 0; j < 3; ++j) {
-            v1[j] = out_x_coil[j*3 + 9] - RL[i][j*3];
-            v2[j] = out_x_coil[(j*3 + 1) +9] - RL[i][1+ j*3];
-            v3[j] = out_x_coil[(j*3 + 2) +9 ] - RL[i][2 + j*3];
-        }
-        residual_per_coil[3] = vNormSq<3>(v1);
-        residual_per_coil[4] = vNormSq<3>(v2);
-        residual_per_coil[5] = vNormSq<3>(v3);
-        for (int j = 0; j < 3; ++j) residual_per_coil[j+3] = sqrt(residual_per_coil[j+3]);
+            actno = SegmentIndex >> 1;
 
-        for (int j = 0; j < 3; ++j) {
-            RESIDUAL[j + i*6] = residual_per_coil[j];
-            RESIDUAL[j + 3+ i*6] = residual_per_coil[j+3];
+            if(SegmentIndex == NUM_SEGMENTS -1){ // if this is free tip flexible segment
+                for (int i = 0; i < 3; ++i) {
+                    n_f[i] = in_ftip[i];
+                }
+//                n_f[0] = n_f[1] = n_f[2] = 0.0;
+            }else{
+                for (int i = 0; i < 3; ++i) {
+                    n_f[i] =  n_L[actno][i];
+                }
+            }
+            CRMFlexForward_pass (  SegmentIndex, p0, R0,  CoreParams, u_0 , n_f, u_new, p_new, R_new, p_atLocMarkers);
+        }else{
+            RigidSegmentLength=(SegBounds[SegmentIndex+1]-SegBounds[SegmentIndex]);
+
+            actno=(SegmentIndex-1)>>1;		// actuator no
+            fsegip1=actno+1;
+
+            CoilDynamics(x_coil[actno], n_L[actno], CoreParams.g, actMass[actno], actInertia[actno], CoreParams.damping[actno], CoreParams.DELTA_T,
+                         CoreParams.B0, muhat[actno], m_L[actno], update_coil_state, out_xdot);
+
+            for (int i = 0; i < 3; ++i) {
+                w[i] = update_coil_state[i+3];
+                w_dot[i] = out_xdot[i+3];
+            }
+            wHat(w,w_hat);
+
+            mMult_ATB<3,3,1>(&(update_coil_state[9]),B0,RscTB0);
+            mMult_AB<3,3,1>(muhat[actno],RscTB0,Tb);
+
+            mMult_AB<3,3,1>(actInertia[actno], w, inertiaw);
+            mMult_AB<3,3,1>(w_hat, inertiaw, w_inertia_w);
+            mMult_AB<3,3,1>(actInertia[actno], w_dot, inertia_wdot);
+            mAdd_AB<3,1>(inertia_wdot, w_inertia_w, w_terms);
+
+            mSub_AB<3,1>( Tb, m_L[actno], Tb_ml);
+            mSub_AB<3,1>( Tb_ml, w_terms, Residual);
+
+            mMult_AB<3,3,1>( Kinv[fsegip1], Residual, K2invResidual );
+            mAdd_AB<3,1>( ustar[fsegip1], K2invResidual, u_0 );
+
+            for (int i = 0; i < 3; ++i) {
+                p0[i] = update_coil_state[i+6] + 0.5*RigidSegmentLength * update_coil_state[9+ i*3+2 ];
+            }
+
+            for (int i = 0; i < 9; ++i) {
+                R0[i] = update_coil_state[i+9];
+            }
+
+            for (int i = 0; i < NUM_COIL_STATES; ++i) {
+                out_coil_state[actno][i] = update_coil_state[i];
+            }
+
         }
     }
 
-    for (int i = 0; i < NUM_ACT_SET; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            out_y[j+ 6*i] = RESIDUAL_SCALE_P * RESIDUAL[j+ 6*i]; // RESIDUAL_SCALE_F * WrenchResidual[i] ;
-            out_y[j+3+ 6*i] = RESIDUAL_SCALE_R * RESIDUAL[j+3+6*i]; // RESIDUAL_SCALE_F * WrenchResidual[i] ;
+    // return tip state
+    for (int i = 0; i < 3; ++i) {
+        out_u_new[i] = u_new[i];
+        out_p_new[i] = p_new[i];
+    }
+    for (int i = 0; i < 9; ++i) {
+        out_R_new[i] = R_new[i];
+    }
 
+    // Copy marker locations to the output
+    if (!CoreParams.FinalValueOnly) {
+        for (int i=0; i<NUM_LOCALIZATION_MARKERS; i++) {
+            for (int j=0; j<3; j++) {
+                out_p_atLocMarkers[i][j]=p_atLocMarkers[(NUM_LOCALIZATION_MARKERS-1)-i][j];
+            }
         }
     }
 
 }
 
-
 template <typename adType>
-void CRMShootingMethodBVP_DYN(	NLEqnParams<adType> in_Params, adType out_u0[NUM_FLEX_SEG][3], adType out_ftip[3], int& out_localmin) {
-
-//    ContactModeType ContactMode = in_Params.ContactMode;
-    int NLEq_Dim = NUM_RESIDUAL;
-    // Scale parameters and call the nonlinear equation solver
-    const double uscaleinv = 1.0 / IVALUE_SCALE_U;
-    const double fscaleinv = 1.0 / IVALUE_SCALE_F;
-    auto* initialguessscaled = new double [NLEq_Dim];
-    auto* returnedparamscaled = new adType [NLEq_Dim];
-
-    if (in_Params.ContactMode == ContactModeType::FREE_TIP) {
-        for (int i = 0; i < NUM_FLEX_SEG; ++i) {
-            for (int j = 0; j < 3; ++j) {
-                initialguessscaled[j+3*i] = uscaleinv * in_Params.u0_initialguess[i][j];
-            }
-        }
-        for (int i = 0; i < 3; i++) {
-            in_Params.TipForce[i] = in_Params.TipForce[i];  // if the catheter is not in contact, the tip force specified within in_Params needs to be used; this would not be scaled as it is not changed by the solver
-        }
-    }
-
-    int localmin = 0, errorcode = 0;
-
-    adType* x = new adType[NLEq_Dim]; // we will create a new variable here and not use initial guess scaled since truss-region-dogleg algorithm uses the same variable for both input and output
-    adType* residual = new adType[NLEq_Dim];
-    int info;
-    int lwa = (NLEq_Dim * (3 * NLEq_Dim + 13)) / 2;
-    double tol = 0.00001;
-    adType* wa = new adType [lwa];
-    for (int i = 0; i < NLEq_Dim; i++) x[i] = initialguessscaled[i];
-#if defined( TRUSTREGION )
-    TrustRegionDogleg(NLEq_Dim, x, residual, tol, info, wa, lwa, in_Params);
-#else // undefined
-    exit(1);
-#endif
-    localmin = (info == 1) ? 0 : (info - 1);
-    for (int i = 0; i < NLEq_Dim; i++) returnedparamscaled[i] = x[i];
-    delete[] residual;
-    delete[] x;
-    delete[] wa;
-
-    if (in_Params.ContactMode == ContactModeType::FREE_TIP) {
-        for (int i = 0; i < NUM_FLEX_SEG; ++i) {
-            for (int j = 0; j < 3; ++j) {
-                out_u0[i][j] = IVALUE_SCALE_U * returnedparamscaled[j+3*i];
-            }
-        }
-        for (int i = 0; i < 3; i++) {
-            out_ftip[i] = in_Params.TipForce[i];  // if it is free-tip, return the tip force specified within in_Params
-        }
-    }
-
-
-    out_localmin = localmin;
-    delete[] initialguessscaled;
-    delete[] returnedparamscaled;
-
-}
-
-template <typename adType>
-void DynamicsBVP(	CRMShootingMethodParams<adType> in_Params, double in_u0_initialguess[NUM_FLEX_SEG][3],
+void DynamicsBVP(	CRMShootingMethodParams<adType> in_Params, const double xf[NUM_STATES],
                               double in_mL_initialguess[NUM_ACT_SET][3], double in_nL_initialguess[NUM_ACT_SET][3], double in_ftip_initialguess[3],
-                              adType out_u0[NUM_FLEX_SEG][3], adType out_mL[NUM_ACT_SET][3], adType out_nL[NUM_ACT_SET][3], adType out_ftip[3], int& out_localmin) {
+                              adType out_u0[3], adType out_mL[NUM_ACT_SET][3], adType out_nL[NUM_ACT_SET][3], adType out_ftip[3], int& out_localmin) {
 
     ContactModeType ContactMode = in_Params.ContactMode;
     int NLEq_Dim;  // Dimension of the Nonlinear Equation to Solve
     NLEq_Dim = NUM_DYN_RESIDUAL;
 
     // Call CRMSolverIVP_Prep, to pre-process parameters
-//    adType x_0[NUM_STATES], u0_calc[NUM_FLEX_SEG*3];
-
-    auto* x_0 = new adType[NUM_STATES];
-    auto* u0_calc = new adType[NUM_FLEX_SEG*3];
-
+    adType x_0[NUM_STATES];
     for (int i = 0; i < NUM_STATES; i++) {
         if (i < 3) {
-            x_0[i] = in_u0_initialguess[0][i];
+            x_0[i] = 0.0; //placeholder
         }
         else if (i < 12) {
             x_0[i] = in_Params.R0[i - 3];
@@ -639,11 +812,8 @@ void DynamicsBVP(	CRMShootingMethodParams<adType> in_Params, double in_u0_initia
     mCopy_AB<3>(in_Params.TipConstraintPoint, DYNNLEParams.TipConstraintPoint);
     mCopy_AB<3>(in_ftip_initialguess, DYNNLEParams.ftip_initialguess);
 
-//    mCopy_AB<3>(in_u0_initialguess, DYNNLEParams.u0_initialguess);
-    for (int i = 0; i < NUM_FLEX_SEG; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            DYNNLEParams.u0_initialguess[i][j] = in_u0_initialguess[i][j];
-        }
+    for (int i = 0; i < NUM_STATES; ++i) {
+        DYNNLEParams.xf[i] = xf[i];
     }
 
     // Scale parameters and call the nonlinear equation solver
@@ -651,63 +821,70 @@ void DynamicsBVP(	CRMShootingMethodParams<adType> in_Params, double in_u0_initia
     const double nscaleinv = 1.0 / IVALUE_SCALE_N;
     const double mscaleinv = 1.0 / IVALUE_SCALE_M;
 
-    const double fscaleinv = 1.0 / IVALUE_SCALE_F;
+//    const double fscaleinv = 1.0 / IVALUE_SCALE_F;
     auto* initialguessscaled = new double [NLEq_Dim];
-    auto* returnedparamscaled = new adType [NLEq_Dim];
+    auto* returnedparamscaled = new double [NLEq_Dim];
 
-    if (ContactMode == ContactModeType::FREE_TIP) {
-        for (int i = 0; i < NUM_ACT_SET; ++i) {
-            for (int j = 0; j < 3; j++) {
-                initialguessscaled[j+ 6*i] = mscaleinv * in_mL_initialguess[i][j];
-                initialguessscaled[j+3 + 6*i] = nscaleinv * in_nL_initialguess[i][j];
-            }
-        }
+    for (int j = 0; j < NUM_ACT_SET; ++j) {
         for (int i = 0; i < 3; i++) {
-            DYNNLEParams.TipForce[i] = in_Params.TipForce[i];  // if the catheter is not in contact, the tip force specified within in_Params needs to be used; this would not be scaled as it is not changed by the solver
+            initialguessscaled[i + j*6] = mscaleinv * in_mL_initialguess[j][i];
+            initialguessscaled[i + j*6 +3] = nscaleinv * in_nL_initialguess[j][i];
         }
+    }
+
+    for (int i = 0; i < 3; ++i) {
+        DYNNLEParams.TipForce[i] = in_Params.TipForce[i];  // if the catheter is not in contact, the tip force specified within in_Params needs to be used; this would not be scaled as it is not changed by the solver
     }
 
     int localmin = 0;
 
-    adType* x = new adType[NLEq_Dim]; // we will create a new variable here and not use initial guess scaled since truss-region-dogleg algorithm uses the same variable for both input and output
+    double* x = new double[NLEq_Dim]; // we will create a new variable here and not use initial guess scaled since truss-region-dogleg algorithm uses the same variable for both input and output
 
-    adType* residual = new adType[NLEq_Dim];
+    double* residual = new double[NLEq_Dim];
     int info;
     int lwa = (NLEq_Dim * (3 * NLEq_Dim + 13)) / 2;
     double tol = 0.00001;
-    adType* wa = new adType [lwa];
+    double* wa = new double [lwa];
     for (int i = 0; i < NLEq_Dim; i++) x[i] = initialguessscaled[i];
 
+//    int REPS = 100;
+//    // Get starting timepoint
+//    auto start = high_resolution_clock::now();
+//    for (int cnt = 0; cnt < REPS; cnt++)
+//        DYNNLEquation(x, returnedparamscaled, DYNNLEParams, out_u0);
+//    auto stop = high_resolution_clock::now();
+//    auto duration = duration_cast<microseconds>(stop - start);
+//    std::cout << std::endl << "Average time taken by DYNNLEquation Solution in " << REPS << " repetitions: " << duration.count() / REPS << " microseconds" << std::endl;
+
+
+
 #if defined( TRUSTREGION )
-    TrustRegionDogleg_dyn(NLEq_Dim, x, residual, tol, info, wa, lwa, DYNNLEParams, u0_calc);
+        TrustRegionDogleg_dyn(NLEq_Dim, x, residual, tol, info, wa, lwa, DYNNLEParams, out_u0);
 #else // undefined
     exit(1);
 #endif
+
     localmin = (info == 1) ? 0 : (info - 1);
     for (int i = 0; i < NLEq_Dim; i++) returnedparamscaled[i] = x[i];
     delete[] residual;
     delete[] x;
     delete[] wa;
 
-    for (int i = 0; i < NUM_ACT_SET; ++i) {
-        for (int j = 0; j < 3; j++) {
-            out_mL[i][j] = IVALUE_SCALE_M * returnedparamscaled[j+ 6*i];
-            out_nL[i][j] = IVALUE_SCALE_N * returnedparamscaled[j+3 + 6*i];
+    for (int j = 0; j < NUM_ACT_SET; ++j) {
+        for (int i = 0; i < 3; i++) {
+            out_mL[j][i] = IVALUE_SCALE_M * returnedparamscaled[i + j * 6];
+            out_nL[j][i] = IVALUE_SCALE_N * returnedparamscaled[i + j * 6 + 3];
         }
     }
-    for (int i = 0; i < 3; i++) {
+
+//    for (int i = 0; i < NUM_ACT_SET; ++i) {
+//        std::cout << "out_mL: " << out_mL[i][0] << " " << out_mL[i][1] << " " <<out_mL[i][2] << std::endl;
+//        std::cout << "out_nL: " << out_nL[i][0] << " " << out_nL[i][1] << " " <<out_nL[i][2] << std::endl;
+//    }
+
+    for (int i = 0; i < 3; ++i) {
         out_ftip[i] = in_Params.TipForce[i];  // if it is free-tip, return the tip force specified within in_Params
     }
-
-    for (int i = 0; i < NUM_FLEX_SEG; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            out_u0[i][j] = u0_calc[j+ 3*i];
-        }
-    }
-
-
-    delete[] x_0;
-    delete[] u0_calc;
 
     out_localmin = localmin;
     delete[] initialguessscaled;
@@ -717,33 +894,30 @@ void DynamicsBVP(	CRMShootingMethodParams<adType> in_Params, double in_u0_initia
 
 
 template <typename adType>
-void DYNSolverIVP(	CRMShootingMethodParams<adType> in_Params, adType in_u0[NUM_FLEX_SEG][3],
+void DYNSolverIVP(	CRMShootingMethodParams<adType> in_Params, adType in_u0[3],
                       adType in_mL[NUM_ACT_SET][3], adType in_nL[NUM_ACT_SET][3], adType in_ftip[3],
-                      bool in_FinalValueOnly, adType out_x_N[NUM_STATES], adType out_coil_state[NUM_COIL_STATES],
+                      bool in_FinalValueOnly,
+                      adType out_x_N[NUM_STATES], adType out_coil_state[NUM_ACT_SET][NUM_COIL_STATES],
                       double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]){
 
     adType x_0[NUM_STATES];
     for (int i = 0; i < NUM_STATES; i++) {
-        if (i < 3) x_0[i] = in_u0[0][i];
+        if (i < 3) x_0[i] = in_u0[i];
         else if (i < 12) x_0[i] = in_Params.R0[i - 3];
         else if (i < 15) x_0[i] = in_Params.p0[i - 12];
     }
 
     CRMIVPCoreParams<adType> CoreParams;
-    adType u_0[NUM_FLEX_SEG][3], n_L[NUM_ACT_SET][3], m_L[NUM_ACT_SET][3], ftip[3];
+    adType u_0[3], n_L[NUM_ACT_SET][3], m_L[NUM_ACT_SET][3], ftip[3];
     // We need to pass u_0 as input argument as the values in CoreParams will be overriden with the values provided in the input arguments - functionality needed for solving Boundary Value Problems (BVP)
     // copy to local variable
-    for (int i = 0; i < NUM_FLEX_SEG; ++i) {
-        for (int j = 0; j < 3; j++) u_0[i][j] = in_u0[i][j];
-    }
-    for (int i = 0; i < NUM_ACT_SET; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            n_L[i][j] = in_nL[i][j];
-            m_L[i][j] = in_mL[i][j];
-        }
-    }
+    for (int i = 0; i < 3; i++) u_0[i] = in_u0[i];
     for (int i = 0; i < 3; i++) ftip[i] = in_ftip[i];
 
+    for (int j = 0; j < NUM_ACT_SET; ++j) {
+        for (int i = 0; i < 3; i++) n_L[j][i] = in_nL[j][i];
+        for (int i = 0; i < 3; i++) m_L[j][i] = in_mL[j][i];
+    }
     CRMSolverIVP_Prep(x_0, in_Params.IntegrationStepSize,
                       in_Params.Li, in_Params.dlambdainv,
                       in_Params.SegEndLambdas, in_Params.LocMarkerLambdas,
@@ -753,61 +927,28 @@ void DYNSolverIVP(	CRMShootingMethodParams<adType> in_Params, adType in_u0[NUM_F
                       in_Params.v_L_pre, in_Params.w_L_pre, in_Params.p_pre, in_Params.R_pre,
                       m_L, n_L, true, in_FinalValueOnly,CoreParams);
 
-    adType pcoil[NUM_ACT_SET][3], Rcoil[NUM_ACT_SET][9], MomentResidual[3], x_coil[NUM_COIL_STATES];
-    adType MagMoment[3] ,muhat[9];
+    double u_new[3], p_new[3], R_new[9];
+    double p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3];
+    CRMIVP_DYN(	 CoreParams, u_0, in_Params.p0, in_Params.R0, m_L, n_L, ftip, out_coil_state, u_new, p_new, R_new, p_atLocMarkers);
 
-    CRMSolverIVP_Core ( CoreParams, u_0, ftip, out_x_N, MomentResidual, pcoil, Rcoil, out_p_atLocMarkers);
-
-    for (int i = 0; i < 3; ++i) {
-        x_coil[i] = CoreParams.v_L_pre[0][i];
-        x_coil[i+3] = CoreParams.w_L_pre[0][i];
-        x_coil[i+6] = CoreParams.p_pre[0][i];
-    }
-    for (int i = 0; i < 9; ++i) {
-        x_coil[i+9] = CoreParams.R_pre[0][i];
-    }
-
-    double actMass = CoreParams.actMass[0];
-    double actInertia[9];
-    for (int j = 0; j < 9; ++j) {
-        actInertia[j] = CoreParams.actInertia[0][j];
-    }
-    double damping[6];
-    for (int i = 0; i < 6; ++i) {
-        damping[i] = CoreParams.damping[0][i];
+    for (int i = 0; i < NUM_STATES; ++i) {
+        if(i<3){
+            out_x_N[i] = u_new[i];
+        }else if(i<3+9){
+            out_x_N[i] = R_new[i-3];
+        }else{
+            out_x_N[i] = p_new[i-3-9];
+        }
     }
 
-//    double tau[3];
-//    for (int i = 0; i < 3; ++i) {
-//        tau[i] = Tbcoil[0][i] - m_L[0][i];
-//    }
-    for (int i = 0; i <3 ; ++i) {
-        MagMoment[i] = CoreParams.MagMoment[0][i];
+    // Copy marker locations to the output
+    if (!in_FinalValueOnly) {
+        for (int i=0; i<NUM_LOCALIZATION_MARKERS; i++) {
+            for (int j=0; j<3; j++) {
+                out_p_atLocMarkers[i][j]=p_atLocMarkers[(NUM_LOCALIZATION_MARKERS-1)-i][j];
+            }
+        }
     }
-    wHat(MagMoment,muhat);
-
-
-    CoilDynamics(x_coil, n_L[0], CoreParams.g, actMass, actInertia, damping, CoreParams.DELTA_T, in_Params.B0, muhat, m_L[0], out_coil_state);
 
 }
 
-template <typename adType>
-void rotationMatrixToEulerAngles(adType in_R[9], adType out_v[3]){
-    double sy = sqrt(in_R[0] * in_R[0] + in_R[3] * in_R[3] );
-    bool singular = sy < 1e-6; // If
-
-    double x, y, z;
-    if (!singular){
-        x = atan2(in_R[7] , in_R[8]);
-        y = atan2(-in_R[6], sy);
-        z = atan2(in_R[3], in_R[0]);
-    }else{
-        std::cout << "Singular Rotation matrix............" << std::endl;
-        x = atan2(-in_R[5], in_R[4]);
-        y = atan2(-in_R[6], sy);
-        z = 0;
-    }
-
-    out_v[0] = x; out_v[1] = y; out_v[2] = z;
-
-}

@@ -12,6 +12,7 @@ addpath(genpath('./matlab'));
 
 addpath(genpath('./Numerical_quasi_static'));
 
+addpath(genpath('./parameters'));
 
 % Remove the magic (clownyness stays)
 clear;

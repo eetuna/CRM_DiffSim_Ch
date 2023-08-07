@@ -1,0 +1,93 @@
+{
+	"cmake" : 
+	{
+		"generator" : 
+		{
+			"multiConfig" : false,
+			"name" : "Unix Makefiles"
+		},
+		"paths" : 
+		{
+			"cmake" : "/home/ranhao/Documents/clion-2020.3.1/bin/cmake/linux/bin/cmake",
+			"cpack" : "/home/ranhao/Documents/clion-2020.3.1/bin/cmake/linux/bin/cpack",
+			"ctest" : "/home/ranhao/Documents/clion-2020.3.1/bin/cmake/linux/bin/ctest",
+			"root" : "/home/ranhao/Documents/clion-2020.3.1/bin/cmake/linux/share/cmake-3.17"
+		},
+		"version" : 
+		{
+			"isDirty" : false,
+			"major" : 3,
+			"minor" : 17,
+			"patch" : 5,
+			"string" : "3.17.5",
+			"suffix" : ""
+		}
+	},
+	"objects" : 
+	[
+		{
+			"jsonFile" : "codemodel-v2-5755a15cf4d822731590.json",
+			"kind" : "codemodel",
+			"version" : 
+			{
+				"major" : 2,
+				"minor" : 0
+			}
+		},
+		{
+			"jsonFile" : "cache-v2-0d71a7e4ab13e704370a.json",
+			"kind" : "cache",
+			"version" : 
+			{
+				"major" : 2,
+				"minor" : 0
+			}
+		},
+		{
+			"jsonFile" : "cmakeFiles-v1-3a62853133e27db53f6f.json",
+			"kind" : "cmakeFiles",
+			"version" : 
+			{
+				"major" : 1,
+				"minor" : 0
+			}
+		}
+	],
+	"reply" : 
+	{
+		"cache-v2" : 
+		{
+			"jsonFile" : "cache-v2-0d71a7e4ab13e704370a.json",
+			"kind" : "cache",
+			"version" : 
+			{
+				"major" : 2,
+				"minor" : 0
+			}
+		},
+		"cmakeFiles-v1" : 
+		{
+			"jsonFile" : "cmakeFiles-v1-3a62853133e27db53f6f.json",
+			"kind" : "cmakeFiles",
+			"version" : 
+			{
+				"major" : 1,
+				"minor" : 0
+			}
+		},
+		"codemodel-v2" : 
+		{
+			"jsonFile" : "codemodel-v2-5755a15cf4d822731590.json",
+			"kind" : "codemodel",
+			"version" : 
+			{
+				"major" : 2,
+				"minor" : 0
+			}
+		},
+		"toolchains-v1" : 
+		{
+			"error" : "unknown query file"
+		}
+	}
+}

@@ -1,25 +1,55 @@
 #pragma once
 #include <cmath>
-#include "Numerical_methods/minpack.hpp"
+#include "Numerical/minpack.hpp"
 
 #define M_PI 3.14159265358979323846
 
 
+/**
+ * To get an initial coil and tip state with zero velocity
+ * @param BVPParams
+ * @param u0_initialguess
+ * @param ftip_initialguess
+ * @param xf
+ * @param pL
+ * @param RL
+ * @param ReportedMarkerPos
+ * @param localmin
+ */
+void CRM_FKState(CRMShootingMethodParams<double> BVPParams, const double u0_initialguess[3], const double ftip_initialguess[3],
+                double xf[NUM_STATES], double pL[NUM_ACT_SET][3], double RL[NUM_ACT_SET][9], double ReportedMarkerPos[NUM_LOCALIZATION_MARKERS][3], int &localmin){
+    //     Populate the variable of convenience for conveniently passing lots of arguments to the BVP Solver
+//	   this step would typicall need to be executed every time BVP needs to be calculated as actuation variables would change at every time step
+
+
+    double u0_calc[3], ftip_calc[3], residual[3];
+    // Cosserat Rod Model - Solve the Boundary Value Problem to calculate the equilibrium configuration of the catheter
+    CRMShootingMethodBVP(BVPParams, u0_initialguess, ftip_initialguess, u0_calc, ftip_calc, localmin);
+
+//    // Cosserat Rod Model - Solve the Initial Value Problem to calculate the shape of the catheter
+    CRMSolverIVP(BVPParams, u0_calc, ftip_calc, false, xf, residual, pL, RL, ReportedMarkerPos);
+
+}
+
+
 template <typename adType>
 void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params, 
-							const double in_u0_initialguess[NUM_FLEX_SEG][3],
-							adType out_u0[NUM_FLEX_SEG][3], adType out_ftip[3], int& out_localmin) {
+							const double in_u0_initialguess[3], const double in_ftip_initialguess[3],
+							adType out_u0[3], adType out_ftip[3], int& out_localmin) {
 
 	ContactModeType ContactMode = in_Params.ContactMode;
 	int NLEq_Dim;  // Dimension of the Nonlinear Equation to Solve
-    NLEq_Dim = NUM_RESIDUAL;
-
-
+	if (ContactMode == ContactModeType::FREE_TIP) {
+		NLEq_Dim = NUM_RESIDUAL;
+	}
+	else { // FIXED_TIP
+		NLEq_Dim = 6;
+	}
 	// Call CRMSolverIVP_Prep, to pre-process parameters
 	adType x_0[NUM_STATES];
 	for (int i = 0; i < NUM_STATES; i++) {
 		if (i < 3) {
-			x_0[i] = in_u0_initialguess[0][i];
+			x_0[i] = in_u0_initialguess[i];
 		}
 		else if (i < 12) {
 			x_0[i] = in_Params.R0[i - 3];
@@ -47,23 +77,26 @@ void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params,
 
 	// Scale parameters and call the nonlinear equation solver
 	const double uscaleinv = 1.0 / IVALUE_SCALE_U;
+//    const double nscaleinv = 1.0 / IVALUE_SCALE_N;
 
-//    const double fscaleinv = 1.0 / IVALUE_SCALE_F;
+    const double fscaleinv = 1.0 / IVALUE_SCALE_F;
 	auto* initialguessscaled = new double [NLEq_Dim];
 	auto* returnedparamscaled = new adType [NLEq_Dim];
 
     if (ContactMode == ContactModeType::FREE_TIP) {
-        for (int i = 0; i < NUM_FLEX_SEG; ++i) {
-            for (int j = 0; j < 3; ++j) {
-                initialguessscaled[j+3*i] = uscaleinv * in_u0_initialguess[i][j];
-            }
-        }
 		for (int i = 0; i < 3; i++) {
+			initialguessscaled[i] = uscaleinv * in_u0_initialguess[i];
             NLEParams.TipForce[i] = in_Params.TipForce[i];  // if the catheter is not in contact, the tip force specified within in_Params needs to be used; this would not be scaled as it is not changed by the solver
 		}
+	}else { // FIXED_TIP
+		for (int i = 0; i < 3; i++) {
+			initialguessscaled[i] = uscaleinv * in_u0_initialguess[i];
+			initialguessscaled[i+3] = fscaleinv * in_ftip_initialguess[i];
+		}
+
 	}
 
-    int localmin = 0;// errorcode = 0;
+    int localmin = 0, errorcode = 0;
 
 	auto* x = new adType[NLEq_Dim]; // we will create a new variable here and not use initial guess scaled since truss-region-dogleg algorithm uses the same variable for both input and output
 
@@ -84,14 +117,29 @@ void CRMShootingMethodBVP(	CRMShootingMethodParams<adType> in_Params,
 	delete[] x;
 	delete[] wa;
 
-     for (int i = 0; i < NUM_FLEX_SEG; ++i) {
-            for (int j = 0; j < 3; ++j) {
-                out_u0[i][j] = IVALUE_SCALE_U * returnedparamscaled[j+3*i];
-            }
-        }
+
+	/*
+	// AUTODIFF TEST CODE
+	using Eigen::MatrixXd;
+	VectorXadType u(NLEq_Dim), y(NLEq_Dim);
+	for (int i=0;i<NLEq_Dim;i++) u(i)=x[i];
+	MatrixXd J = jacobian(NLEquationAD, wrt(u), at(u, NLEParams), y);
+	std::cout << "y = \n" << y << std::endl;    // print the evaluated output vector F
+	std::cout << "J = \n" << J << std::endl;    // print the evaluated Jacobian matrix dF/dx
+	*/
+
+	if (ContactMode == ContactModeType::FREE_TIP) {
 		for (int i = 0; i < 3; i++) {
+			out_u0[i] = IVALUE_SCALE_U * returnedparamscaled[i];
             out_ftip[i] = in_Params.TipForce[i];  // if it is free-tip, return the tip force specified within in_Params
 		}
+	}
+	else { // FIXED_TIP
+		for (int i = 0; i < 3; i++) {
+			out_u0[i] = IVALUE_SCALE_U * returnedparamscaled[i];
+			out_ftip[i] = IVALUE_SCALE_F * returnedparamscaled[i+3];
+		}
+	}
 
 	out_localmin = localmin;
 	delete[] initialguessscaled;
@@ -111,36 +159,37 @@ void NLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params) {
     auto* OutResidual = new adType [NUM_RESIDUAL];
 
     // output for time advance, not used in BVP, just placeholders
-    adType u_0[NUM_FLEX_SEG][3], ftip[3];
+    adType u_0[3], ftip[3];
     // don't forget to scale parameters before passing to the CRMSolverIVP
     if (Params.ContactMode == ContactModeType::FREE_TIP) {
-        for (int i = 0; i < NUM_FLEX_SEG; ++i) {
-            for (int j = 0; j < 3; ++j) {
-                u_0[i][j] = IVALUE_SCALE_U * in_x[j+3*i];
-            }
-        }
         for (int i = 0; i < 3; i++) {
+            u_0[i] = IVALUE_SCALE_U * in_x[i];
             ftip[i] = Params.TipForce[i];  // for free-tip, this parameter is not given by the nonlinear equation solver, and hence, does not need to be scaled
         }
     }
+    else { // FIXED_TIP
+        for (int i = 0; i < 3; i++) {
+            u_0[i] = IVALUE_SCALE_U * in_x[i];
+            ftip[i] = IVALUE_SCALE_F * in_x[i + 9];
+        }
+    }
 
-
-    adType pcoil[NUM_ACT_SET][3], Rcoil[NUM_ACT_SET][9];
-
-
+//    adType Tbcoil[3], pcoil[3], Rcoil[9];
+    auto* pcoil = new adType [NUM_ACT_SET][3];
+    auto* Rcoil = new adType [NUM_ACT_SET][9];
     // We will only call the IVP_Core, since preprocessing is already done
     CRMSolverIVP_Core(Params, u_0, ftip, x_N, OutResidual, pcoil, Rcoil, p_atLocMarkers );
 
     // don't forget to scale parameters before returning to the nonlinear equation solver
-    if (Params.ContactMode == ContactModeType::FREE_TIP) {
-        for (int i = 0; i < NUM_RESIDUAL; i++) {
-            out_y[i] = RESIDUAL_SCALE_M * OutResidual[i];// RESIDUAL_SCALE_F * WrenchResidual[i] ;
-        }
+    for (int i = 0; i < 3; i++) {
+        out_y[i] = RESIDUAL_SCALE_M * OutResidual[i];// RESIDUAL_SCALE_F * WrenchResidual[i] ;
     }
 
     delete[] x_N;
     delete[] p_atLocMarkers;
     delete[] OutResidual;
+    delete[] pcoil;
+    delete[] Rcoil;
 
 }
 
@@ -177,9 +226,10 @@ void CRMShootingMethodBVP_Prep (
 template <typename adType>
 void CRMConstructShootingMethodParamSet(	CRMCatheterModelParams CathParams, CatheterConfiguration CathConfig,
                                             adType InsertionLength, adType ActuationCurrents[NUM_ACT_SET][3],
-                                            ContactModeType ContactMode, double TipConstraintPoint[3], double TipForce[3], double IntegrationStepSize,
-                                            double in_v_L_pre[NUM_ACT_SET][3], double in_w_L_pre[NUM_ACT_SET][3], double in_p_pre[NUM_ACT_SET][3],
-                                            double in_R_pre[NUM_ACT_SET][9], double in_damping[NUM_ACT_SET][6], double in_DELTA_T,
+                                            ContactModeType ContactMode,
+                                            double TipConstraintPoint[3], double TipForce[3],
+                                            double IntegrationStepSize,
+                                            double in_v_L_pre[NUM_ACT_SET][3], double in_w_L_pre[NUM_ACT_SET][3], double in_p_pre[NUM_ACT_SET][3], double in_R_pre[NUM_ACT_SET][9], double in_damping[NUM_ACT_SET][6], double in_DELTA_T,
                                             CRMShootingMethodParams<adType> &ShootingParams) {
     double length = 0.0;
     for (int i = 0; i < NUM_SEGMENTS; i++) {
@@ -228,26 +278,11 @@ void CRMConstructShootingMethodParamSet(	CRMCatheterModelParams CathParams, Cath
         }
     }
 
-//    mCopy_AB<3>(in_v_L_pre, ShootingParams.v_L_pre);
-//    mCopy_AB<3>(in_w_L_pre, ShootingParams.w_L_pre);
-//    mCopy_AB<3>(in_p_pre, ShootingParams.p_pre);
-//    mCopy_AB<9>(in_R_pre, ShootingParams.R_pre);
-//    mCopy_AB<6>(in_damping, ShootingParams.damping);
-
-    for (int i = 0; i < NUM_ACT_SET; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            ShootingParams.v_L_pre[i][j] = in_v_L_pre[i][j];
-            ShootingParams.w_L_pre[i][j] = in_w_L_pre[i][j];
-            ShootingParams.p_pre[i][j] = in_p_pre[i][j];
-        }
-        for (int j = 0; j < 9; ++j) {
-            ShootingParams.R_pre[i][j] = in_R_pre[i][j];
-        }
-        for (int j = 0; j < 6; ++j) {
-            ShootingParams.damping[i][j] = in_damping[i][j];
-        }
-    }
-
+    mCopy_AB<NUM_ACT_SET, 3>(in_v_L_pre, ShootingParams.v_L_pre);
+    mCopy_AB<NUM_ACT_SET, 3>(in_w_L_pre, ShootingParams.w_L_pre);
+    mCopy_AB<NUM_ACT_SET, 3>(in_p_pre, ShootingParams.p_pre);
+    mCopy_AB<NUM_ACT_SET, 9>(in_R_pre, ShootingParams.R_pre);
+    mCopy_AB<NUM_ACT_SET, 6>(in_damping, ShootingParams.damping);
     ShootingParams.DELTA_T = in_DELTA_T;
 
     ShootingParams.fcumlambda[0][0] = 0.0;

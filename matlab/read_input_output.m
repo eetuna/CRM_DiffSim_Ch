@@ -42,8 +42,6 @@ normal_mat = circle(cutoff_i : end,9:11)';
 tip_position_mat_raw = circle(cutoff_i : end,12:14) - circle(cutoff_i : end,3:5) ;
 tip_position_mat_raw = tip_position_mat_raw' * 10^3;
 
-
-
 time_output = circle(cutoff_i : end,1);
 data_length = length(time_output);
 time_output = [0:1:data_length-1] * Ts_camera; %time_output - ones(data_length, 1) *  time_output(1,1);
@@ -87,28 +85,28 @@ time_output = [0:1:data_length-1] * Ts_camera; %time_output - ones(data_length, 
 %     end
 %     coil_position_mat = coil_position_mat_raw;
 
-    coil_position_mat = [];
-    tip_position_mat = [];
-    timer = 0.0;
-    
-    for i = 1: current_size
-        ind_up = ceil(timer / Ts_camera)+1;
-        ind_down = floor(timer / Ts_camera)+1;
-        interpolated_pts = (timer - time_output(ind_down)) * (coil_position_mat_raw(:,ind_up)...
-            - coil_position_mat_raw(:,ind_down)) / Ts_camera + coil_position_mat_raw(:,ind_down);
-    
-        coil_position_mat = [coil_position_mat, interpolated_pts];
+coil_position_mat = [];
+tip_position_mat = [];
+timer = 0.0;
 
-        interpolated_pts_tip = (timer - time_output(ind_down)) * (tip_position_mat_raw(:,ind_up)...
-            - tip_position_mat_raw(:,ind_down)) / Ts_camera + tip_position_mat_raw(:,ind_down);
-    
-        tip_position_mat = [tip_position_mat, interpolated_pts_tip];
+for i = 1: current_size
+    ind_up = ceil(timer / Ts_camera)+1;
+    ind_down = floor(timer / Ts_camera)+1;
+    interpolated_pts = (timer - time_output(ind_down)) * (coil_position_mat_raw(:,ind_up)...
+        - coil_position_mat_raw(:,ind_down)) / Ts_camera + coil_position_mat_raw(:,ind_down);
 
-        timer = timer + Ts;
-        if timer >= time_output(data_length)
-            break;
-        end
+    coil_position_mat = [coil_position_mat, interpolated_pts];
+
+    interpolated_pts_tip = (timer - time_output(ind_down)) * (tip_position_mat_raw(:,ind_up)...
+        - tip_position_mat_raw(:,ind_down)) / Ts_camera + tip_position_mat_raw(:,ind_down);
+
+    tip_position_mat = [tip_position_mat, interpolated_pts_tip];
+
+    timer = timer + Ts;
+    if timer >= time_output(data_length)
+        break;
     end
+end
 
 
 if Ts >= Ts_camera
@@ -120,6 +118,7 @@ end
 
     currents = raw_currents(:, 1:data_length);
 
+%% check data
 %     figure(12)
 %     subplot(3,2,1);
 %     length_ = size(coil_position_mat,2);
