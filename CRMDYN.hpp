@@ -17,8 +17,8 @@ using namespace std::chrono;
 #endif
 #define EQNDIMENSION 6	// domain: u[0..2], range: m_tip[0..2]
 
-#define NUM_ACT_SET 1								// Number of actuator sets
-#define NUM_FLEX_SEG 2								// Number of flexible segments
+#define NUM_ACT_SET 2								// Number of actuator sets
+#define NUM_FLEX_SEG 3								// Number of flexible segments
 #define NUM_SEGMENTS (NUM_ACT_SET+NUM_FLEX_SEG)		// Total number of segments
 #define NUM_LOCALIZATION_MARKERS 5					// Total number of localization markers
 	// IMPORTANT NOTE: for now most proximal segment is assumed to be always flexible
@@ -44,8 +44,8 @@ using namespace std::chrono;
 #define IVALUE_SCALE_N	1.0		// the variable used in Nonlinear Solver is multiplied with this scale to calculate ftip (tip force) that will be used in IVP
 #define IVALUE_SCALE_U	1.0 //(0.01)			// the variable used in Nonlinear Solver is multiplied with this scale to calculate u (curvature) that will be used in IVP
 #define IVALUE_SCALE_F	0.01//(0.01)			// the variable used in Nonlinear Solver is multiplied with this scale to calculate ftip (tip force) that will be used in IVP
-#define RESIDUAL_SCALE_P	1e+1 //(10.0)			// the residual for tip position error coming out of the IVP will be multiplied with this scale to return to the Nonlinear Solver
-#define RESIDUAL_SCALE_R	1e+1 //(10.0)			// the residual for tip position error coming out of the IVP will be multiplied with this scale to return to the Nonlinear Solver
+#define RESIDUAL_SCALE_P	1 //(10.0)			// the residual for tip position error coming out of the IVP will be multiplied with this scale to return to the Nonlinear Solver
+#define RESIDUAL_SCALE_R	1//(10.0)			// the residual for tip position error coming out of the IVP will be multiplied with this scale to return to the Nonlinear Solver
 
 // NL Solver method selection
 #define TRUSTREGION							// Trust Region Method with the numerical jacobian (Default)

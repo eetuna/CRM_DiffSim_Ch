@@ -1,5 +1,6 @@
 file(REMOVE_RECURSE
   "CMakeFiles/CRMDYN_test.dir/CRMDYN_test.cpp.o"
+  "CMakeFiles/CRMDYN_test.dir/CRMDYN_test.cpp.o.d"
   "CRMDYN_test"
   "CRMDYN_test.pdb"
 )

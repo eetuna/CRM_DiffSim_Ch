@@ -79,7 +79,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "17"
+			"value" : "21"
 		},
 		{
 			"name" : "CMAKE_CACHE_PATCH_VERSION",
@@ -91,7 +91,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "5"
+			"value" : "1"
 		},
 		{
 			"name" : "CMAKE_CODEBLOCKS_COMPILER_ID",
@@ -155,7 +155,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "/home/ranhao/Documents/clion-2020.3.1/bin/cmake/linux/bin/cmake"
+			"value" : "/home/ranhao/Documents/clion-2021.3.2/bin/cmake/linux/bin/cmake"
 		},
 		{
 			"name" : "CMAKE_CPACK_COMMAND",
@@ -167,7 +167,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "/home/ranhao/Documents/clion-2020.3.1/bin/cmake/linux/bin/cpack"
+			"value" : "/home/ranhao/Documents/clion-2021.3.2/bin/cmake/linux/bin/cpack"
 		},
 		{
 			"name" : "CMAKE_CTEST_COMMAND",
@@ -179,7 +179,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "/home/ranhao/Documents/clion-2020.3.1/bin/cmake/linux/bin/ctest"
+			"value" : "/home/ranhao/Documents/clion-2021.3.2/bin/cmake/linux/bin/ctest"
 		},
 		{
 			"name" : "CMAKE_CXX_COMPILER",
@@ -194,7 +194,7 @@
 					"value" : "CXX compiler"
 				}
 			],
-			"type" : "FILEPATH",
+			"type" : "STRING",
 			"value" : "/usr/bin/c++"
 		},
 		{
@@ -322,7 +322,7 @@
 					"value" : "C compiler"
 				}
 			],
-			"type" : "FILEPATH",
+			"type" : "STRING",
 			"value" : "/usr/bin/cc"
 		},
 		{
@@ -967,7 +967,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "/home/ranhao/Documents/clion-2020.3.1/bin/cmake/linux/share/cmake-3.17"
+			"value" : "/home/ranhao/Documents/clion-2021.3.2/bin/cmake/linux/share/cmake-3.21"
 		},
 		{
 			"name" : "CMAKE_SHARED_LINKER_FLAGS",
@@ -1218,6 +1218,18 @@
 			"value" : "/home/ranhao/Documents/CRM_Dynamics/cmake-build-debug"
 		},
 		{
+			"name" : "CRM_Dynamics_IS_TOP_LEVEL",
+			"properties" : 
+			[
+				{
+					"name" : "HELPSTRING",
+					"value" : "Value Computed by CMake"
+				}
+			],
+			"type" : "STATIC",
+			"value" : "ON"
+		},
+		{
 			"name" : "CRM_Dynamics_SOURCE_DIR",
 			"properties" : 
 			[
@@ -1239,7 +1251,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "[/usr/lib/x86_64-linux-gnu/libpython3.6m.so][/usr/include/python3.6m][v3.6.9()]"
+			"value" : "[/usr/lib/x86_64-linux-gnu/libpython3.6m.so][/usr/include/python3.6m][v()]"
 		},
 		{
 			"name" : "PYTHON_INCLUDE_DIR",

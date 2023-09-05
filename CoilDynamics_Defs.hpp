@@ -81,6 +81,8 @@ void CoilIntegrad(adType in_twist[6], adType in_n[3], adType g[3], adType R[9], 
          twistdot[i+3] = wdot[i];
      }
 
+
+
  }
 
 
@@ -137,7 +139,9 @@ void CoilDynamics( adType in_coil_state[NUM_COIL_STATES], adType in_n[3], adType
     for (int i = 0; i < NUM_COIL_STATES; i++) {
             x_n[i] = in_coil_state[i];
     }
-
+//        std::cout << "input v_n: " << x_n[0] << " " << x_n[1] << " " << x_n[2] <<  std::endl;
+//         std::cout << "input w_n: " << x_n[3] << " " << x_n[4] << " " << x_n[5] <<  std::endl;
+//
 
     int N = ceil(DELTA_T / t_step);
 
@@ -154,6 +158,9 @@ void CoilDynamics( adType in_coil_state[NUM_COIL_STATES], adType in_n[3], adType
 //                exit( 3 );
             }
         }
+
+//        std::cout << "input v_n: " << xdot_n[0] << " " << xdot_n[1] << " " << xdot_n[2] <<  std::endl;
+//         std::cout << "input w_n: " << xdot_n[3] << " " << xdot_n[4] << " " << xdot_n[5] <<  std::endl;
 
         // update the iteration items
         for (int i = 0; i < NUM_COIL_STATES; i++) {
@@ -178,6 +185,12 @@ void CoilDynamics( adType in_coil_state[NUM_COIL_STATES], adType in_n[3], adType
         out_xdot_n[i] = xdot_n[i];
     }
 
+
+    std::cout << "out_coil_state v_n: " << out_coil_state[0] << " " << out_coil_state[1] << " " << out_coil_state[2] <<  std::endl;
+    std::cout << "out_coil_state w_n: " << out_coil_state[3] << " " << out_coil_state[4] << " " << out_coil_state[5] <<  std::endl;
+    std::cout << "out_coil_state v dot: " << out_xdot_n[0] << " " << out_xdot_n[1] << " " << out_xdot_n[2] <<  std::endl;
+    std::cout << "out_coil_state w dot: " << out_xdot_n[3] << " " << out_xdot_n[4] << " " << out_xdot_n[5] <<  std::endl;
+    std::cout << " ---------  " <<  std::endl;
 }
 
 
@@ -208,8 +221,6 @@ void RK2_coildyn(adType in_x_n[NUM_COIL_STATES], adType in_n[3], adType g[3],  a
         muhat[i] = in_muhat[i];
     }
 
-//    std::cout << "input v_n: " << twist_n[0] << " " << twist_n[1] << " " << twist_n[2] <<  std::endl;
-//    std::cout << "input w_n: " << twist_n[3] << " " << twist_n[4] << " " << twist_n[5] <<  std::endl;
 
     //RK2_STEP_STEP1:
     CoilIntegrad(twist_n, nL, g, R_n, actMass, actInertia, damping,B0, muhat, mL, xdot_n);
@@ -490,6 +501,8 @@ void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, ad
         R_d[i] = Params.xi[3+i];
     }
 
+    double RigidSegmentLength;
+    double net_nL[3];  // placeholder for force applied on the flexible segment
 
     for (int segi = NUM_SEGMENTS-1; segi >=0; --segi) { // starting from the last segment
         if ( segi%2 == 0 ) {
@@ -533,8 +546,11 @@ void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, ad
                     p_L[i] = out_x_coil[actno][i+6] - R_L[ i*3 +2 ]*RigidSegmentLength * 0.5;
                 }
 
+                // nL is the force applied to the flexible segment
                 CRMFlexible_IVP_Back ( segi, p_L, R_L, Params,u_L , n_L[actno],
                                        u_f, p_f, R_f);
+
+                // we now compute the terms needed for the actuator below
                 actno = fsegi - 1;
 //                std::cout << "u_f: " << u_f[0] << " " << u_f[1] << " " << u_f[2] <<  std::endl;
 //                std::cout << "p_f: " << p_f[0] << " " << p_f[1] << " " << p_f[2] <<  std::endl;
@@ -551,13 +567,29 @@ void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, ad
         else{
 
             actno = (segi -1 )>>1;
-            CoilDynamics(x_coil[actno], n_L[actno], Params.g, actMass[actno], actInertia[actno],
+
+            std::cout << "n_L dyn: " << n_L[actno][0] << " " << n_L[actno][1] << " " << n_L[actno][2] << std::endl;
+            std::cout << "net_mL dyn: " << net_mL[0] << " " << net_mL[1] << " " << net_mL[2] << std::endl;
+
+            if(actno< NUM_ACT_SET-1){
+                mSub_AB<3,1>( n_L[actno], n_L[actno+1], net_nL);
+            }else{
+                mSub_AB<3,1>( n_L[actno], n_0, net_nL);
+            }
+
+            // nL is the force applied to the flexible segment, that is negated in the calculation
+            CoilDynamics(x_coil[actno], net_nL, Params.g, actMass[actno], actInertia[actno],
                          Params.damping[actno], Params.DELTA_T, Params.B0,
                          muhat[actno], net_mL, out_x_coil[actno], out_xdot);
 
+
+//            for (int i = 0; i < NUM_COIL_STATES; ++i) {
+//                std::cout << "out_xdot" << out_xdot[i] << std::endl;
+//            }
+//            std::cout << "------------------------------" << std::endl;
             // compute the residual against the last flexible segment above
             if(actno<NUM_ACT_SET-1){
-                double RigidSegmentLength	=	SegBounds[segi+1]-SegBounds[segi];	// how far we need to move along the length of the rigid segment to reach the next flexible segment
+                 RigidSegmentLength	=	SegBounds[segi+1]-SegBounds[segi];	// how far we need to move along the length of the rigid segment to reach the next flexible segment
 
                 //indices for the residual
                 actno_mn = actno + 1;
@@ -606,11 +638,12 @@ void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, ad
     v_val[2] = vNormSq<3>(v3);
     for (int i = 0; i < 3; ++i) residual[actno][i+3] = sqrt(v_val[i]);
 
-//    for (int i = 0; i < NUM_ACT_SET; ++i) {
-//        std::cout << "residual p: " << residual[i][0] << " " << residual[i][1] << " " <<residual[i][2] << std::endl;
-//        std::cout << "residual R: " << residual[i][3] << " " << residual[i][4] << " " <<residual[i][5] << std::endl;
-//    }
-//
+    for (int i = 0; i < NUM_ACT_SET; ++i) {
+        std::cout << "residual p: " << residual[i][0] << " " << residual[i][1] << " " <<residual[i][2] << std::endl;
+        std::cout << "residual R: " << residual[i][3] << " " << residual[i][4] << " " <<residual[i][5] << std::endl;
+    }
+
+    std::cout << " --------------------------------- " << std::endl;
 
     for (int i = 0; i < NUM_ACT_SET; ++i) {
         for (int j = 0; j < 3; ++j) {

@@ -41,7 +41,6 @@ Coil_align = nlgr_model.Parameters(5).Value; %[-0.0871, -0.3934]
 Coil_turnarea = nlgr_model.Parameters(6).Value;%[1.3851;1.44;1.60];% [1.44;1.3851;1.60];
 mass_ =nlgr_model.Parameters(7).Value;% [5.7736e-5]; 
 
-
 %test with varying freq data
 load('output_currents.mat');
 load('output_coil_traj.mat');
