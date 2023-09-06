@@ -114,6 +114,14 @@ void CoilDynamics( adType in_coil_state[NUM_COIL_STATES], adType in_n[3], adType
 //        std::cout << "in_tau: " << in_tau[i] << std::endl;
 //    }
 
+//
+//        std::cout << "R_pre: " << std::endl;
+//        std::cout <<  in_coil_state[9] << " " << in_coil_state[10]<< " " << in_coil_state[11] <<  std::endl;
+//        std::cout <<  in_coil_state[12]<< " " << in_coil_state[13]<< " " << in_coil_state[14] <<  std::endl;
+//        std::cout << in_coil_state[15]<< " " << in_coil_state[16] << " " << in_coil_state[17] <<  std::endl;
+//
+
+
     adType x_nm3[NUM_COIL_STATES];
     adType x_nm2[NUM_COIL_STATES];
     adType x_nm1[NUM_COIL_STATES];
@@ -184,13 +192,20 @@ void CoilDynamics( adType in_coil_state[NUM_COIL_STATES], adType in_n[3], adType
     for (int i = 0; i < 6; ++i) {
         out_xdot_n[i] = xdot_n[i];
     }
+//
+//    std::cout << "RL_now: " << std::endl;
+//    std::cout <<  x_n[9] << " " << x_n[10]<< " " << x_n[11] <<  std::endl;
+//    std::cout <<  x_n[12]<< " " << x_n[13]<< " " << x_n[14] <<  std::endl;
+//    std::cout << x_n[15]<< " " << x_n[16] << " " << x_n[17] <<  std::endl;
+//
 
 
-    std::cout << "out_coil_state v_n: " << out_coil_state[0] << " " << out_coil_state[1] << " " << out_coil_state[2] <<  std::endl;
-    std::cout << "out_coil_state w_n: " << out_coil_state[3] << " " << out_coil_state[4] << " " << out_coil_state[5] <<  std::endl;
-    std::cout << "out_coil_state v dot: " << out_xdot_n[0] << " " << out_xdot_n[1] << " " << out_xdot_n[2] <<  std::endl;
-    std::cout << "out_coil_state w dot: " << out_xdot_n[3] << " " << out_xdot_n[4] << " " << out_xdot_n[5] <<  std::endl;
-    std::cout << " ---------  " <<  std::endl;
+
+//    std::cout << "out_coil_state v_n: " << out_coil_state[0] << " " << out_coil_state[1] << " " << out_coil_state[2] <<  std::endl;
+//    std::cout << "out_coil_state w_n: " << out_coil_state[3] << " " << out_coil_state[4] << " " << out_coil_state[5] <<  std::endl;
+//    std::cout << "out_coil_state v dot: " << out_xdot_n[0] << " " << out_xdot_n[1] << " " << out_xdot_n[2] <<  std::endl;
+//    std::cout << "out_coil_state w dot: " << out_xdot_n[3] << " " << out_xdot_n[4] << " " << out_xdot_n[5] <<  std::endl;
+//    std::cout << " ---------  " <<  std::endl;
 }
 
 
@@ -421,7 +436,7 @@ void SE3_TimeSpace(adType in_R_n[9], adType in_p_n[3], adType h, adType in_twist
 #undef EPS
 
 template <typename adType>
-void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, adType out_u0[3]) {
+void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, adType out_u0[3], adType out_tau[NUM_ACT_SET*3]) {
 
     // output for time advance, not used in BVP, just placeholders
     adType m_L[NUM_ACT_SET][3], n_L[NUM_ACT_SET][3], n_0[3];
@@ -432,6 +447,13 @@ void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, ad
             n_L[j][i] = IVALUE_SCALE_N * in_x[i+ j*6 + 3];
         }
     }
+
+//
+//    for (int i = 0; i < NUM_ACT_SET; ++i) {
+//        std::cout << "nL dyn: " << n_L[i][0] << " " << n_L[i][1] << " " << n_L[i][2] << std::endl;
+//        std::cout << "ML dyn: " << m_L[i][0] << " " << m_L[i][1] << " " << m_L[i][2] << std::endl;
+//    }
+
 
     for (int i = 0; i < 3; i++) {
         n_0[i] = Params.TipForce[i];  // for free-tip, this parameter is not given by the nonlinear equation solver, and hence, does not need to be scaled
@@ -446,6 +468,7 @@ void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, ad
     adType MagMoment[NUM_ACT_SET][3], muhat[NUM_ACT_SET][9], actMass[NUM_ACT_SET], actInertia[NUM_ACT_SET][9];
 
     double mu[3], muhattemp[9];
+
 
     for (int j = 0; j < NUM_ACT_SET; ++j) {
         for (int i = 0; i < 3; ++i) {
@@ -529,6 +552,11 @@ void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, ad
 
                 mSub_AB<3,1>( m_L[actno], tau, net_mL);  // the net torque applied to the downwards coil
 
+                //copy to the output for forward calculation
+                for (int i = 0; i < 3; ++i) {
+                    out_tau[i+actno*3] = tau[i];
+                }
+
             }else{ // the non-free tip flexible segments with coils on top
 
                 actno = fsegi;
@@ -560,6 +588,11 @@ void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, ad
                     mMult_AB<3,3,1>( K[fsegi], du, tau ); // calculate moment at upper side of the coil
 
                     mSub_AB<3,1>( m_L[actno], tau, net_mL); // net torque applied at the downwards coil
+                    //copy to the output for forward calculation
+
+                    for (int i = 0; i < 3; ++i) {
+                        out_tau[i+actno*3] = tau[i];
+                    }
                 }
 
             }
@@ -568,8 +601,8 @@ void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, ad
 
             actno = (segi -1 )>>1;
 
-            std::cout << "n_L dyn: " << n_L[actno][0] << " " << n_L[actno][1] << " " << n_L[actno][2] << std::endl;
-            std::cout << "net_mL dyn: " << net_mL[0] << " " << net_mL[1] << " " << net_mL[2] << std::endl;
+//            std::cout << "n_L dyn: " << n_L[actno][0] << " " << n_L[actno][1] << " " << n_L[actno][2] << std::endl;
+//            std::cout << "net_mL dyn: " << net_mL[0] << " " << net_mL[1] << " " << net_mL[2] << std::endl;
 
             if(actno< NUM_ACT_SET-1){
                 mSub_AB<3,1>( n_L[actno], n_L[actno+1], net_nL);
@@ -581,6 +614,11 @@ void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, ad
             CoilDynamics(x_coil[actno], net_nL, Params.g, actMass[actno], actInertia[actno],
                          Params.damping[actno], Params.DELTA_T, Params.B0,
                          muhat[actno], net_mL, out_x_coil[actno], out_xdot);
+
+//            std::cout << "RL now: " << std::endl;
+//            std::cout <<  out_x_coil[actno][9] << " " << out_x_coil[actno][10]<< " " << out_x_coil[actno][11] <<  std::endl;
+//            std::cout <<  out_x_coil[actno][12]<< " " << out_x_coil[actno][13]<< " " << out_x_coil[actno][14] <<  std::endl;
+//            std::cout << out_x_coil[actno][15]<< " " << out_x_coil[actno][16] << " " << out_x_coil[actno][17] <<  std::endl;
 
 
 //            for (int i = 0; i < NUM_COIL_STATES; ++i) {
@@ -638,12 +676,12 @@ void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, ad
     v_val[2] = vNormSq<3>(v3);
     for (int i = 0; i < 3; ++i) residual[actno][i+3] = sqrt(v_val[i]);
 
-    for (int i = 0; i < NUM_ACT_SET; ++i) {
-        std::cout << "residual p: " << residual[i][0] << " " << residual[i][1] << " " <<residual[i][2] << std::endl;
-        std::cout << "residual R: " << residual[i][3] << " " << residual[i][4] << " " <<residual[i][5] << std::endl;
-    }
-
-    std::cout << " --------------------------------- " << std::endl;
+//    for (int i = 0; i < NUM_ACT_SET; ++i) {
+//        std::cout << "residual p: " << residual[i][0] << " " << residual[i][1] << " " <<residual[i][2] << std::endl;
+//        std::cout << "residual R: " << residual[i][3] << " " << residual[i][4] << " " <<residual[i][5] << std::endl;
+//    }
+//
+//    std::cout << " --------------------------------- " << std::endl;
 
     for (int i = 0; i < NUM_ACT_SET; ++i) {
         for (int j = 0; j < 3; ++j) {
@@ -661,13 +699,18 @@ void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, ad
 }
 
 void CRMIVP_DYN(	 CRMIVPCoreParams<double> CoreParams, const double in_u0[3], const double in_p0[3], const double in_R0[9],
-                     const double in_mL[NUM_ACT_SET][3], const double in_nL[NUM_ACT_SET][3], const double in_ftip[3],
+                     const double in_mL[NUM_ACT_SET][3], const double in_nL[NUM_ACT_SET][3], const double in_tau[NUM_ACT_SET][3], const double in_ftip[3],
                      double out_coil_state[NUM_ACT_SET][NUM_COIL_STATES],  double out_u_new[3], double out_p_new[3], double out_R_new[9],
                      double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]) {
 
     double x_coil[NUM_ACT_SET][NUM_COIL_STATES];
     double MagMoment[NUM_ACT_SET][3], muhat[NUM_ACT_SET][9], actMass[NUM_ACT_SET], actInertia[NUM_ACT_SET][9];
 
+
+//    for (int i = 0; i < NUM_ACT_SET; ++i) {
+//        std::cout << "nL dyn: " << in_nL[i][0] << " " << in_nL[i][1] << " " << in_nL[i][2] << std::endl;
+//        std::cout << "ML dyn: " << in_mL[i][0] << " " << in_mL[i][1] << " " << in_mL[i][2] << std::endl;
+//    }
     double mu[3], muhattemp[9];
     for (int j = 0; j < NUM_ACT_SET; ++j) {
         for (int i = 0; i < 3; ++i) {
@@ -707,10 +750,11 @@ void CRMIVP_DYN(	 CRMIVPCoreParams<double> CoreParams, const double in_u0[3], co
     auto & SegBounds = CoreParams.SegBounds;
     double w[3], w_dot[3], w_hat[9], w_inertia_w[3], inertia_wdot[3], out_xdot[6], w_terms[3], Tb_ml[3], K2invResidual[3];
 
-    double u_0[3], p0[3], R0[9], n_L[NUM_ACT_SET][3], m_L[NUM_ACT_SET][3];
+    double u_0[3], p0[3], R0[9], n_L[NUM_ACT_SET][3], m_L[NUM_ACT_SET][3], tau[NUM_ACT_SET][3];
 
     mCopy_AB<NUM_ACT_SET, 3>(in_nL, n_L);
     mCopy_AB<NUM_ACT_SET, 3>(in_mL, m_L);
+    mCopy_AB<NUM_ACT_SET, 3>(in_tau, tau);
 
     for (int i = 0; i < 3; ++i) {
         u_0[i] = in_u0[i];
@@ -719,6 +763,8 @@ void CRMIVP_DYN(	 CRMIVPCoreParams<double> CoreParams, const double in_u0[3], co
     for (int i = 0; i < 9; ++i) {
         R0[i] = in_R0[i];
     }
+
+    double net_nL[3], net_mL[3];
 
     double RigidSegmentLength;
 
@@ -749,8 +795,18 @@ void CRMIVP_DYN(	 CRMIVPCoreParams<double> CoreParams, const double in_u0[3], co
             actno=(SegmentIndex-1)>>1;		// actuator no
             fsegip1=actno+1;
 
-            CoilDynamics(x_coil[actno], n_L[actno], CoreParams.g, actMass[actno], actInertia[actno], CoreParams.damping[actno], CoreParams.DELTA_T,
-                         CoreParams.B0, muhat[actno], m_L[actno], update_coil_state, out_xdot);
+
+            if(actno< NUM_ACT_SET-1){
+                mSub_AB<3,1>( n_L[actno], n_L[actno+1], net_nL);
+            }else{
+                mSub_AB<3,1>( n_L[actno], in_ftip, net_nL);
+            }
+
+            mSub_AB<3,1>( m_L[actno], tau[actno], net_mL); // net torque applied at the downwards coil
+
+
+            CoilDynamics(x_coil[actno], net_nL, CoreParams.g, actMass[actno], actInertia[actno], CoreParams.damping[actno], CoreParams.DELTA_T,
+                         CoreParams.B0, muhat[actno], net_mL, update_coil_state, out_xdot);
 
             for (int i = 0; i < 3; ++i) {
                 w[i] = update_coil_state[i+3];
@@ -766,10 +822,10 @@ void CRMIVP_DYN(	 CRMIVPCoreParams<double> CoreParams, const double in_u0[3], co
             mMult_AB<3,3,1>(actInertia[actno], w_dot, inertia_wdot);
             mAdd_AB<3,1>(inertia_wdot, w_inertia_w, w_terms);
 
-            mSub_AB<3,1>( Tb, m_L[actno], Tb_ml);
-            mSub_AB<3,1>( Tb_ml, w_terms, Residual);
+//            mSub_AB<3,1>( Tb, m_L[actno], Tb_ml);
+//            mSub_AB<3,1>( Tb_ml, w_terms, Residual);
 
-            mMult_AB<3,3,1>( Kinv[fsegip1], Residual, K2invResidual );
+            mMult_AB<3,3,1>( Kinv[fsegip1], tau[actno], K2invResidual );
             mAdd_AB<3,1>( ustar[fsegip1], K2invResidual, u_0 );
 
             for (int i = 0; i < 3; ++i) {
@@ -810,7 +866,7 @@ void CRMIVP_DYN(	 CRMIVPCoreParams<double> CoreParams, const double in_u0[3], co
 template <typename adType>
 void DynamicsBVP(	CRMShootingMethodParams<adType> in_Params, const double xf[NUM_STATES],
                               double in_mL_initialguess[NUM_ACT_SET][3], double in_nL_initialguess[NUM_ACT_SET][3], double in_ftip_initialguess[3],
-                              adType out_u0[3], adType out_mL[NUM_ACT_SET][3], adType out_nL[NUM_ACT_SET][3], adType out_ftip[3], int& out_localmin) {
+                              adType out_u0[3], adType out_mL[NUM_ACT_SET][3], adType out_nL[NUM_ACT_SET][3], adType out_tau[NUM_ACT_SET][3], adType out_ftip[3], int& out_localmin) {
 
     ContactModeType ContactMode = in_Params.ContactMode;
     int NLEq_Dim;  // Dimension of the Nonlinear Equation to Solve
@@ -889,10 +945,10 @@ void DynamicsBVP(	CRMShootingMethodParams<adType> in_Params, const double xf[NUM
 //    auto duration = duration_cast<microseconds>(stop - start);
 //    std::cout << std::endl << "Average time taken by DYNNLEquation Solution in " << REPS << " repetitions: " << duration.count() / REPS << " microseconds" << std::endl;
 
-
+    double tau[NUM_ACT_SET*3];
 
 #if defined( TRUSTREGION )
-        TrustRegionDogleg_dyn(NLEq_Dim, x, residual, tol, info, wa, lwa, DYNNLEParams, out_u0);
+        TrustRegionDogleg_dyn(NLEq_Dim, x, residual, tol, info, wa, lwa, DYNNLEParams, out_u0, tau);
 #else // undefined
     exit(1);
 #endif
@@ -908,11 +964,17 @@ void DynamicsBVP(	CRMShootingMethodParams<adType> in_Params, const double xf[NUM
             out_mL[j][i] = IVALUE_SCALE_M * returnedparamscaled[i + j * 6];
             out_nL[j][i] = IVALUE_SCALE_N * returnedparamscaled[i + j * 6 + 3];
         }
+
+        for (int i = 0; i < 3; ++i) {
+            out_tau[j][i] = tau[i+j*3];
+        }
     }
+
 
 //    for (int i = 0; i < NUM_ACT_SET; ++i) {
 //        std::cout << "out_mL: " << out_mL[i][0] << " " << out_mL[i][1] << " " <<out_mL[i][2] << std::endl;
 //        std::cout << "out_nL: " << out_nL[i][0] << " " << out_nL[i][1] << " " <<out_nL[i][2] << std::endl;
+//        std::cout << "out_tau: " << out_tau[i][0] << " " << out_tau[i][1] << " " <<out_tau[i][2] << std::endl;
 //    }
 
     for (int i = 0; i < 3; ++i) {
@@ -928,7 +990,7 @@ void DynamicsBVP(	CRMShootingMethodParams<adType> in_Params, const double xf[NUM
 
 template <typename adType>
 void DYNSolverIVP(	CRMShootingMethodParams<adType> in_Params, adType in_u0[3],
-                      adType in_mL[NUM_ACT_SET][3], adType in_nL[NUM_ACT_SET][3], adType in_ftip[3],
+                      adType in_mL[NUM_ACT_SET][3], adType in_nL[NUM_ACT_SET][3], double in_tau[NUM_ACT_SET][3], adType in_ftip[3],
                       bool in_FinalValueOnly,
                       adType out_x_N[NUM_STATES], adType out_coil_state[NUM_ACT_SET][NUM_COIL_STATES],
                       double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]){
@@ -941,7 +1003,7 @@ void DYNSolverIVP(	CRMShootingMethodParams<adType> in_Params, adType in_u0[3],
     }
 
     CRMIVPCoreParams<adType> CoreParams;
-    adType u_0[3], n_L[NUM_ACT_SET][3], m_L[NUM_ACT_SET][3], ftip[3];
+    adType u_0[3], n_L[NUM_ACT_SET][3], m_L[NUM_ACT_SET][3], tau[NUM_ACT_SET][3], ftip[3];
     // We need to pass u_0 as input argument as the values in CoreParams will be overriden with the values provided in the input arguments - functionality needed for solving Boundary Value Problems (BVP)
     // copy to local variable
     for (int i = 0; i < 3; i++) u_0[i] = in_u0[i];
@@ -950,6 +1012,8 @@ void DYNSolverIVP(	CRMShootingMethodParams<adType> in_Params, adType in_u0[3],
     for (int j = 0; j < NUM_ACT_SET; ++j) {
         for (int i = 0; i < 3; i++) n_L[j][i] = in_nL[j][i];
         for (int i = 0; i < 3; i++) m_L[j][i] = in_mL[j][i];
+        for (int i = 0; i < 3; i++) tau[j][i] = in_tau[j][i];
+
     }
     CRMSolverIVP_Prep(x_0, in_Params.IntegrationStepSize,
                       in_Params.Li, in_Params.dlambdainv,
@@ -962,7 +1026,7 @@ void DYNSolverIVP(	CRMShootingMethodParams<adType> in_Params, adType in_u0[3],
 
     double u_new[3], p_new[3], R_new[9];
     double p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3];
-    CRMIVP_DYN(	 CoreParams, u_0, in_Params.p0, in_Params.R0, m_L, n_L, ftip, out_coil_state, u_new, p_new, R_new, p_atLocMarkers);
+    CRMIVP_DYN(	 CoreParams, u_0, in_Params.p0, in_Params.R0, m_L, n_L, tau,ftip, out_coil_state, u_new, p_new, R_new, p_atLocMarkers);
 
     for (int i = 0; i < NUM_STATES; ++i) {
         if(i<3){

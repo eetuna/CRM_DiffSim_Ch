@@ -150,6 +150,7 @@ void compute_dx(double *dx, double t, double *x, double *u, double **p)
     CatheterConfiguration CathConfig;		// Catheter spatial configuration parameters will be packages into this structure
 
 
+
     CRMShootingMethodBVP_Prep(B0,gravity, p0, R0,SegmentLengths, MarkerLoc,
                               iRlist, oRlist, YoungModlist, ShearModlist, ustarlist,
                               CoilAlignmentAngles, CoilTurnAreaMat, rho, ActMass, ActInertia,
@@ -204,6 +205,9 @@ void compute_dx(double *dx, double t, double *x, double *u, double **p)
 //    }
 //
 
+
+    double out_tau[NUM_ACT_SET][3];
+
     CRMConstructShootingMethodParamSet<double>(CathParams, CathConfig, InsertedLength, ActuationCurrents, ContactMode,
                                                TipConstraintPoint, TipForce, IntegrationStepSize,
                                                v_L_pre, w_L_pre, pL_pre,  RL_pre, damping_, Delta_T,
@@ -211,11 +215,11 @@ void compute_dx(double *dx, double t, double *x, double *u, double **p)
 
 
     DynamicsBVP(BVPParams, xf_pre, mL_initialguess, nL_initialguess, ftip_initialguess,
-                u0_calc, mL_calc, nL_calc, ftip_calc, localmin);
+                u0_calc, mL_calc, nL_calc, out_tau, ftip_calc, localmin);
 
     double out_ReportedMarkerPos[NUM_LOCALIZATION_MARKERS][3], x_coil[NUM_ACT_SET][NUM_COIL_STATES];
 
-    DYNSolverIVP(BVPParams, u0_calc, mL_calc, nL_calc, ftip_calc,
+    DYNSolverIVP(BVPParams, u0_calc, mL_calc, nL_calc, out_tau, ftip_calc,
                  true, xf, x_coil,out_ReportedMarkerPos);
 
     /** Output report **/

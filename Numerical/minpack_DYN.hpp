@@ -66,16 +66,16 @@
 #include "minpack.hpp"
 
 template <typename adType>
-void TrustRegionDogleg_dyn(	int n, adType x[], adType fvec[], double tol, int& info, adType wa[], int lwa, NLEqnParams<adType> Params, adType out_u0[3]);
+void TrustRegionDogleg_dyn(	int n, adType x[], adType fvec[], double tol, int& info, adType wa[], int lwa, NLEqnParams<adType> Params, adType out_u0[3], adType out_tau[NUM_ACT_SET*3]);
 
 template <typename adType>
 void hybrd_dyn(		int n, adType x[], adType fvec[], double xtol, int maxfev, int ml, int mu, double epsfcn,
 						adType diag[], int mode, double factor, int nprint, int& info, int& nfev,
 						adType fjac[], int ldfjac, adType r[], int lr, adType qtf[],
-						adType wa1[], adType wa2[], adType wa3[], adType wa4[], NLEqnParams<adType> Params, adType out_u0[3]);
+						adType wa1[], adType wa2[], adType wa3[], adType wa4[], NLEqnParams<adType> Params, adType out_u0[3], adType out_tau[NUM_ACT_SET*3]);
 
 template <typename adType>
 void fdjac1_dyn(	int n, adType x[], adType fvec[], adType fjac[], int ldfjac, int& iflag,
-						int ml, int mu, double epsfcn, adType wa1[], adType wa2[], NLEqnParams<adType> Params, adType out_u0[3]);
+						int ml, int mu, double epsfcn, adType wa1[], adType wa2[], NLEqnParams<adType> Params, adType out_u0[3], adType out_tau[NUM_ACT_SET*3]);
 
 #include "minpack_DYN_Defs.hpp"

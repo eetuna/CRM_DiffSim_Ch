@@ -95,14 +95,14 @@
 //C
 //C     Argonne National Laboratory. MINPACK Project. November 1996.
 //C     Burton S. Garbow, Kenneth E. Hillstrom, Jorge J. More'
-#define DPMPAR1 2.220446049250313e-16
-//#define DPMPAR2 2.22507385852e-308
-//#define DPMPAR3 1.79769313485e+308
-#define DPMPAR2 0.4450147717014e-307
-#define DPMPAR3 1.0e+30
+//#define DPMPAR1 2.220446049250313e-16
+////#define DPMPAR2 2.22507385852e-308
+////#define DPMPAR3 1.79769313485e+308
+//#define DPMPAR2 0.4450147717014e-307
+//#define DPMPAR3 1.0e+30
 
 template <typename adType>
-void TrustRegionDogleg_dyn(	int n, adType x[], adType fvec[], double tol, int& info, adType wa[], int lwa, NLEqnParams<adType> Params, adType out_u0[3]) {
+void TrustRegionDogleg_dyn(	int n, adType x[], adType fvec[], double tol, int& info, adType wa[], int lwa, NLEqnParams<adType> Params, adType out_u0[3], adType out_tau[NUM_ACT_SET*3]) {
 	//C     **********
 	//C
 	//C     subroutine hybrd1
@@ -214,7 +214,7 @@ void TrustRegionDogleg_dyn(	int n, adType x[], adType fvec[], double tol, int& i
 	}
     hybrd_dyn(n, x, fvec, xtol, maxfev, ml, mu, epsfcn, wa,
 		mode, factor, nprint, info, nfev, wa+index, n, wa+6*n,
-		lr, wa+n, wa+2*n, wa+3*n, wa+4*n, wa+5*n, Params, out_u0);
+		lr, wa+n, wa+2*n, wa+3*n, wa+4*n, wa+5*n, Params, out_u0, out_tau);
 	if (info == 5) {
 		info = 4;
 	}
@@ -225,7 +225,7 @@ template <typename adType>
 void hybrd_dyn(int n, adType x[], adType fvec[], double xtol, int maxfev, int ml, int mu, double epsfcn,
 	adType diag[], int mode, double factor, int nprint, int& info, int& nfev,
 	adType fjac[], int ldfjac, adType r[], int lr, adType qtf[],
-	adType wa1[], adType wa2[], adType wa3[], adType wa4[], NLEqnParams<adType> Params, adType out_u0[3]) {
+	adType wa1[], adType wa2[], adType wa3[], adType wa4[], NLEqnParams<adType> Params, adType out_u0[3], adType out_tau[NUM_ACT_SET*3]) {
 	//C     **********
 	//C
 	//C     subroutine hybrd
@@ -436,7 +436,7 @@ void hybrd_dyn(int n, adType x[], adType fvec[], double xtol, int maxfev, int ml
 	//C     and calculate its norm.
 	//C
 	iflag = 1;
-	DYNNLEquation(x, fvec, Params, out_u0);
+	DYNNLEquation(x, fvec, Params, out_u0, out_tau);
 	nfev = 1;
 	if (iflag < 0) {
 		info = iflag;
@@ -465,7 +465,7 @@ void hybrd_dyn(int n, adType x[], adType fvec[], double xtol, int maxfev, int ml
 		//C        calculate the jacobian matrix.
 		//C
 		iflag = 2;
-		fdjac1_dyn(n, x, fvec, fjac, ldfjac, iflag, ml, mu, epsfcn, wa1, wa2, Params, out_u0);
+		fdjac1_dyn(n, x, fvec, fjac, ldfjac, iflag, ml, mu, epsfcn, wa1, wa2, Params, out_u0, out_tau);
 		nfev += msum;
 		if (iflag < 0) {
 			info = iflag;
@@ -557,7 +557,7 @@ void hybrd_dyn(int n, adType x[], adType fvec[], double xtol, int maxfev, int ml
 			if (nprint > 0) {
 				iflag = 0;
 				if (((iter - 1) % nprint) == 0) {
-					DYNNLEquation(x, fvec, Params, out_u0);
+					DYNNLEquation(x, fvec, Params, out_u0, out_tau);
 				}
 				if (iflag < 0) {
 					info = iflag;
@@ -587,7 +587,7 @@ void hybrd_dyn(int n, adType x[], adType fvec[], double xtol, int maxfev, int ml
 			//C           evaluate the function at x + p and calculate its norm.
 			//C
 			iflag = 1;
-			DYNNLEquation(wa2, wa4, Params, out_u0);
+			DYNNLEquation(wa2, wa4, Params, out_u0, out_tau);
 			nfev++;
 			if (iflag < 0) {
 				info = iflag;
@@ -744,7 +744,7 @@ void hybrd_dyn(int n, adType x[], adType fvec[], double xtol, int maxfev, int ml
 	}
 	iflag = 0;
 	if (nprint > 0) {
-		DYNNLEquation(x, fvec, Params, out_u0);
+		DYNNLEquation(x, fvec, Params, out_u0, out_tau);
 	}
 	//C
 	//C     last card of subroutine hybrd.
@@ -753,7 +753,7 @@ void hybrd_dyn(int n, adType x[], adType fvec[], double xtol, int maxfev, int ml
 
 template <typename adType>
 void fdjac1_dyn(int n, adType x[], adType fvec[], adType fjac[], int ldfjac, int& iflag,
-	int ml, int mu, double epsfcn, adType wa1[], adType wa2[], NLEqnParams<adType> Params, adType out_u0[3]) {
+	int ml, int mu, double epsfcn, adType wa1[], adType wa2[], NLEqnParams<adType> Params, adType out_u0[3], adType out_tau[NUM_ACT_SET*3]) {
 	//C     **********
 	//C
 	//C     subroutine fdjac1
@@ -864,7 +864,7 @@ void fdjac1_dyn(int n, adType x[], adType fvec[], adType fjac[], int ldfjac, int
 				h = eps;
 			}
 			x[j] = temp + h;
-			DYNNLEquation(x, wa1, Params, out_u0);
+			DYNNLEquation(x, wa1, Params, out_u0, out_tau);
 			if (iflag < 0) {
 				return;
 			}
@@ -887,7 +887,7 @@ void fdjac1_dyn(int n, adType x[], adType fvec[], adType fjac[], int ldfjac, int
 				}
 				x[j] = wa2[j] + h;
 			}
-			DYNNLEquation(x, wa1, Params, out_u0);
+			DYNNLEquation(x, wa1, Params, out_u0, out_tau);
 			if (iflag < 0) {
 				return;
 			}

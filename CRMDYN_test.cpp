@@ -304,7 +304,7 @@ int RunExample(void) {
 //    std::cout << "ActuationCurrents: " << ActuationCurrents[0][0] << " " << ActuationCurrents[0][1] << " " << ActuationCurrents[0][2] <<  std::endl;
 
     double xf[NUM_STATES];
-    double out_u0[3], out_nL[NUM_ACT_SET][3], out_mL[NUM_ACT_SET][3];
+    double out_u0[3], out_nL[NUM_ACT_SET][3], out_mL[NUM_ACT_SET][3], out_tau[NUM_ACT_SET][3];
     double x_coil[NUM_ACT_SET][NUM_COIL_STATES];
 
     for (int k = 0; k < 4; ++k) {
@@ -317,7 +317,7 @@ int RunExample(void) {
 
 
         DynamicsBVP(BVPParams, xf_pre, mL_initialguess, nL_initialguess, ftip_initialguess,
-                    out_u0, out_mL, out_nL, ftip_calc, localmin);
+                    out_u0, out_mL, out_nL, out_tau, ftip_calc, localmin);
 //
 //        std::cout << "out_u0: " << out_u0[0] << " " << out_u0[1] << " " << out_u0[2] <<  std::endl;
 //        for (int i = 0; i < NUM_ACT_SET; ++i) {
@@ -325,7 +325,7 @@ int RunExample(void) {
 //            std::cout << "out_nL: " << out_nL[i][0] << " " << out_nL[i][1] << " " << out_nL[i][2] <<  std::endl;
 //        }
 
-        DYNSolverIVP(BVPParams, out_u0, out_mL, out_nL, ftip_calc,
+        DYNSolverIVP(BVPParams, out_u0, out_mL, out_nL, out_tau, ftip_calc,
                      true, xf, x_coil,ReportedMarkerPos);
 
     double v_L_pre_[NUM_ACT_SET][3], w_L_pre_[NUM_ACT_SET][3], pL_[NUM_ACT_SET][3], RL_[NUM_ACT_SET][9], xf_pre_[NUM_STATES];
@@ -337,8 +337,10 @@ int RunExample(void) {
             }
 
             for (int i = 0; i < 9; ++i) {
-                RL_[j][i] = x_coil[j][i+9];
+                RL[j][i] = x_coil[j][i+9];
             }
+//            printMatrix(RL[j], 1, 9, "R at Coil");
+//            std::cout << " mew coil" << std::endl;
 
 //            for (int i = 0; i < 3; ++i) {
 //                mL_initialguess[j][i] = out_mL[j][i];

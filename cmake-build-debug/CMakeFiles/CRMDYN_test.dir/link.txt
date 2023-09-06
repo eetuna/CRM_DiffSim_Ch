@@ -1,1 +1,0 @@
-/usr/bin/c++  -O0 -g CMakeFiles/CRMDYN_test.dir/CRMDYN_test.cpp.o -o CRMDYN_test 

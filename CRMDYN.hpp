@@ -17,8 +17,8 @@ using namespace std::chrono;
 #endif
 #define EQNDIMENSION 6	// domain: u[0..2], range: m_tip[0..2]
 
-#define NUM_ACT_SET 2								// Number of actuator sets
-#define NUM_FLEX_SEG 3								// Number of flexible segments
+#define NUM_ACT_SET 1								// Number of actuator sets
+#define NUM_FLEX_SEG 2								// Number of flexible segments
 #define NUM_SEGMENTS (NUM_ACT_SET+NUM_FLEX_SEG)		// Total number of segments
 #define NUM_LOCALIZATION_MARKERS 5					// Total number of localization markers
 	// IMPORTANT NOTE: for now most proximal segment is assumed to be always flexible
@@ -368,16 +368,16 @@ void ABM4_coildyn(	adType in_x_n[NUM_COIL_STATES],adType in_xdot_nm1[6], adType 
                       adType out_x_np1[NUM_COIL_STATES], adType out_xdot_n[6]);
 
 template <typename adType>
-void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, adType out_u0[3]);
+void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, adType out_u0[3],adType out_tau[NUM_ACT_SET*3]);
 
 template <typename adType>
-void DynamicsBVP(CRMShootingMethodParams<adType> in_Params, const double xf[NUM_STATES],
-                 double in_mL_initialguess[NUM_ACT_SET][3], double in_nL_initialguess[NUM_ACT_SET][3], double in_ftip_initialguess[3],
-                 adType out_u0[3], adType out_mL[NUM_ACT_SET][3], adType out_nL[NUM_ACT_SET][3], adType out_ftip[3], int& out_localmin) ;
+void DynamicsBVP(	CRMShootingMethodParams<adType> in_Params, const double xf[NUM_STATES],
+                     double in_mL_initialguess[NUM_ACT_SET][3], double in_nL_initialguess[NUM_ACT_SET][3], double in_ftip_initialguess[3],
+                     adType out_u0[3], adType out_mL[NUM_ACT_SET][3], adType out_nL[NUM_ACT_SET][3], adType out_tau[NUM_ACT_SET][3], adType out_ftip[3], int& out_localmin);
 
 template <typename adType>
 void DYNSolverIVP(	CRMShootingMethodParams<adType> in_Params, adType in_u0[3],
-                      adType in_mL[NUM_ACT_SET][3], adType in_nL[NUM_ACT_SET][3], adType in_ftip[3],
+                      adType in_mL[NUM_ACT_SET][3], adType in_nL[NUM_ACT_SET][3], double in_tau[NUM_ACT_SET][3], adType in_ftip[3],
                       bool in_FinalValueOnly,
                       adType out_x_N[NUM_STATES], adType out_coil_state[NUM_ACT_SET][NUM_COIL_STATES],
                       double out_p_atLocMarkers[NUM_LOCALIZATION_MARKERS][3]);
