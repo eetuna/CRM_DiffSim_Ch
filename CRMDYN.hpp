@@ -17,8 +17,8 @@ using namespace std::chrono;
 #endif
 #define EQNDIMENSION 6	// domain: u[0..2], range: m_tip[0..2]
 
-#define NUM_ACT_SET 1								// Number of actuator sets
-#define NUM_FLEX_SEG 2								// Number of flexible segments
+#define NUM_ACT_SET 2								// Number of actuator sets
+#define NUM_FLEX_SEG 3								// Number of flexible segments
 #define NUM_SEGMENTS (NUM_ACT_SET+NUM_FLEX_SEG)		// Total number of segments
 #define NUM_LOCALIZATION_MARKERS 5					// Total number of localization markers
 	// IMPORTANT NOTE: for now most proximal segment is assumed to be always flexible

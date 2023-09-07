@@ -610,6 +610,36 @@ void DYNNLEquation(adType in_x[], adType out_y[], NLEqnParams<adType> Params, ad
                 mSub_AB<3,1>( n_L[actno], n_0, net_nL);
             }
 
+//
+//            for (int i = 0; i < NUM_COIL_STATES; ++i) {
+//                std::cout << "x_coil : " << x_coil[actno][i] << std::endl;
+//            }
+//            for (int i = 0; i < 3; ++i) {
+//                std::cout << "net_nL : " << net_nL[i] << std::endl;
+//            }
+//            std::cout << "actMass[actno] : " << actMass[actno] << std::endl;
+//
+//            for (int i = 0; i < 9; ++i) {
+//                std::cout << "actInertia[actno] : " << actInertia[actno][i] << std::endl;
+//            }
+//
+//
+//            for (int i = 0; i < 6; ++i) {
+//                std::cout << "Params.damping[actno] : " << Params.damping[actno][i] << std::endl;
+//            }
+//            for (int i = 0; i < 3; ++i) {
+//                std::cout << "Params.B0, : " << Params.B0[i] << std::endl;
+//            }
+//            for (int i = 0; i < 9; ++i) {
+//                std::cout << "muhat[actno]: " << muhat[actno][i] << std::endl;
+//            }
+//
+//            for (int i = 0; i < 3; ++i) {
+//                std::cout << "net_mL: " << net_mL[i] << std::endl;
+//            }
+//
+
+
             // nL is the force applied to the flexible segment, that is negated in the calculation
             CoilDynamics(x_coil[actno], net_nL, Params.g, actMass[actno], actInertia[actno],
                          Params.damping[actno], Params.DELTA_T, Params.B0,

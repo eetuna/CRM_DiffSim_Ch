@@ -157,11 +157,11 @@ int RunExample(void) {
     double ustarlist[NUM_FLEX_SEG][3] = { 0.0000148626102272827, 0.000094448815853795, 0, 0.0007399849479553773, -0.0002292201697658481, 0, 0.0007399849479553773, -0.0002292201697658481, 0 };
 
 
-    double InsertedLength  =     80;
+    double InsertedLength  =     86;
     // Actuation currents for each of the coils for each of the coil sets - unit: A
 //    double ActuationCurrents[NUM_ACT_SET][3] = {{0.000891613642404,-0.015136231914507,0.119640152093819},{0.000949165551101,0.004289529301964,0.197909928730404}};
 
-    double ActuationCurrents[NUM_ACT_SET][3] = {{0.0,-0.0,0.119640152093819},{0.0,0.0,0.00001}};
+    double ActuationCurrents[NUM_ACT_SET][3] = {{0.0,-0.0,0.119640152093819},{0.0,0.0,0.19}};
 
     double damping[NUM_ACT_SET][6] = {{120.1761626666366,120.1761626666366,
                                               284.429938756989,
@@ -328,7 +328,7 @@ int RunExample(void) {
         DYNSolverIVP(BVPParams, out_u0, out_mL, out_nL, out_tau, ftip_calc,
                      true, xf, x_coil,ReportedMarkerPos);
 
-    double v_L_pre_[NUM_ACT_SET][3], w_L_pre_[NUM_ACT_SET][3], pL_[NUM_ACT_SET][3], RL_[NUM_ACT_SET][9], xf_pre_[NUM_STATES];
+//    double v_L_pre_[NUM_ACT_SET][3], w_L_pre_[NUM_ACT_SET][3], pL_[NUM_ACT_SET][3], RL_[NUM_ACT_SET][9], xf_pre_[NUM_STATES];
         for (int j = 0; j < NUM_ACT_SET; ++j) {
             for (int i = 0; i < 3; ++i) {
                 v_L_pre[j][i] = x_coil[j][i];
