@@ -1,0 +1,17 @@
+# prototype 11.P35.1.a  
+# coil design version 11, Pebax35, single coil, prototype a
+# parameter estimation data collected on 
+# 
+CatheterConfig F A F
+NumLocalizationMarkers 5
+oRlist 1.5875 1.5875
+iRlist 0.9906 0.9906 
+YoungModlist 5.3948 5.3948 
+ShearModlist 2.3881 2.3881
+CoilAlignmentAngles -2.9472 0.3079
+CoilTurnAreaMat 0.0 1.3851 0.0 0.0 0.0 1.60 1.44 0.0  0.0 
+SegmentLengths 19.85 18.3 59.80
+ActMass 5.7736e-5
+MarkerLoc 2.18 18.79 50.06 101.52 104.02
+rho 2.8814e-7 2.8814e-7 2.8814e-7 
+ustarlist 0.000128 -0.000173 0 0.00567 -0.00822 0
