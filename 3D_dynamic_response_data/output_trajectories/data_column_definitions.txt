@@ -1,7 +1,0 @@
-%% data column definitions
-% 1 is the time
-% 2 is the arduino write state
-% 3:5 is the position of the catheter base
-% 6:8 is the position of the catheter coil
-% 9:11 is the normalized coil tangent
-% 12:14 is the tip position
