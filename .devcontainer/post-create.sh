@@ -72,6 +72,15 @@ cd ..
 echo "Normalizing line endings for WSL 2..."
 find . -name "*.cpp" -o -name "*.hpp" -o -name "*.h" | xargs dos2unix 2>/dev/null || true
 
+# ============================================================
+# EXPLICITLY BUILD PYTHON BINDINGS
+# ============================================================
+echo ""
+echo "Building Python bindings (crm_cpp)..."
+cd build_debug
+ninja crm_cpp 2>/dev/null || echo "Warning: crm_cpp build skipped (pybind11 or source file may be missing)"
+cd ..
+
 echo "=========================================="
 echo "✓ Development environment ready!"
 echo "=========================================="
@@ -85,6 +94,10 @@ echo ""
 echo "Python (in .venv):"
 echo "  source .venv/bin/activate"
 echo "  python your_script.py"
+echo ""
+echo "Test Python bindings:"
+echo "  source .venv/bin/activate"
+echo "  python -c 'import sys; sys.path.insert(0, \"./build_debug\"); import crm_cpp; print(crm_cpp.version_info())'"
 echo ""
 echo "To enter container:"
 echo "  Ctrl+Shift+P → Dev Containers: Open Folder in Container"
