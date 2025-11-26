@@ -1,0 +1,12 @@
+.git
+.gitignore
+build_debug/
+build_release/
+.venv/
+*.o
+*.a
+*.so
+__pycache__/
+*.pyc
+.pytest_cache/
+.vscode/
