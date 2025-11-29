@@ -9,6 +9,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
+# ============================================================
+# POSITION INDEPENDENT CODE (for shared libraries/Python)
+# ============================================================
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
@@ -80,7 +85,6 @@ target_include_directories(CRMCPPLib PUBLIC
 
 target_link_libraries(CRMCPPLib PUBLIC Eigen3::Eigen)
 
-# Set compiler flags for optimization and warnings
 target_compile_options(CRMCPPLib PRIVATE
     -Wall -Wextra -Wpedantic
     $<$<CONFIG:Release>:-O3 -march=native>
@@ -148,29 +152,32 @@ target_compile_options(CRMDYNTest PRIVATE
 if(pybind11_FOUND AND Python3_FOUND)
     message(STATUS "Building Python bindings with pybind11")
     
-    pybind11_add_module(crm_cpp
-        python/crm_bindings.cpp
-    )
-    
-    target_include_directories(crm_cpp PRIVATE
-        "${SRC_DIR}"
-        "${NUM_DIR}"
-    )
-    
-    target_link_libraries(crm_cpp PRIVATE
-        CRMCPPLib
-        Eigen3::Eigen
-    )
-    
-    target_compile_options(crm_cpp PRIVATE
-        -Wall -Wextra
-        $<$<CONFIG:Release>:-O3 -march=native>
-    )
-    
-    # Install Python module to site-packages
-    install(TARGETS crm_cpp
-        LIBRARY DESTINATION "${Python3_SITELIB}"
-    )
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/python/crm_bindings.cpp")
+        pybind11_add_module(crm_cpp
+            python/crm_bindings.cpp
+        )
+        
+        target_include_directories(crm_cpp PRIVATE
+            "${SRC_DIR}"
+            "${NUM_DIR}"
+        )
+        
+        target_link_libraries(crm_cpp PRIVATE
+            CRMCPPLib
+            Eigen3::Eigen
+        )
+        
+        target_compile_options(crm_cpp PRIVATE
+            -Wall -Wextra
+            $<$<CONFIG:Release>:-O3 -march=native>
+        )
+        
+        install(TARGETS crm_cpp
+            LIBRARY DESTINATION "${Python3_SITELIB}"
+        )
+    else()
+        message(WARNING "python/crm_bindings.cpp not found; skipping Python bindings")
+    endif()
 else()
     message(WARNING "pybind11 or Python3 not found; skipping Python bindings")
 endif()
@@ -200,7 +207,6 @@ enable_testing()
 add_test(NAME CRMTest COMMAND CRMTest)
 add_test(NAME CRMDYNTest COMMAND CRMDYNTest)
 
-# Package configuration
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION "1.0.0")
 include(CPack)
@@ -214,6 +220,7 @@ message(STATUS "========== Build Summary ==========")
 message(STATUS "Project: ${PROJECT_NAME}")
 message(STATUS "Build Type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "C++ Standard: ${CMAKE_CXX_STANDARD}")
+message(STATUS "Position Independent Code: ON")
 message(STATUS "Eigen3 Found: YES")
 message(STATUS "Python3 Found: ${Python3_FOUND}")
 message(STATUS "pybind11 Found: ${pybind11_FOUND}")

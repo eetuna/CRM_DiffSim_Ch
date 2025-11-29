@@ -1,0 +1,2 @@
+complete_all_architectures.py
+python
