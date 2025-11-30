@@ -1,83 +1,54 @@
-FROM mcr.microsoft.com/devcontainers/cpp:1-ubuntu-22.04
+FROM ubuntu:22.04 AS base
 
-# ============================================================
-# SYSTEM DEPENDENCIES & BUILD TOOLS
-# ============================================================
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    cmake \
-    ninja-build \
-    git \
-    pkg-config \
-    gdb \
-    valgrind \
-    clang \
-    clang-format \
-    && rm -rf /var/lib/apt/lists/*
-
-# ============================================================
-# C++ LIBRARIES (Eigen3, pybind11)
-# ============================================================
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libeigen3-dev \
-    pybind11-dev \
+    build-essential cmake ninja-build git pkg-config \
+    gdb valgrind clang clang-format clang-tidy \
+    wget curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# ============================================================
-# PYTHON 3 & ML STACK
-# ============================================================
+FROM base AS cpp-deps
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 \
-    python3-dev \
-    python3-pip \
-    python3-venv \
+    libeigen3-dev pybind11-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Create virtual environment in container
-ENV VENV_PATH="/opt/venv"
-RUN python3 -m venv ${VENV_PATH}
-ENV PATH="${VENV_PATH}/bin:$PATH"
-
-# Upgrade pip and install core ML/scientific packages
-RUN pip install --upgrade pip setuptools wheel && \
-    pip install \
-    numpy \
-    scipy \
-    matplotlib \
-    scikit-learn \
-    pandas \
-    jupyterlab \
-    ipython \
-    pybind11[global] \
-    && rm -rf /tmp/pip-*
-
-# Install PyTorch (CPU version; adjust for CUDA if needed)
-RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-
-# ============================================================
-# OPTIONAL: Medical/Robotics ML Libraries
-# ============================================================
-
-RUN pip install \
-    pillow \
-    opencv-python \
-    scikit-image \
-    && rm -rf /tmp/pip-*
-
-# ============================================================
-# DOCUMENTATION & ADDITIONAL TOOLS
-# ============================================================
+FROM cpp-deps AS python-env
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    doxygen \
-    graphviz \
+    python3.10 python3.10-dev python3-pip python3-venv \
     && rm -rf /var/lib/apt/lists/*
 
-# ============================================================
-# CLEANUP
-# ============================================================
+ENV VIRTUAL_ENV=/opt/venv
+RUN python3 -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+FROM python-env AS development
+
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt && rm /tmp/requirements.txt
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    doxygen graphviz vim nano htop tmux sudo \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+ARG USERNAME=developer
+ARG USER_UID=1000
+ARG USER_GID=$USER_UID
+
+RUN groupadd --gid $USER_GID $USERNAME \
+    && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
+    && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
+    && chmod 0440 /etc/sudoers.d/$USERNAME
+
+USER $USERNAME
+
+RUN echo "source /opt/venv/bin/activate" >> /home/$USERNAME/.bashrc
+
+CMD ["/bin/bash"]

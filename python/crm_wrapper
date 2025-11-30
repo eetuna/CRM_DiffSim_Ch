@@ -1,0 +1,105 @@
+"""High-level Python wrapper for CRM Catheter C++ bindings."""
+
+import numpy as np
+from typing import Optional, Tuple, Dict, Any
+from . import crm_cpp
+
+
+class CatheterModel:
+    """High-level Python interface for CRM Catheter dynamics."""
+    
+    def __init__(self, num_segments: int = 20):
+        """Initialize catheter model.
+        
+        Args:
+            num_segments: Number of discrete segments along catheter
+        """
+        self.num_segments = num_segments
+        self._cpp_model = crm_cpp.CatheterModel(num_segments)
+        
+    def solve_forward_kinematics(
+        self,
+        magnetic_field: np.ndarray,
+        boundary_conditions: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, np.ndarray]:
+        """Solve forward kinematics given magnetic field.
+        
+        Args:
+            magnetic_field: 3D magnetic field vector [Bx, By, Bz]
+            boundary_conditions: Optional boundary conditions dict
+            
+        Returns:
+            Dictionary with 'positions', 'orientations', 'strains'
+        """
+        if boundary_conditions is None:
+            boundary_conditions = {}
+            
+        result = self._cpp_model.solve_fk(
+            magnetic_field.astype(np.float64),
+            boundary_conditions
+        )
+        
+        return {
+            'positions': np.array(result['positions']),
+            'orientations': np.array(result['orientations']),
+            'strains': np.array(result['strains'])
+        }
+    
+    def solve_dynamics(
+        self,
+        initial_state: np.ndarray,
+        magnetic_field_trajectory: np.ndarray,
+        time_steps: np.ndarray
+    ) -> Dict[str, np.ndarray]:
+        """Solve dynamic trajectory.
+        
+        Args:
+            initial_state: Initial catheter state vector
+            magnetic_field_trajectory: Time series of magnetic fields (T, 3)
+            time_steps: Time points for integration
+            
+        Returns:
+            Dictionary with 'states', 'positions', 'velocities'
+        """
+        result = self._cpp_model.solve_dynamics(
+            initial_state.astype(np.float64),
+            magnetic_field_trajectory.astype(np.float64),
+            time_steps.astype(np.float64)
+        )
+        
+        return {
+            'states': np.array(result['states']),
+            'positions': np.array(result['positions']),
+            'velocities': np.array(result['velocities'])
+        }
+    
+    def compute_jacobian(
+        self,
+        state: np.ndarray,
+        magnetic_field: np.ndarray
+    ) -> np.ndarray:
+        """Compute Jacobian matrix for control.
+        
+        Args:
+            state: Current catheter state
+            magnetic_field: Current magnetic field
+            
+        Returns:
+            Jacobian matrix (n_outputs x n_inputs)
+        """
+        return np.array(
+            self._cpp_model.compute_jacobian(
+                state.astype(np.float64),
+                magnetic_field.astype(np.float64)
+            )
+        )
+    
+    @property
+    def state_dimension(self) -> int:
+        """Get state vector dimension."""
+        return self._cpp_model.get_state_dim()
+    
+    @property
+    def control_dimension(self) -> int:
+        """Get control input dimension."""
+        return 3  # Magnetic field [Bx, By, Bz]

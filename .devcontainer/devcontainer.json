@@ -1,63 +1,55 @@
 {
-  "name": "CosseratCatheter-DevEnv",
+  "name": "CRM Catheter ML/AI Development",
   "build": {
-    "dockerfile": "Dockerfile",
-    "context": "."
+    "dockerfile": "../Dockerfile",
+    "context": "..",
+    "target": "development",
+    "args": {
+      "USERNAME": "developer",
+      "USER_UID": "1000",
+      "USER_GID": "1000"
+    }
   },
   "features": {
-    "ghcr.io/devcontainers/features/github-cli:1": {}
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
   },
   "customizations": {
     "vscode": {
       "extensions": [
         "ms-vscode.cpptools",
-        "ms-vscode.cpptools-extension-pack",
-        "ms-python.python",
-        "ms-python.vscode-pylance",
         "ms-vscode.cmake-tools",
-        "twxs.cmake",
-        "ms-vscode-remote.remote-containers",
-        "eamodio.gitlens",
-        "GitHub.copilot"
+        "ms-python.python",
+        "ms-python.vscode-pylance"
       ],
       "settings": {
         "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
-        "C_Cpp.default.cStandard": "c17",
-        "C_Cpp.default.cppStandard": "c++17",
-        "cmake.configureOnOpen": true,
-        "cmake.autoSelectActiveFolder": true,
-        "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
-        "python.linting.enabled": true,
-        "python.linting.pylintEnabled": true,
-        "editor.formatOnSave": true,
-        "[cpp]": {
-          "editor.defaultFormatter": "ms-vscode.cpptools",
-          "editor.formatOnSave": true
-        },
-        "[c]": {
-          "editor.defaultFormatter": "ms-vscode.cpptools"
-        }
+        "cmake.configureOnOpen": true
       }
     }
   },
-  "remoteUser": "vscode",
-  "postCreateCommand": "bash .devcontainer/post-create.sh",
-  "forwardPorts": [
-    8000,
-    8001,
-    8888
+  "mounts": [
+    "source=${localEnv:HOME}/.ssh,target=/home/developer/.ssh,type=bind,consistency=cached"
   ],
+  "postCreateCommand": "bash ${containerWorkspaceFolder}/.devcontainer/post-create.sh",
+  "postStartCommand": "git config --global --add safe.directory ${containerWorkspaceFolder}",
+  "remoteEnv": {
+    "WORKSPACE_FOLDER": "${containerWorkspaceFolder}"
+  },
+  "forwardPorts": [8888, 6006],
   "portsAttributes": {
-    "8000": {
-      "label": "Application",
-      "onAutoForward": "notify"
-    },
     "8888": {
-      "label": "Jupyter",
+      "label": "Jupyter Lab",
+      "onAutoForward": "openBrowser"
+    },
+    "6006": {
+      "label": "TensorBoard",
       "onAutoForward": "notify"
     }
   },
   "runArgs": [
-    "--platform=linux/amd64"
+    "--platform=linux/amd64",
+    "--cap-add=SYS_PTRACE",
+    "--security-opt=seccomp=unconfined"
   ]
 }
