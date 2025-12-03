@@ -1,0 +1,27 @@
+# Core ML
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.0.0
+numpy>=1.24.0,<2.0.0
+
+# Data handling
+h5py
+pandas
+
+# RL
+gymnasium
+stable-baselines3
+
+# Visualization
+matplotlib
+
+# Utils
+tqdm
+pyyaml
+scikit-learn
+
+# Testing
+pytest
+pytest-cov
+
+# C++ bindings
+pybind11[global]>=2.11.0

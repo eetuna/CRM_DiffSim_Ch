@@ -1,0 +1,312 @@
+.
+├── 3D_dynamic_response_data_0124
+│   ├── desired_input_trajectories
+│   │   ├── circleTrajectory.mat
+│   │   └── lemniscateTrajectory.mat
+│   ├── input_currents
+│   │   ├── circleCurrents.mat
+│   │   └── lemniscateCurrents.mat
+│   └── output_trajectories
+│       ├── DefinitionOfCatheterAndMagneticField_prototype_6b.m
+│       ├── circle01.mat
+│       ├── circle01_01.txt
+│       ├── circle03.mat
+│       ├── circle03_01.txt
+│       ├── circle05.mat
+│       ├── circle05_01.txt
+│       ├── circle08.mat
+│       ├── circle08_01.txt
+│       ├── circle10.mat
+│       ├── circle100.mat
+│       ├── circle100_01.txt
+│       ├── circle10_01.txt
+│       ├── circle12.mat
+│       ├── circle12_01.txt
+│       ├── circle15.mat
+│       ├── circle15_01.txt
+│       ├── circle18.mat
+│       ├── circle18_01.txt
+│       ├── circle20.mat
+│       ├── circle20_01.txt
+│       ├── circle25.mat
+│       ├── circle25_01.txt
+│       ├── circle50.mat
+│       ├── circle50_01.txt
+│       ├── data_column_definitions.txt
+│       ├── lemniscate01.mat
+│       ├── lemniscate01_01.txt
+│       ├── lemniscate03.mat
+│       ├── lemniscate03_01.txt
+│       ├── lemniscate05.mat
+│       ├── lemniscate05_01.txt
+│       ├── lemniscate08.mat
+│       ├── lemniscate08_01.txt
+│       ├── lemniscate10.mat
+│       ├── lemniscate100.mat
+│       ├── lemniscate100_01.txt
+│       ├── lemniscate10_01.txt
+│       ├── lemniscate12.mat
+│       ├── lemniscate12_01.txt
+│       ├── lemniscate15.mat
+│       ├── lemniscate15_01.txt
+│       ├── lemniscate18.mat
+│       ├── lemniscate18_01.txt
+│       ├── lemniscate20.mat
+│       ├── lemniscate20_01.txt
+│       ├── lemniscate25.mat
+│       ├── lemniscate25_01.txt
+│       ├── lemniscate50.mat
+│       ├── lemniscate50_01.txt
+│       └── myfun_loadingdata_from_experiments.m
+├── CMakeLists.txt
+├── Mexfiles
+│   ├── CRMCatheterRenderingExample.m
+│   ├── CRMDYN_c.cpp
+│   ├── CRMDYN_c.mexa64
+│   ├── CRMDYN_c_mex.cpp
+│   ├── CRMDYN_c_mex.mexa64
+│   ├── CRM_CalculateCatheterEnergy_matlab.cpp
+│   ├── CRM_CalculateCatheterEnergy_matlab.mexw64
+│   ├── CRM_FKJacobian_Analytical_matlab.cpp
+│   ├── CRM_FKJacobian_Analytical_matlab.mexa64
+│   ├── CRM_FKJacobian_Analytical_matlab.mexw64
+│   ├── CRM_ForwardKinematics_matlab.cpp
+│   ├── CRM_ForwardKinematics_matlab.mexa64
+│   ├── CRM_ForwardKinematics_matlab.mexw64
+│   ├── CatheterMotionTest.m
+│   ├── CreateCppMEXFiles_ubuntu.m
+│   ├── CreateCppMEXFiles_win.m
+│   ├── Create_Dynamics_functions.m
+│   ├── DrawCRMCatheterModel.m
+│   ├── Load_CRMCatheterModelParams_matlab.cpp
+│   ├── Load_CRMCatheterModelParams_matlab.mexa64
+│   ├── Load_CRMCatheterModelParams_matlab.mexw64
+│   ├── Load_CatheterConfiguration_matlab.cpp
+│   ├── Load_CatheterConfiguration_matlab.mexa64
+│   ├── Load_CatheterConfiguration_matlab.mexw64
+│   ├── SampleEnergyAnalysis.mlx
+│   ├── TestCppMEXFiles.m
+│   └── init_bk_new.mat
+├── README.md
+├── build
+│   ├── CMakeCache.txt
+│   ├── CMakeFiles
+│   │   ├── 3.20.0
+│   │   │   ├── CMakeCCompiler.cmake
+│   │   │   ├── CMakeCXXCompiler.cmake
+│   │   │   ├── CMakeDetermineCompilerABI_C.bin
+│   │   │   ├── CMakeDetermineCompilerABI_CXX.bin
+│   │   │   ├── CMakeSystem.cmake
+│   │   │   ├── CompilerIdC
+│   │   │   │   ├── CMakeCCompilerId.c
+│   │   │   │   └── a.out
+│   │   │   └── CompilerIdCXX
+│   │   │       ├── CMakeCXXCompilerId.cpp
+│   │   │       └── a.out
+│   │   ├── CMakeDirectoryInformation.cmake
+│   │   ├── CMakeOutput.log
+│   │   ├── CRMCPPLib.dir
+│   │   │   ├── DependInfo.cmake
+│   │   │   ├── build.make
+│   │   │   ├── cmake_clean.cmake
+│   │   │   ├── cmake_clean_target.cmake
+│   │   │   ├── compiler_depend.make
+│   │   │   ├── compiler_depend.ts
+│   │   │   ├── depend.make
+│   │   │   ├── flags.make
+│   │   │   ├── link.txt
+│   │   │   ├── numerical
+│   │   │   │   ├── minpack.cpp.o
+│   │   │   │   ├── minpack.cpp.o.d
+│   │   │   │   ├── minpack_DYN_Defs.cpp.o
+│   │   │   │   └── minpack_DYN_Defs.cpp.o.d
+│   │   │   ├── progress.make
+│   │   │   └── src
+│   │   │       ├── CRM_BVPSolver.cpp.o
+│   │   │       ├── CRM_BVPSolver.cpp.o.d
+│   │   │       ├── CRM_CatheterClass.cpp.o
+│   │   │       ├── CRM_CatheterClass.cpp.o.d
+│   │   │       ├── CRM_ForwardKinematics.cpp.o
+│   │   │       ├── CRM_ForwardKinematics.cpp.o.d
+│   │   │       ├── CRM_IVPJacobian.cpp.o
+│   │   │       ├── CRM_IVPJacobian.cpp.o.d
+│   │   │       ├── CRM_IVPSolver.cpp.o
+│   │   │       ├── CRM_IVPSolver.cpp.o.d
+│   │   │       ├── CRM_SupportFunctions.cpp.o
+│   │   │       ├── CRM_SupportFunctions.cpp.o.d
+│   │   │       ├── CoilDynamics_Defs.cpp.o
+│   │   │       └── CoilDynamics_Defs.cpp.o.d
+│   │   ├── CRMDYNTest.dir
+│   │   │   ├── DependInfo.cmake
+│   │   │   ├── build.make
+│   │   │   ├── cmake_clean.cmake
+│   │   │   ├── compiler_depend.internal
+│   │   │   ├── compiler_depend.make
+│   │   │   ├── compiler_depend.ts
+│   │   │   ├── depend.make
+│   │   │   ├── flags.make
+│   │   │   ├── link.txt
+│   │   │   ├── main
+│   │   │   │   ├── CRMDYN_test.cpp.o
+│   │   │   │   ├── CRMDYN_test.cpp.o.d
+│   │   │   │   ├── CRM_KinematicsTestFunctions.cpp.o
+│   │   │   │   └── CRM_KinematicsTestFunctions.cpp.o.d
+│   │   │   ├── numerical
+│   │   │   │   ├── minpack.cpp.o
+│   │   │   │   ├── minpack.cpp.o.d
+│   │   │   │   ├── minpack_DYN_Defs.cpp.o
+│   │   │   │   └── minpack_DYN_Defs.cpp.o.d
+│   │   │   ├── progress.make
+│   │   │   └── src
+│   │   │       ├── CRM_BVPSolver.cpp.o
+│   │   │       ├── CRM_BVPSolver.cpp.o.d
+│   │   │       ├── CRM_CatheterClass.cpp.o
+│   │   │       ├── CRM_CatheterClass.cpp.o.d
+│   │   │       ├── CRM_ForwardKinematics.cpp.o
+│   │   │       ├── CRM_ForwardKinematics.cpp.o.d
+│   │   │       ├── CRM_IVPJacobian.cpp.o
+│   │   │       ├── CRM_IVPJacobian.cpp.o.d
+│   │   │       ├── CRM_IVPSolver.cpp.o
+│   │   │       ├── CRM_IVPSolver.cpp.o.d
+│   │   │       ├── CRM_SupportFunctions.cpp.o
+│   │   │       ├── CRM_SupportFunctions.cpp.o.d
+│   │   │       ├── CoilDynamics_Defs.cpp.o
+│   │   │       └── CoilDynamics_Defs.cpp.o.d
+│   │   ├── CRMTest.dir
+│   │   │   ├── DependInfo.cmake
+│   │   │   ├── build.make
+│   │   │   ├── cmake_clean.cmake
+│   │   │   ├── compiler_depend.internal
+│   │   │   ├── compiler_depend.make
+│   │   │   ├── compiler_depend.ts
+│   │   │   ├── depend.make
+│   │   │   ├── flags.make
+│   │   │   ├── link.txt
+│   │   │   ├── main
+│   │   │   │   ├── CRMTest.cpp.o
+│   │   │   │   ├── CRMTest.cpp.o.d
+│   │   │   │   ├── CRM_KinematicsTestFunctions.cpp.o
+│   │   │   │   └── CRM_KinematicsTestFunctions.cpp.o.d
+│   │   │   ├── numerical
+│   │   │   │   ├── minpack.cpp.o
+│   │   │   │   ├── minpack.cpp.o.d
+│   │   │   │   ├── minpack_DYN_Defs.cpp.o
+│   │   │   │   └── minpack_DYN_Defs.cpp.o.d
+│   │   │   ├── progress.make
+│   │   │   └── src
+│   │   │       ├── CRM_BVPSolver.cpp.o
+│   │   │       ├── CRM_BVPSolver.cpp.o.d
+│   │   │       ├── CRM_CatheterClass.cpp.o
+│   │   │       ├── CRM_CatheterClass.cpp.o.d
+│   │   │       ├── CRM_ForwardKinematics.cpp.o
+│   │   │       ├── CRM_ForwardKinematics.cpp.o.d
+│   │   │       ├── CRM_IVPJacobian.cpp.o
+│   │   │       ├── CRM_IVPJacobian.cpp.o.d
+│   │   │       ├── CRM_IVPSolver.cpp.o
+│   │   │       ├── CRM_IVPSolver.cpp.o.d
+│   │   │       ├── CRM_SupportFunctions.cpp.o
+│   │   │       ├── CRM_SupportFunctions.cpp.o.d
+│   │   │       ├── CoilDynamics_Defs.cpp.o
+│   │   │       └── CoilDynamics_Defs.cpp.o.d
+│   │   ├── Makefile.cmake
+│   │   ├── Makefile2
+│   │   ├── TargetDirectories.txt
+│   │   ├── cmake.check_cache
+│   │   └── progress.marks
+│   ├── CRMDYNTest
+│   ├── CRMTest
+│   ├── Makefile
+│   ├── cmake_install.cmake
+│   └── libCRMCPPLib.a
+├── catheterdata
+│   ├── CatheterParameterSet_1.txt
+│   ├── CatheterParameterSet_1_dyn.txt
+│   ├── CatheterParameterSet_1_new.txt
+│   ├── CatheterParameterSet_2.txt
+│   ├── CatheterParameterSet_2_dyn.txt
+│   ├── CatheterParameterSet_2_tougher.txt
+│   ├── CatheterSpatialConfiguration_1.txt
+│   ├── ParameterEstResult_ran_dynamics.txt
+│   └── ParameterEstResult_ran_dynamics_initial.txt
+├── data
+├── fast_data_hybrid.zip
+├── hybrid.zip
+├── hybrid_data
+│   ├── coil_position_mat_10.mat
+│   ├── coil_position_mat_100.mat
+│   ├── coil_position_mat_12.mat
+│   ├── coil_position_mat_15.mat
+│   ├── coil_position_mat_18.mat
+│   ├── coil_position_mat_20.mat
+│   ├── coil_position_mat_25.mat
+│   ├── coil_position_mat_50.mat
+│   ├── p_mat_10.mat
+│   ├── p_mat_100.mat
+│   ├── p_mat_12.mat
+│   ├── p_mat_15.mat
+│   ├── p_mat_18.mat
+│   ├── p_mat_20.mat
+│   ├── p_mat_25.mat
+│   └── p_mat_50.mat
+├── main
+│   ├── CRMCPPTest.vcxproj
+│   ├── CRMCPPTest.vcxproj.filters
+│   ├── CRMDYN_test.cpp
+│   ├── CRMTest.cpp
+│   ├── CRMTest.h
+│   ├── CRM_KinematicsTestFunctions.cpp
+│   └── CRM_KinematicsTestFunctions.hpp
+├── matlab
+│   ├── data_stitch.m
+│   ├── greybox_modeling.m
+│   ├── jacobian_forward_difference.m
+│   ├── linear_identification.m
+│   ├── load_parameters.m
+│   ├── read_input_output.m
+│   ├── rotation_matrix.m
+│   ├── skewsym2vector.m
+│   ├── so3rot.m
+│   ├── twistr.m
+│   ├── twistt.m
+│   └── vector2skewsym.m
+├── numerical
+│   ├── minpack.cpp
+│   ├── minpack.hpp
+│   ├── minpack_DYN.hpp
+│   ├── minpack_DYN_Defs.cpp
+│   ├── minpack_TemplateDefinitions.hpp
+│   └── minpack_wGivenJac_TemplateDefinitions.hpp
+├── output_data
+│   ├── coil_position_new.mat
+│   ├── currents_new.mat
+│   ├── output_coil_traj.mat
+│   ├── output_currents.mat
+│   ├── output_tip_traj.mat
+│   └── tip_position_new.mat
+├── parameters
+│   ├── init_new_data.mat
+│   ├── model_1.mat
+│   ├── model_2.mat
+│   └── model_3.mat
+├── src
+│   ├── CRM.hpp
+│   ├── CRMDYN.hpp
+│   ├── CRMDYN_Numerical_Integration.hpp
+│   ├── CRM_BVPIVP_APIDeclarations.hpp
+│   ├── CRM_BVPSolver.cpp
+│   ├── CRM_CatheterClass.cpp
+│   ├── CRM_FK_InternalAPI.hpp
+│   ├── CRM_ForwardKinematics.cpp
+│   ├── CRM_IVPJacobian.cpp
+│   ├── CRM_IVPJacobian.hpp
+│   ├── CRM_IVPJacobian_InternalAPI.hpp
+│   ├── CRM_IVPSolver.cpp
+│   ├── CRM_IVP_NumericalIntegrationTemplates.hpp
+│   ├── CRM_MatrixOperations.hpp
+│   ├── CRM_StateVector_Definitions.hpp
+│   ├── CRM_SupportFunctions.cpp
+│   └── CoilDynamics_Defs.cpp
+├── startup.m
+└── tree_output.txt
+
+31 directories, 279 files
