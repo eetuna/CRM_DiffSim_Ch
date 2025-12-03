@@ -1,0 +1,76 @@
+# ============================================
+# C++ Build artifacts
+# ============================================
+build/
+bin/
+lib/
+*.o
+*.a
+*.so
+*.dylib
+*.exe
+*.out
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps/
+
+# Visual Studio / VS Code
+.vs/
+.vscode/
+*.user
+*.suo
+
+# macOS
+.DS_Store
+
+# ============================================
+# Python / ML
+# ============================================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Jupyter
+.ipynb_checkpoints
+
+# PyTorch / ML models
+*.pth
+*.pt
+*.ckpt
+*.h5
+*.pkl
+*.pickle
+
+# Data directories
+data/
+datasets/
+logs/
+outputs/
+runs/
+checkpoints/
+results/
+experiments/
+
+## Python
+__pycache__/
+*.pyc
+*.egg-info/
+
+# C++ build
+crm_ml_rl/bindings/build/
+
+# Data
+data/
+models/
+results/
+logs/
+
+# IDE
+.vscode/
+.idea/
