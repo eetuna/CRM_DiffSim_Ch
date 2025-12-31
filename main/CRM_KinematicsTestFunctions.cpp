@@ -1,3 +1,4 @@
+#include <iostream>
 #include "CRM.hpp"
 #include "CRM_BVPIVP_APIDeclarations.hpp"
 #include "CRM_IVPJacobian.hpp"
@@ -200,6 +201,120 @@ namespace CRMCatheterModel {
 
 		VectorXd result = XF;
 		return result;
+	}
+
+	CRMIVPTipJacobiansRaw CRM_PrintIVPTipJacobiansRawExample() {
+		std::cout << "### Raw IVP Jacobian blocks at tip (u0, zc) example..." << std::endl;
+
+		CRMCatheterModelParams CathParams = Load_CRMCatheterModelParams("../catheterdata/CatheterParameterSet_1_new.txt");
+		CatheterConfiguration CathConfig = Load_CatheterConfiguration("../catheterdata/CatheterSpatialConfiguration_1.txt");
+
+		ContactModeType ContactMode = ContactModeType::FREE_TIP;
+		double TipForce[3] = { 0.0, 0.0, 0.0 };
+		double TipConstraintPoint[3] = { 0.0, 0.0, 0.0 };
+		double InsertedLength = 94.0;
+		double IntegrationStepSize = 0.2;
+
+		double ActuationCurrents[NUM_ACT_SET][3];
+		for (int i = 0; i < NUM_ACT_SET; i++) for (int j = 0; j < 3; j++) ActuationCurrents[i][j] = 0.0;
+		if (NUM_ACT_SET > 0) {
+			ActuationCurrents[0][0] = 0.02;
+			ActuationCurrents[0][1] = -0.01;
+			ActuationCurrents[0][2] = 0.03;
+		}
+
+		CRMShootingMethodParams BVPParams =
+			CRMConstructShootingMethodParamSet(CathParams, CathConfig, InsertedLength, ActuationCurrents,
+				ContactMode, TipConstraintPoint, TipForce, IntegrationStepSize);
+
+		double deltau0[3] = { 0.0, 0.0, 0.0 };
+		double ftip[3] = { TipForce[0], TipForce[1], TipForce[2] };
+
+		CRMIVPTipJacobiansRaw Jraw = CRMSolverIVPJacobian_TipRaw(BVPParams, deltau0, ftip);
+
+		std::cout << "JIVP_p_u0_raw:\n" << Jraw.p_u0 << "\n";
+		std::cout << "JIVP_p_zc_raw:\n" << Jraw.p_zc << "\n";
+		std::cout << "JIVP_u_u0_raw:\n" << Jraw.u_u0 << "\n";
+		std::cout << "JIVP_u_zc_raw:\n" << Jraw.u_zc << "\n";
+		std::cout << "JIVP_ws_u0_raw:\n" << Jraw.ws_u0 << "\n";
+		std::cout << "JIVP_ws_zc_raw:\n" << Jraw.ws_zc << "\n";
+
+		return Jraw;
+	}
+
+	void CRM_FDTest_EquilibriumResidualJacobian_B() {
+		std::cout << "### FD test for B = dF_scaled/du (fixed deltau0)..." << std::endl;
+
+		CRMCatheterModelParams CathParams = Load_CRMCatheterModelParams("../catheterdata/CatheterParameterSet_1_new.txt");
+		CatheterConfiguration CathConfig = Load_CatheterConfiguration("../catheterdata/CatheterSpatialConfiguration_1.txt");
+
+		ContactModeType ContactMode = ContactModeType::FREE_TIP;
+		double TipForce[3] = { 0.0, 0.0, 0.0 };
+		double TipConstraintPoint[3] = { 0.0, 0.0, 0.0 };
+		double InsertedLength = 94.0;
+		double IntegrationStepSize = 0.2;
+
+		double ActuationCurrents[NUM_ACT_SET][3];
+		for (int i = 0; i < NUM_ACT_SET; i++) for (int j = 0; j < 3; j++) ActuationCurrents[i][j] = 0.0;
+		if (NUM_ACT_SET > 0) {
+			ActuationCurrents[0][0] = 0.02;
+			ActuationCurrents[0][1] = -0.01;
+			ActuationCurrents[0][2] = 0.03;
+		}
+
+		CRMShootingMethodParams BVPParams =
+			CRMConstructShootingMethodParamSet(CathParams, CathConfig, InsertedLength, ActuationCurrents,
+				ContactMode, TipConstraintPoint, TipForce, IntegrationStepSize);
+
+		double deltau0_guess[3] = { 0.0, 0.0, 0.0 };
+		double ftip_guess[3] = { 0.0, 0.0, 0.0 };
+		double deltau0_eq[3];
+		double ftip_eq[3];
+		int localmin = 0;
+		CRMShootingMethodBVP(BVPParams, deltau0_guess, ftip_guess, deltau0_eq, ftip_eq, localmin);
+
+		Eigen::Matrix<double, 3, CURRENT_ACT_VECTOR_DIM, Eigen::RowMajor> B =
+			CRM_EquilibriumResidualJacobian_B(BVPParams, deltau0_eq, ftip_eq);
+
+		const double h = NUM_JACOBIAN_CURRENT_STEPSIZE;
+		Eigen::Matrix<double, 3, CURRENT_ACT_VECTOR_DIM, Eigen::RowMajor> B_fd;
+
+		double curr_plus[NUM_ACT_SET][3];
+		double curr_minus[NUM_ACT_SET][3];
+		for (int i = 0; i < NUM_ACT_SET; i++) for (int j = 0; j < 3; j++) {
+			curr_plus[i][j] = ActuationCurrents[i][j];
+			curr_minus[i][j] = ActuationCurrents[i][j];
+		}
+
+		for (int act = 0; act < NUM_ACT_SET; act++) {
+			for (int j = 0; j < 3; j++) {
+				curr_plus[act][j] = ActuationCurrents[act][j] + h;
+				curr_minus[act][j] = ActuationCurrents[act][j] - h;
+
+				CRMShootingMethodParams ParamsPlus = BVPParams;
+				CRMShootingMethodParams ParamsMinus = BVPParams;
+				CRMUpdateShootingMethodParamSetWithNewActuationCurrents(ParamsPlus, curr_plus);
+				CRMUpdateShootingMethodParamSetWithNewActuationCurrents(ParamsMinus, curr_minus);
+
+				Eigen::Matrix<double, 3, 1> F_plus = CRM_EquilibriumResidual_FScaled(ParamsPlus, deltau0_eq);
+				Eigen::Matrix<double, 3, 1> F_minus = CRM_EquilibriumResidual_FScaled(ParamsMinus, deltau0_eq);
+
+				Eigen::Matrix<double, 3, 1> dF = (F_plus - F_minus) * (0.5 / h);
+				B_fd.col(act * 3 + j) = dF;
+
+				curr_plus[act][j] = ActuationCurrents[act][j];
+				curr_minus[act][j] = ActuationCurrents[act][j];
+			}
+		}
+
+		Eigen::Matrix<double, 3, CURRENT_ACT_VECTOR_DIM, Eigen::RowMajor> diff = B - B_fd;
+		double max_abs_err = diff.cwiseAbs().maxCoeff();
+		double max_fd = B_fd.cwiseAbs().maxCoeff();
+		double rel_err = max_abs_err / ((max_fd > 1e-12) ? max_fd : 1e-12);
+
+		std::cout << "B FD max_abs_err: " << max_abs_err << std::endl;
+		std::cout << "B FD rel_err: " << rel_err << std::endl;
+		std::cout << "solver localmin: " << localmin << std::endl;
 	}
 
 

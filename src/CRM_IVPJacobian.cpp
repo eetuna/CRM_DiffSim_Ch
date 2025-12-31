@@ -99,6 +99,58 @@ namespace CRMCatheterModel {
 		return { JBVP_p_z, JBVP_ws_z, JBVP_p_ft, JBVP_ws_ft, Jft_z };
 	}
 
+	CRMIVPTipJacobiansRaw CRMSolverIVPJacobian_TipRaw(
+		CRMShootingMethodParams in_Params,
+		double in_deltau0[3], double in_ftip[3]) {
+
+		double x_0[NUM_STATES];
+		for (int i = 0; i < 3; i++) x_0[i] = in_Params.p0[i];
+		for (int i = 0; i < 9; i++) x_0[i + 3] = in_Params.R0[i];
+		for (int i = 0; i < 3; i++) x_0[i + 3 + 9] = std::nan("0");  // overridden in CRMSolverIVP_CoreWithJacobian
+
+		CRMIVPCoreParams CoreParams(in_Params.no_flex_seg, in_Params.no_rigid_seg, in_Params.no_act_set, in_Params.no_locmarkers, in_Params.no_fcum_steps);
+		bool CalculateEnergy = false;
+		bool FinalValueOnly = true;
+
+		AugmentedStateVector<IVPJacobiansFull> x_N;
+		double MomentResidual[3];
+
+		CRMSolverIVP_Prep(
+			in_Params.no_flex_seg, in_Params.no_rigid_seg, in_Params.no_act_set, in_Params.no_locmarkers, in_Params.no_fcum_steps,
+			x_0, in_Params.IntegrationStepSize,
+			in_Params.Li, in_Params.dlambdainv,
+			in_Params.SegmentTypes,
+			in_Params.SegEndLambdas, in_Params.LocMarkerLambdas,
+			in_Params.rho,
+			in_Params.K, in_Params.Kinv, in_Params.ustar,
+			in_Params.ActMass,
+			in_Params.CoilAlignmentTurnAreaMatrix,
+			in_Params.MagMoment, in_Params.fcumlambda,
+			in_Params.B0, in_Params.g,
+			CalculateEnergy,
+			FinalValueOnly,
+			CoreParams);
+
+		CRMSolverIVP_CoreWithJacobian(CoreParams, in_deltau0, in_ftip, x_N, MomentResidual);
+
+		constexpr unsigned int Cs = CURRENT_ACT_VECTOR_DIM;
+		__EMT<3, 3> JIVP_p_u0(x_N._p_u0);
+		__EMT<3, Cs> JIVP_p_zc(x_N._p_zc);
+		__EMT<3, 3> JIVP_u_u0(x_N._u_u0);
+		__EMT<3, Cs> JIVP_u_zc(x_N._u_zc);
+		__EMT<3, 3> JIVP_ws_u0(x_N._ws_u0);
+		__EMT<3, Cs> JIVP_ws_zc(x_N._ws_zc);
+
+		CRMIVPTipJacobiansRaw out;
+		out.p_u0 = JIVP_p_u0;
+		out.p_zc = JIVP_p_zc;
+		out.u_u0 = JIVP_u_u0;
+		out.u_zc = JIVP_u_zc;
+		out.ws_u0 = JIVP_ws_u0;
+		out.ws_zc = JIVP_ws_zc;
+		return out;
+	}
+
 
 
 	template <typename IVPJacobians>

@@ -33,6 +33,15 @@ namespace CRMCatheterModel {
 	// helper to be able to match state vector types
 	template <class T> using expr_type = std::remove_cv_t<std::remove_reference_t<T>>;
 
+	// Canonical MINPACK Jacobian conversion: column-major fjac -> row-major dense.
+	inline void MinpackJacobianToRowMajor(const double* fjac, int rows, int cols, double* out_row_major) {
+		for (int r = 0; r < rows; r++) {
+			for (int c = 0; c < cols; c++) {
+				out_row_major[r * cols + c] = fjac[r + c * rows];
+			}
+		}
+	}
+
 	// Structure for passing parameters to the CRM Shooting Method Boundary Value Problem Solver CRMShootingMethodBVP
 	class CRMShootingMethodParams {
 	public:
@@ -413,6 +422,19 @@ namespace CRMCatheterModel {
 	void CRM_NLEquation(double in_x[], double out_y[], NLEqnParams Params);
 
 	void CRM_NLEquation_AnalyticalJac(double in_x[], double out_y[], double out_fjac[], NLEqnParams Params);
+
+	// Free-tip equilibrium residual and Jacobians (scaled) for v1.0.
+	Eigen::Matrix<double, 3, 1> CRM_EquilibriumResidual_FScaled(
+		CRMShootingMethodParams in_Params,
+		double in_deltau0[3]);
+
+	Eigen::Matrix<double, 3, 3, Eigen::RowMajor> CRM_EquilibriumResidualJacobian_A(
+		CRMShootingMethodParams in_Params,
+		double in_deltau0[3]);
+
+	Eigen::Matrix<double, 3, CURRENT_ACT_VECTOR_DIM, Eigen::RowMajor> CRM_EquilibriumResidualJacobian_B(
+		CRMShootingMethodParams in_Params,
+		double in_deltau0[3], double in_ftip[3]);
 
 	//
 	// Numerical Integration Support Functions

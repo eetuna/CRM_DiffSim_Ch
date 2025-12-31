@@ -41,6 +41,20 @@ namespace CRMCatheterModel {
 		bool in_FinalValueOnly,
 		double out_x_N[NUM_STATES], double out_MomentResidual[3]);
 
+	struct CRMIVPTipJacobiansRaw {
+		Eigen::Matrix<double, 3, 3, Eigen::RowMajor> p_u0;
+		Eigen::Matrix<double, 3, Eigen::Dynamic, Eigen::RowMajor> p_zc;
+		Eigen::Matrix<double, 3, 3, Eigen::RowMajor> u_u0;
+		Eigen::Matrix<double, 3, Eigen::Dynamic, Eigen::RowMajor> u_zc;
+		Eigen::Matrix<double, 3, 3, Eigen::RowMajor> ws_u0;
+		Eigen::Matrix<double, 3, Eigen::Dynamic, Eigen::RowMajor> ws_zc;
+	};
+
+	// Internal helper for raw tip IVP Jacobian blocks (pre-elimination).
+	CRMIVPTipJacobiansRaw CRMSolverIVPJacobian_TipRaw(
+		CRMShootingMethodParams in_Params,
+		double in_deltau0[3], double in_ftip[3]);
+
 
 	// Core Computations used for CRMSolverIVP Jacobian Calculation
 	//    parameters are prepared using CRMSolverIVP_Prep

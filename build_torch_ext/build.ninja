@@ -1,0 +1,39 @@
+ninja_required_version = 1.3
+cxx = c++
+
+cflags = -DTORCH_EXTENSION_NAME=crm_equilibrium_ext -DTORCH_API_INCLUDE_EXTENSION_H -I/workspaces/CRM_DiffSim_Ch/src -I/workspaces/CRM_DiffSim_Ch/numerical -isystem /home/vscode/.local/lib/python3.10/site-packages/torch/include -isystem /home/vscode/.local/lib/python3.10/site-packages/torch/include/torch/csrc/api/include -isystem /usr/include/python3.10 -fPIC -std=c++17 -O3 -std=c++17
+post_cflags = 
+cuda_dlink_post_cflags = 
+sycl_dlink_post_cflags = 
+ldflags = -shared -L/home/vscode/.local/lib/python3.10/site-packages/torch/lib -lc10 -ltorch_cpu -ltorch -ltorch_python
+
+rule compile
+  command = $cxx -MMD -MF $out.d $cflags -c $in -o $out $post_cflags
+  depfile = $out.d
+  deps = gcc
+
+
+
+
+
+rule link
+  command = $cxx $in $ldflags -o $out
+
+build CRM_TorchEquilibrium.o: compile /workspaces/CRM_DiffSim_Ch/src/CRM_TorchEquilibrium.cpp
+build CRM_IVPSolver.o: compile /workspaces/CRM_DiffSim_Ch/src/CRM_IVPSolver.cpp
+build CRM_BVPSolver.o: compile /workspaces/CRM_DiffSim_Ch/src/CRM_BVPSolver.cpp
+build CRM_IVPJacobian.o: compile /workspaces/CRM_DiffSim_Ch/src/CRM_IVPJacobian.cpp
+build CRM_ForwardKinematics.o: compile /workspaces/CRM_DiffSim_Ch/src/CRM_ForwardKinematics.cpp
+build CRM_CatheterClass.o: compile /workspaces/CRM_DiffSim_Ch/src/CRM_CatheterClass.cpp
+build CRM_SupportFunctions.o: compile /workspaces/CRM_DiffSim_Ch/src/CRM_SupportFunctions.cpp
+build minpack.o: compile /workspaces/CRM_DiffSim_Ch/numerical/minpack.cpp
+build minpack_DYN_Defs.o: compile /workspaces/CRM_DiffSim_Ch/numerical/minpack_DYN_Defs.cpp
+build CoilDynamics_Defs.o: compile /workspaces/CRM_DiffSim_Ch/src/CoilDynamics_Defs.cpp
+
+
+
+
+
+build crm_equilibrium_ext.so: link CRM_TorchEquilibrium.o CRM_IVPSolver.o CRM_BVPSolver.o CRM_IVPJacobian.o CRM_ForwardKinematics.o CRM_CatheterClass.o CRM_SupportFunctions.o minpack.o minpack_DYN_Defs.o CoilDynamics_Defs.o
+
+default crm_equilibrium_ext.so

@@ -9,6 +9,36 @@
 
 namespace CRMCatheterModel {
 
+	static void CRM_PrepareNLEParamsFromShooting(CRMShootingMethodParams& in_Params, NLEqnParams& out_Params) {
+		double x_0[NUM_STATES];
+		for (int i = 0; i < 3; i++) x_0[i] = in_Params.p0[i];
+		for (int i = 0; i < 9; i++) x_0[i + 3] = in_Params.R0[i];
+		for (int i = 0; i < 3; i++) x_0[i + 3 + 9] = std::nan("0");  // overridden in CRMSolverIVP_Core/WithJacobian
+
+		bool CalculateEnergy = false;
+		bool FinalValueOnly = true;
+
+		CRMSolverIVP_Prep(
+			in_Params.no_flex_seg, in_Params.no_rigid_seg, in_Params.no_act_set, in_Params.no_locmarkers, in_Params.no_fcum_steps,
+			x_0, in_Params.IntegrationStepSize,
+			in_Params.Li, in_Params.dlambdainv,
+			in_Params.SegmentTypes,
+			in_Params.SegEndLambdas, in_Params.LocMarkerLambdas,
+			in_Params.rho,
+			in_Params.K, in_Params.Kinv, in_Params.ustar,
+			in_Params.ActMass,
+			in_Params.CoilAlignmentTurnAreaMatrix,
+			in_Params.MagMoment, in_Params.fcumlambda,
+			in_Params.B0, in_Params.g,
+			CalculateEnergy,
+			FinalValueOnly,
+			out_Params);
+
+		out_Params.ContactMode = in_Params.ContactMode;
+		mCopy_AB<3>(in_Params.TipConstraintPoint, out_Params.TipConstraintPoint);
+		mCopy_AB<3>(in_Params.TipForce, out_Params.TipForce);
+	}
+
 
 	void CRMShootingMethodBVP(CRMShootingMethodParams in_Params,
 		double in_deltau0_initialguess[3], double in_ftip_initialguess[3],
@@ -255,6 +285,83 @@ namespace CRMCatheterModel {
 		}
 
 
+	}
+
+	Eigen::Matrix<double, 3, 1> CRM_EquilibriumResidual_FScaled(
+		CRMShootingMethodParams in_Params,
+		double in_deltau0[3]) {
+
+		if (in_Params.ContactMode != ContactModeType::FREE_TIP) {
+			std::cerr << "CRM_EquilibriumResidual_FScaled only supports FREE_TIP.\n";
+			exit(1);
+		}
+
+		NLEqnParams Params(in_Params.no_flex_seg, in_Params.no_rigid_seg, in_Params.no_act_set, in_Params.no_locmarkers, in_Params.no_fcum_steps);
+		CRM_PrepareNLEParamsFromShooting(in_Params, Params);
+
+		double in_x[3];
+		const double DUSCALE_INV = 1.0 / IVALUE_SCALE_DU;
+		for (int i = 0; i < 3; i++) in_x[i] = DUSCALE_INV * in_deltau0[i];
+
+		double out_y[3];
+		CRM_NLEquation(in_x, out_y, Params);
+
+		Eigen::Matrix<double, 3, 1> out_F;
+		out_F << out_y[0], out_y[1], out_y[2];
+		return out_F;
+	}
+
+	Eigen::Matrix<double, 3, 3, Eigen::RowMajor> CRM_EquilibriumResidualJacobian_A(
+		CRMShootingMethodParams in_Params,
+		double in_deltau0[3]) {
+
+		if (in_Params.ContactMode != ContactModeType::FREE_TIP) {
+			std::cerr << "CRM_EquilibriumResidualJacobian_A only supports FREE_TIP.\n";
+			exit(1);
+		}
+
+		NLEqnParams Params(in_Params.no_flex_seg, in_Params.no_rigid_seg, in_Params.no_act_set, in_Params.no_locmarkers, in_Params.no_fcum_steps);
+		CRM_PrepareNLEParamsFromShooting(in_Params, Params);
+
+		double in_x[3];
+		const double DUSCALE_INV = 1.0 / IVALUE_SCALE_DU;
+		for (int i = 0; i < 3; i++) in_x[i] = DUSCALE_INV * in_deltau0[i];
+
+		double out_y[3];
+		double out_fjac[9];
+		CRM_NLEquation_AnalyticalJac(in_x, out_y, out_fjac, Params);
+
+		double fjac_rm[9];
+		MinpackJacobianToRowMajor(out_fjac, 3, 3, fjac_rm);
+
+		__EMT<3, 3> A_rm(fjac_rm);
+		Eigen::Matrix<double, 3, 3, Eigen::RowMajor> A = A_rm;
+		return A;
+	}
+
+	Eigen::Matrix<double, 3, CURRENT_ACT_VECTOR_DIM, Eigen::RowMajor> CRM_EquilibriumResidualJacobian_B(
+		CRMShootingMethodParams in_Params,
+		double in_deltau0[3], double in_ftip[3]) {
+
+		if (in_Params.ContactMode != ContactModeType::FREE_TIP) {
+			std::cerr << "CRM_EquilibriumResidualJacobian_B only supports FREE_TIP.\n";
+			exit(1);
+		}
+
+		CRMIVPTipJacobiansRaw Jraw = CRMSolverIVPJacobian_TipRaw(in_Params, in_deltau0, in_ftip);
+		Eigen::Matrix<double, 3, CURRENT_ACT_VECTOR_DIM, Eigen::RowMajor> B;
+
+		if (in_Params.SegmentTypes[in_Params.no_segments - 1] == CatheterSegmentType::FLEXIBLE) {
+			double kJuzc[3 * CURRENT_ACT_VECTOR_DIM];
+			mMult_AB<3, 3, CURRENT_ACT_VECTOR_DIM>(in_Params.K[in_Params.no_flex_seg - 1], Jraw.u_zc.data(), kJuzc);
+			__EMT<3, CURRENT_ACT_VECTOR_DIM> kJuzc_rm(kJuzc);
+			B = RESIDUAL_SCALE_M * kJuzc_rm;
+		}
+		else {
+			B = RESIDUAL_SCALE_M * Jraw.u_zc;
+		}
+
+		return B;
 	}
 
 

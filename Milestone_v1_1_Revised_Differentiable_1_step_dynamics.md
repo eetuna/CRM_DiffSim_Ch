@@ -160,6 +160,15 @@ Instead, implement VJP product functions:
 - $H_x^T g = (\partial H / \partial x_t)^T g$
 These must be computable at the converged $(\eta^*, x_t, u_t)$ without iterations.
 
+### 7.7 Temporary v1.1 FD bridge (PR-7/CP-7/PR-8 only)
+As a temporary bridge for v1.1, FD-based Jacobians/VJP products are allowed for PR-7/CP-7/PR-8 **only**:
+- Allowed: `fdjac1_dyn` for $A_{\text{step}}$ and central differences for $B_{\text{step}}, C_{\text{step}}$, and $H_*^T g$.
+- Allowed (bridge-only): direct FD of `crm_step_forward` to approximate gradients w.r.t. $x_t$ and $u_t$ as a black-box (no differentiation through solver iterations).
+- Not allowed: differentiation through solver iterations, pseudo-inverse/SVD/damping/regularization, or any hidden state.
+- Determinism and the strict non-convergence policy remain mandatory and unchanged.
+- Any MINPACK layout conversions must use the canonical `MinpackJacobianToRowMajor` helper.
+- **Performance/accuracy caveat:** FD-based Jacobians/VJPs are slower and less accurate; results may be sensitive to step size. They are accepted for v1.1 only and must be replaced in v1.2.
+
 ### 7.5 Exact implicit VJP solve (transpose conventions)
 Given upstream gradient $g = \partial L / \partial x_{t+1}$ (shape $[24 \times N_{\text{act}} + 15]$):
 1. Compute RHS using VJP product: $\text{rhs} = H_{\eta}^T g$
@@ -179,10 +188,11 @@ For each required Jacobian/VJP block, the plan requires a concrete source:
 - $G$ evaluation: MUST be callable through the same residual callback used inside the nonlinear solver invoked by `DynamicsBVP`.
   - Source: existing dynamics residual function used by the solver (repo lookup required; see Section 10).
 - $A_{\text{step}}, B_{\text{step}}, C_{\text{step}}$:
-  - MUST be implemented analytically for v1.1 backward.
-  - FD is allowed only in tests (Section 9), not in backward.
+  - v1.1 bridge: FD is allowed in backward for PR-7/CP-7/PR-8 (see Section 7.7).
+  - Analytic implementation is mandatory for v1.2 (see Section 11).
 - $H_{\eta}^T g, H_u^T g, H_x^T g$:
   - MUST be implemented as VJP products (default).
+  - v1.1 bridge: FD-based VJP products are allowed for PR-7/CP-7/PR-8 (see Section 7.7).
   - No full-matrix construction required unless trivially available.
 
 ## 9) Validation gate for v1.1 (FD tests + rollout smoke test; explicit tolerances)
@@ -256,6 +266,22 @@ Define $\eta$ as **exactly** the decision vector passed to `TrustRegionDogleg_dy
 - **Tasks:** Bind `step_forward`; implement backward solve $A_{\text{step}}^T \lambda = H_{\eta}^T g$; compute $g_u, g_x$; enforce non-convergence policy; add tests.
 - **Acceptance:** gradcheck passes in stable regime; FD tests pass tolerances; rollout smoke test passes.
 - **Checkpoint:** CP-8 (v1.1 complete)
+
+## 11) Milestone v1.2: Replace FD Jacobians/VJPs with analytic implementations
+### Goal
+Replace the v1.1 FD bridge with analytic $A_{\text{step}}, B_{\text{step}}, C_{\text{step}}$ and analytic $H_*^T g$ products.
+
+### Acceptance criteria
+- Analytic $A_{\text{step}}$ from the dynamics residual Jacobian callback used by `TrustRegionDogleg_dyn` (solver coordinates).
+- Analytic $B_{\text{step}}$ and $C_{\text{step}}$ assembled via IVP analytic Jacobian blocks and chain rule.
+- Analytic $H_{\eta}^T g$, $H_u^T g$, $H_x^T g$ via analytic IVP Jacobians and chain rule (no FD).
+- No differentiation through solver iterations; strict non-convergence policy unchanged.
+- Canonical MINPACK column-major to row-major conversion helper used wherever applicable.
+
+### Tests
+- FD comparison with tighter tolerances than v1.1 (target: `max_abs_err <= 1e-5`, `rel_err <= 1e-4`).
+- Gradcheck with tightened tolerances (target: `rtol <= 1e-4`, `atol <= 1e-6`) in stable regimes.
+- Runtime benchmark: report per-step runtime with analytic Jacobians vs FD bridge.
 
 ## Minimal Python training-loop demo (pseudo-code; batched; gradients to $u_t$)
 ```python
