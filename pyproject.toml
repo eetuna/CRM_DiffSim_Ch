@@ -5,6 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "crm-diffsims"
 version = "0.0.0"
+optional-dependencies = {plots = ["matplotlib>=3.5"]}
 
 [tool.setuptools]
 package-dir = {"" = "python"}

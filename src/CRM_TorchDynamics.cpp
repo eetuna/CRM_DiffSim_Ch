@@ -1733,6 +1733,81 @@ namespace CRMCatheterModel {
 
 }  // namespace CRMCatheterModel
 
+// v1.3 implicit backward scaffolding (no math yet).
+namespace CRMCatheterModel {
+
+torch::Tensor crm_dyn_jacobian_layout_to_row_major(torch::Tensor j_col_major) {
+	// TODO(v1.3): implement canonical column-major -> row-major conversion.
+	return j_col_major.contiguous();
+}
+
+std::vector<torch::Tensor> crm_dyn_vjp_v1_3(
+	torch::Tensor grad_x_tp1,
+	torch::Tensor eta,
+	torch::Tensor x_t,
+	torch::Tensor u_t,
+	torch::Tensor Li,
+	std::shared_ptr<DynamicsConfig> cfg) {
+	TORCH_CHECK(cfg != nullptr, "cfg_dyn is null.");
+	CheckStepInputs(x_t, u_t, Li);
+	TORCH_CHECK(eta.device().is_cpu(), "eta must be a CPU tensor.");
+	TORCH_CHECK(eta.dtype() == torch::kFloat64, "eta must be float64.");
+	TORCH_CHECK(eta.dim() == 2 && eta.size(1) == NUM_DYN_RESIDUAL, "eta must have shape [B, NUM_DYN_RESIDUAL].");
+	TORCH_CHECK(grad_x_tp1.device().is_cpu(), "grad_x_tp1 must be a CPU tensor.");
+	TORCH_CHECK(grad_x_tp1.dtype() == torch::kFloat64, "grad_x_tp1 must be float64.");
+	TORCH_CHECK(grad_x_tp1.dim() == 2 && grad_x_tp1.size(1) == 24 * NUM_ACT_SET + 15,
+		"grad_x_tp1 must have shape [B, 24*N_act+15].");
+
+	auto direct = crm_dyn_vjp(grad_x_tp1, eta, x_t, u_t, Li, cfg);
+	auto A_B_C = crm_dyn_jacobians(eta, x_t, u_t, Li, cfg);
+
+	auto vjp_eta_direct = direct[0];
+	auto vjp_u_direct = direct[1];
+	auto vjp_x_direct = direct[2];
+
+	auto A_step = crm_dyn_jacobian_layout_to_row_major(A_B_C[0]);
+	auto B_step = A_B_C[1];
+	auto C_step = A_B_C[2];
+
+	const auto B = x_t.size(0);
+	const int u_dim = 3 * NUM_ACT_SET;
+	const int x_dim = 24 * NUM_ACT_SET + 15;
+
+	auto options = x_t.options();
+	auto vjp_u = torch::zeros({ B, NUM_ACT_SET, 3 }, options);
+	auto vjp_x = torch::zeros({ B, x_dim }, options);
+
+	for (int64_t b = 0; b < B; b++) {
+		auto J_eta = A_step[b];
+		auto J_u = B_step[b];
+		auto J_x = C_step[b];
+
+		auto rhs = vjp_eta_direct[b].unsqueeze(1);
+		auto lambda = at::linalg_solve(J_eta.transpose(0, 1), rhs).squeeze(1);
+
+		auto vjp_x_b = vjp_x_direct[b] - torch::matmul(J_x.transpose(0, 1), lambda);
+		auto vjp_u_flat = vjp_u_direct[b].reshape({ u_dim }) - torch::matmul(J_u.transpose(0, 1), lambda);
+
+		vjp_x[b] = vjp_x_b;
+		vjp_u[b] = vjp_u_flat.reshape({ NUM_ACT_SET, 3 });
+	}
+
+	return { vjp_x, vjp_u };
+}
+
+std::vector<torch::Tensor> crm_dyn_backward_v1_3(
+	torch::Tensor grad_x_tp1,
+	torch::Tensor eta,
+	torch::Tensor x_t,
+	torch::Tensor u_t,
+	torch::Tensor Li,
+	std::shared_ptr<DynamicsConfig> cfg) {
+	TORCH_CHECK(false, "crm_dyn_backward_v1_3 not implemented (use crm_dyn_vjp_v1_3)");
+	return { grad_x_tp1, eta, x_t, u_t, Li };
+}
+
+}  // namespace CRMCatheterModel
+
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
 	py::class_<CRMCatheterModel::DynamicsConfig, std::shared_ptr<CRMCatheterModel::DynamicsConfig>>(m, "DynamicsConfig")
 		.def(py::init<const std::string&, const std::string&, double, const std::vector<double>&,
@@ -1755,4 +1830,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
 	m.def("crm_dyn_jacobians_fd", &CRMCatheterModel::crm_dyn_jacobians_fd, "CRM dynamics Jacobians A_step, B_step, C_step (pure FD reference)");
 	m.def("crm_dyn_vjp", &CRMCatheterModel::crm_dyn_vjp, "CRM dynamics H VJP products (eta, u, x)");
 	m.def("crm_dyn_vjp_fd", &CRMCatheterModel::crm_dyn_vjp_fd, "CRM dynamics H VJP products (pure FD reference)");
+	m.def("crm_dyn_vjp_v1_3", &CRMCatheterModel::crm_dyn_vjp_v1_3, "CRM dynamics v1.3 implicit VJP stub");
+	m.def("crm_dyn_backward_v1_3", &CRMCatheterModel::crm_dyn_backward_v1_3, "CRM dynamics v1.3 backward stub");
+	m.def("crm_dyn_jacobian_layout_to_row_major", &CRMCatheterModel::crm_dyn_jacobian_layout_to_row_major, "CRM Jacobian layout conversion helper");
 }

@@ -1,0 +1,4 @@
+v1.3 vs autograd benchmark
+autograd mean: 77.450506s (min 77.450506s, max 77.450506s)
+v1.3 operator mean: 0.298129s (min 0.298129s, max 0.298129s)
+speedup: 259.8x

@@ -30,6 +30,8 @@ def _load_targets(path):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--fast", action="store_true", help="Run a short validation rollout")
+    parser.add_argument("--backend", choices=["v1_3", "autograd"], default="v1_3")
+    parser.add_argument("--plot", action="store_true", help="Save plots to output_data/")
     parser.add_argument("--profile-step", action="store_true", help="Profile crm_step and save flight recorder")
     parser.add_argument("--max-wall-sec", type=float, default=None, help="Hard wall time limit in seconds")
     parser.add_argument("--save-u-seq", action="store_true", help="Save iLQR u_seq after MPC run")
@@ -64,6 +66,17 @@ def main():
         max_du=0.008,
         max_sign_flip=0.004,
     )
+    cfg.linearization_backend = args.backend
+    cfg.linearization_dense = True
+
+    safe_path = "docs/control/safe_bounds.json"
+    if os.path.exists(safe_path):
+        with open(safe_path, "r", encoding="ascii") as f:
+            import json
+
+            bounds = json.load(f)
+        cfg.max_u = float(bounds.get("umax_safe", cfg.max_u))
+        cfg.max_du = float(bounds.get("d_umax_safe", cfg.max_du))
 
     if args.fast:
         n_steps = min(n_steps, 3)
@@ -72,7 +85,7 @@ def main():
         cfg.horizon = min(cfg.horizon, 10)
         cfg.max_iter = min(cfg.max_iter, 5)
         u_warm = torch.zeros((cfg.horizon, 1, 3), dtype=torch.float64)
-        def _linearize_fast(x_t, u_t, li_in, cfg_in):
+        def _linearize_fast(x_t, u_t, li_in, cfg_in, backend=None, dense=None):
             n_x = x_t.shape[-1]
             n_u = u_t.shape[-1]
             a = torch.eye(n_x, dtype=x_t.dtype, device=x_t.device)
@@ -81,7 +94,34 @@ def main():
 
         ilqr_mod._linearize = _linearize_fast
         print("FAST mode: using approximate linearization for quick validation")
-    tip_index_sanity_check(x0, u_warm[:1], li, cfg_dyn)
+    elif args.backend == "v1_3":
+        n_steps = min(n_steps, 3)
+        targets = targets[: n_steps + 1]
+        cfg.horizon = min(cfg.horizon, 5)
+        cfg.max_iter = min(cfg.max_iter, 1)
+        u_warm = torch.zeros((cfg.horizon, 1, 3), dtype=torch.float64)
+        if u_warm.shape[0] != cfg.horizon:
+            if u_warm.shape[0] > cfg.horizon:
+                u_warm = u_warm[: cfg.horizon]
+            else:
+                pad = u_warm[-1:].repeat(cfg.horizon - u_warm.shape[0], 1, 1)
+                u_warm = torch.cat([u_warm, pad], dim=0)
+        u_clamped = u_warm.clone()
+        for t in range(u_clamped.shape[0]):
+            u_clamped[t] = torch.clamp(u_clamped[t], -cfg.max_u, cfg.max_u)
+            if t > 0:
+                delta = u_clamped[t] - u_clamped[t - 1]
+                delta_clamped = torch.clamp(delta, -cfg.max_du, cfg.max_du)
+                sign_flip = (u_clamped[t - 1] * (u_clamped[t - 1] + delta_clamped)) < 0.0
+                if sign_flip.any():
+                    delta_clamped = torch.where(
+                        sign_flip,
+                        torch.clamp(delta_clamped, -cfg.max_sign_flip, cfg.max_sign_flip),
+                        delta_clamped,
+                    )
+                u_clamped[t] = u_clamped[t - 1] + delta_clamped
+        u_warm = u_clamped
+    tip_index_sanity_check(x0, u_warm[:1], li, cfg_dyn, backend=args.backend)
 
     start_time = time.time()
     x_roll, u_roll, u_final, stats = run_mpc(
@@ -142,52 +182,46 @@ def main():
         print(f"Final MPC clamp_rate={stats[-1]['clamp_rate']:.2%} sign_flip_rate={stats[-1]['sign_flip_rate']:.2%}")
         return
 
+    if not args.plot:
+        print(f"Final MPC clamp_rate={stats[-1]['clamp_rate']:.2%} sign_flip_rate={stats[-1]['sign_flip_rate']:.2%}")
+        return
+
     try:
-        import matplotlib.pyplot as plt
-        from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
-    except ImportError as exc:
-        raise SystemExit("matplotlib is required for plotting") from exc
-
-    fig = plt.figure(figsize=(8, 6))
-    ax = fig.add_subplot(111, projection="3d")
-    ax.plot(targets[:, 0].cpu().numpy(), targets[:, 1].cpu().numpy(), targets[:, 2].cpu().numpy(), label="target")
-    ax.plot(tip_roll[:, 0].cpu().numpy(), tip_roll[:, 1].cpu().numpy(), tip_roll[:, 2].cpu().numpy(), label="ilqr")
-    ax.set_title("Tip trajectory (circle)")
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
-    ax.set_zlabel("z")
-    ax.legend()
-
-    fig2, ax2 = plt.subplots(figsize=(8, 4))
-    u_np = u_roll[:, 0].cpu().numpy()
-    ax2.plot(t[: u_np.shape[0]], u_np[:, 0], label="i1")
-    ax2.plot(t[: u_np.shape[0]], u_np[:, 1], label="i2")
-    ax2.plot(t[: u_np.shape[0]], u_np[:, 2], label="i3")
-    ax2.set_title("Currents (circle)")
-    ax2.set_xlabel("time [s]")
-    ax2.set_ylabel("current")
-    ax2.legend()
+        from crm_diffsims.control import plot_utils
+    except Exception:
+        print("matplotlib not installed; skipping plots")
+        return
 
     errors = np.linalg.norm(tip_roll[: targets.shape[0]].cpu().numpy() - targets.cpu().numpy(), axis=1)
-    fig3, ax3 = plt.subplots(figsize=(8, 4))
-    ax3.plot(t[: errors.shape[0]], errors, label="tip error")
-    ax3.set_title("Tip tracking error (circle)")
-    ax3.set_xlabel("time [s]")
-    ax3.set_ylabel("error")
-    ax3.legend()
 
     out_dir = "output_data"
     os.makedirs(out_dir, exist_ok=True)
-    fig.savefig(f"{out_dir}/ilqr_circle_tip_{stamp}.png", dpi=150)
-    fig2.savefig(f"{out_dir}/ilqr_circle_currents_{stamp}.png", dpi=150)
-    fig3.savefig(f"{out_dir}/ilqr_circle_error_{stamp}.png", dpi=150)
-    print(f"Saved plots to {out_dir}/ilqr_circle_*_{stamp}.png")
+    try:
+        plot_utils.save_tip_trajectory_plot(
+            tip_roll.cpu().numpy(),
+            targets.cpu().numpy(),
+            title="Tip trajectory (circle)",
+            out_path=f"{out_dir}/ilqr_circle_tip_{stamp}",
+        )
+        plot_utils.save_currents_plot(
+            u_roll[:, 0].cpu().numpy(),
+            title="Currents (circle)",
+            out_path=f"{out_dir}/ilqr_circle_currents_{stamp}",
+        )
+        plot_utils.save_error_plot(
+            errors,
+            title="Tip tracking error (circle)",
+            out_path=f"{out_dir}/ilqr_circle_error_{stamp}",
+        )
+    except Exception:
+        print("matplotlib not installed; skipping plots")
+        return
+    print(f"Saved plots to {out_dir}/ilqr_circle_*_{stamp}.{{png,pdf}}")
     print(f"Final MPC clamp_rate={stats[-1]['clamp_rate']:.2%} sign_flip_rate={stats[-1]['sign_flip_rate']:.2%}")
     for step in range(1, errors.shape[0]):
         mean_err = errors[: step + 1].mean()
         final_err = errors[step]
         print(f"MPC step {step}: mean_tip_error={mean_err:.3e} final_tip_error={final_err:.3e}")
-    plt.show()
 
     if args.profile_step:
         run_rollout_profile(x0, u_roll, li, cfg_dyn, label="circle_profile", save_dir="output_data")

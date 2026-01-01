@@ -1,12 +1,15 @@
 """Minimal iLQR/MPC utilities for CRM dynamics."""
 
 from dataclasses import dataclass
+import json
+import os
 import time
 from typing import Dict, Iterable, List, Tuple
 
 import torch
 
 from crm_diffsims.dynamics.step import crm_step
+from crm_diffsims.dynamics.step_v1_3 import crm_step_v1_3_forward
 
 
 TIP_POS_IDX = torch.tensor([24, 25, 26])
@@ -30,6 +33,8 @@ class ILQRConfig:
     cost_increase_ratio: float = 1.2
     max_line_search_tries: int = 3
     line_search_alphas: Tuple[float, ...] = (1.0, 0.5, 0.25, 0.1)
+    linearization_backend: str = "autograd"
+    linearization_dense: bool = True
 
 
 @dataclass
@@ -52,15 +57,48 @@ def tip_position(x_t: torch.Tensor) -> torch.Tensor:
     return x_t[:, TIP_POS_IDX]
 
 
-def rollout(x0: torch.Tensor, u_seq: torch.Tensor, li: torch.Tensor, cfg_dyn) -> Tuple[torch.Tensor, torch.Tensor]:
+def _maybe_apply_safe_bounds(cfg: ILQRConfig) -> None:
+    path = "docs/control/safe_bounds.json"
+    if not os.path.exists(path):
+        return
+    try:
+        with open(path, "r", encoding="ascii") as f:
+            bounds = json.load(f)
+    except Exception:
+        return
+    umax = float(bounds.get("umax_safe", cfg.max_u))
+    d_umax = float(bounds.get("d_umax_safe", cfg.max_du))
+    cfg.max_u = min(cfg.max_u, umax)
+    cfg.max_du = min(cfg.max_du, d_umax)
+
+
+def _step_forward(
+    x_t: torch.Tensor, u_t: torch.Tensor, li: torch.Tensor, cfg_dyn, backend: str
+) -> Tuple[torch.Tensor, bool]:
+    if backend == "v1_3":
+        x_tp1, cache = crm_step_v1_3_forward(x_t, u_t, li, cfg_dyn)
+        solver_exit = int(cache["solver_exit"].item())
+        residual = float(cache["residual_norm"].item())
+        ok = solver_exit == 0 and residual <= cfg_dyn.residual_threshold
+        return x_tp1, ok
+    return crm_step(x_t, u_t, li, cfg_dyn), True
+
+
+def rollout(
+    x0: torch.Tensor, u_seq: torch.Tensor, li: torch.Tensor, cfg_dyn, backend: str
+) -> Tuple[torch.Tensor, torch.Tensor, bool]:
     x_seq = [x0]
     tip_seq = [tip_position(x0)]
     x_t = x0
+    ok = True
     for t in range(u_seq.shape[0]):
-        x_t = crm_step(x_t, u_seq[t : t + 1], li, cfg_dyn)
+        x_t, step_ok = _step_forward(x_t, u_seq[t : t + 1], li, cfg_dyn, backend)
+        if not step_ok or not torch.isfinite(x_t).all().item():
+            ok = False
+            break
         x_seq.append(x_t)
         tip_seq.append(tip_position(x_t))
-    return torch.cat(x_seq, dim=0), torch.cat(tip_seq, dim=0)
+    return torch.cat(x_seq, dim=0), torch.cat(tip_seq, dim=0), ok
 
 
 def _running_cost(tip: torch.Tensor, target: torch.Tensor, u_t: torch.Tensor) -> torch.Tensor:
@@ -91,7 +129,21 @@ def total_cost(
     return cost + terminal
 
 
-def _linearize(x_t: torch.Tensor, u_t: torch.Tensor, li: torch.Tensor, cfg_dyn) -> Tuple[torch.Tensor, torch.Tensor]:
+def _linearize(
+    x_t: torch.Tensor,
+    u_t: torch.Tensor,
+    li: torch.Tensor,
+    cfg_dyn,
+    backend: str,
+    dense: bool,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    if backend == "v1_3":
+        from crm_diffsims.dynamics.linearize_v1_3 import linearize_v1_3
+
+        if not dense:
+            raise RuntimeError("iLQR requires dense A,B; set linearization_dense=True.")
+        return linearize_v1_3(x_t, u_t, li, cfg_dyn, return_dense=True)
+
     x_t = x_t.detach().requires_grad_(True)
     u_t = u_t.detach().requires_grad_(True)
 
@@ -180,11 +232,12 @@ def tip_index_sanity_check(
     li: torch.Tensor,
     cfg_dyn,
     epsilon: float = 1e-3,
+    backend: str = "autograd",
 ) -> Dict[str, float]:
-    x_next = crm_step(x0, u0, li, cfg_dyn)
+    x_next, _ = _step_forward(x0, u0, li, cfg_dyn, backend)
     u_pert = u0.clone()
     u_pert[0, 0, 0] += epsilon
-    x_next_pert = crm_step(x0, u_pert, li, cfg_dyn)
+    x_next_pert, _ = _step_forward(x0, u_pert, li, cfg_dyn, backend)
 
     tip = tip_position(x_next)[0]
     tip_pert = tip_position(x_next_pert)[0]
@@ -214,14 +267,15 @@ def ilqr_solve(
     max_wall_sec: float | None = None,
     start_time: float | None = None,
 ) -> ILQRResult:
+    _maybe_apply_safe_bounds(cfg)
     u_seq = u_init.clone()
     reg = cfg.reg
 
-    x_seq, tip_seq = rollout(x0, u_seq, li, cfg_dyn)
+    x_seq, tip_seq, rollout_ok = rollout(x0, u_seq, li, cfg_dyn, cfg.linearization_backend)
     cost = total_cost(tip_seq, u_seq, targets, cfg)
     clamp_hits = 0
     sign_flip_hits = 0
-    nan_detected = not torch.isfinite(cost).item()
+    nan_detected = not torch.isfinite(cost).item() or not rollout_ok
     first_iter_u_seq = None
     timed_out = False
 
@@ -249,7 +303,14 @@ def ilqr_solve(
         for t in reversed(range(u_seq.shape[0])):
             if _check_timeout():
                 break
-            a_t, b_t = _linearize(x_seq[t : t + 1], u_seq[t : t + 1], li, cfg_dyn)
+            a_t, b_t = _linearize(
+                x_seq[t : t + 1],
+                u_seq[t : t + 1],
+                li,
+                cfg_dyn,
+                cfg.linearization_backend,
+                cfg.linearization_dense,
+            )
             u_prev = u_seq[t - 1, 0] if t > 0 else None
             u_next = u_seq[t + 1, 0] if t < u_seq.shape[0] - 1 else None
             l_x, l_u, l_xx, l_uu = _cost_derivatives(
@@ -307,8 +368,8 @@ def ilqr_solve(
                         sign_flip_hits += sign_hit
                         u_prop = u_prop.unsqueeze(0)
                     u_new[t, 0] = u_prop[0]
-                    x_new = crm_step(x_new, u_new[t : t + 1], li, cfg_dyn)
-                    if not torch.isfinite(x_new).all().item():
+                    x_new, step_ok = _step_forward(x_new, u_new[t : t + 1], li, cfg_dyn, cfg.linearization_backend)
+                    if not step_ok or not torch.isfinite(x_new).all().item():
                         nan_rollout = True
                         break
 
@@ -316,9 +377,9 @@ def ilqr_solve(
                     nan_detected = True
                     continue
 
-                x_cand, tip_cand = rollout(x0, u_new, li, cfg_dyn)
+                x_cand, tip_cand, cand_ok = rollout(x0, u_new, li, cfg_dyn, cfg.linearization_backend)
                 cost_cand = total_cost(tip_cand, u_new, targets, cfg)
-                if not torch.isfinite(cost_cand).item():
+                if not cand_ok or not torch.isfinite(cost_cand).item():
                     nan_detected = True
                     continue
 
@@ -349,7 +410,7 @@ def ilqr_solve(
         clamp_rate = iter_clamp_hits / max(1, u_seq.shape[0] - 1)
         sign_rate = iter_sign_hits / max(1, u_seq.shape[0] - 1)
         print(
-            f"iLQR iter {it + 1}: cost={float(cost):.6e} "
+            f"iLQR iter {it + 1}: cost={float(cost):.6e} reg={reg:.3e} "
             f"clamp_rate={clamp_rate:.2%} sign_flip_rate={sign_rate:.2%}"
         )
         if improved and abs(prev_cost - float(cost)) <= cfg.tol_cost:
@@ -383,6 +444,7 @@ def run_mpc(
     u_warm: torch.Tensor,
     max_wall_sec: float | None = None,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, List[Dict[str, float]]]:
+    _maybe_apply_safe_bounds(cfg)
     n_steps = targets.shape[0] - 1
     u_seq = u_warm.clone()
     x_roll = [x0]
@@ -413,6 +475,8 @@ def run_mpc(
                 "nan_detected": result.nan_detected,
                 "first_iter_u_seq": result.first_iter_u_seq,
                 "timed_out": result.timed_out,
+                "cost": result.cost,
+                "converged": result.converged,
             }
         )
         print(
@@ -421,10 +485,14 @@ def run_mpc(
         )
         u_apply = result.u_seq[0:1]
         u_roll.append(u_apply)
-        x_next = crm_step(x_roll[-1], u_apply, li, cfg_dyn)
+        x_next, step_ok = _step_forward(x_roll[-1], u_apply, li, cfg_dyn, cfg.linearization_backend)
+        if not step_ok or not torch.isfinite(x_next).all().item():
+            break
         x_roll.append(x_next)
         u_seq = torch.cat([result.u_seq[1:], result.u_seq[-1:]], dim=0)
         if result.timed_out:
+            break
+        if result.nan_detected:
             break
         if max_wall_sec is not None and (time.time() - start_time) > max_wall_sec:
             break
