@@ -1,0 +1,301 @@
+\documentclass[journal]{IEEEtran}
+
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{hyperref}
+\usepackage{url}
+
+\newcommand{\path}[1]{\texttt{\detokenize{#1}}}
+
+\begin{document}
+
+\title{Differentiable CRM Catheter Dynamics: Implicit Step, Safe Control, and Learning Pipeline}
+
+\author{Anonymous Author}
+
+\maketitle
+
+\begin{abstract}
+This document provides a complete, PDF-ready technical description of the catheter dynamics, control, and learning pipeline implemented in the CRM\_DiffSim\_Ch repository. The simulator solves the CRM step via an implicit residual equation and exposes a v1.3 implicit vector-Jacobian product (VJP) for differentiable control and learning. Safety and stability are enforced with empirically derived safe bounds from forward-only sweeps. We document replay, CEM MPC, and iLQR MPC baselines, plus behavior cloning (BC) and policy warm-start experiments. Results are reported only from recorded run reports and artifacts. On the 50-step circle scoreboard window, replay-only achieves mean tip error 5.134 mm, policy-only 16.736 mm, and policy+MPC 38.233 mm with a max-wall timeout (run reports \path{docs/control/run_reports/scoreboard_20260102_225133_*.md}). BC policies train to low supervised error but underperform the replay expert in rollout (e.g., circle: 10.411 mm vs 7.028 mm; lemniscate: 13.089 mm vs 5.987 mm). Policy warm-started MPC yields small error reductions relative to policy-only in short windows but at large runtime costs and with documented MPC-only failure modes. This report emphasizes reproducibility, with explicit references to every NPZ and run report used.
+\end{abstract}
+
+\begin{IEEEkeywords}
+catheter dynamics, implicit differentiation, iLQR, CEM, behavior cloning, safety bounds, CRM
+\end{IEEEkeywords}
+
+\section{Introduction}
+Robotic catheter control combines stiff, high-dimensional dynamics with strict safety limits. This repository implements a differentiable CRM (continuous rod model) simulator with an implicit solver and an explicit v1.3 implicit VJP, enabling gradient-based control and learning. The pipeline includes:
+\begin{itemize}
+  \item A C++ CRM step solver exposed to PyTorch, with deterministic failure handling.
+  \item Safe operating bounds derived from forward stability sweeps and enforced across controllers.
+  \item Control baselines: replay-only, CEM MPC (Jacobian-free), and iLQR MPC (with v1.3 linearization).
+  \item Learning baselines: BC from replay/CEM oracles and policy warm-started MPC.
+  \item A scoreboard evaluation framework and run reports for reproducibility.
+\end{itemize}
+All quantitative results in this paper are sourced from the run reports under \path{docs/control/run_reports} and artifacts in \path{output_data}.
+
+\section{Background}
+\subsection{Datasets}
+The pipeline uses two primary datasets:
+\begin{itemize}
+  \item Circle: \path{data/dyn_fk_ramp_circle1_hold1.npz}
+  \item Lemniscate: \path{data/dyn_fk_lem1_y40_a10_L94_hold1.npz}
+\end{itemize}
+Typical dataset metadata from run reports: $\Delta t = 0.05$ s, insertion length $L_i = 94.3$ mm, and current bounds from safe regime (Section IV).
+
+\subsection{State and Control}
+The CRM step operates on a 39D state $x_t \in \mathbb{R}^{39}$ and a 3D control $u_t \in \mathbb{R}^3$ (coil currents). The tip position used for tracking cost is extracted via indices 24--26, consistent with \path{python/crm_diffsims/control/ilqr.py}.
+
+\section{Dynamics Model}
+The forward dynamics are solved implicitly. Let $\eta$ denote the solver decision vector. The CRM step satisfies:
+\begin{equation}
+G(\eta, x_t, u_t, L_i) = 0,
+\end{equation}
+and returns the next state via:
+\begin{equation}
+x_{t+1} = H(\eta^\*, x_t, u_t, L_i).
+\end{equation}
+The C++ extension exposes \path{crm_step_forward}, which returns $(x_{t+1}, \eta, \text{solver\_exit}, \text{residual\_norm}, u_0, \tau)$. Backward computation is disabled for non-converged steps (solver\_exit $\neq 0$ or residual\_norm $>$ threshold).
+
+\section{Differentiable Simulator (Implicit VJP)}
+\subsection{v1.2 Finite-Difference Bridge}
+The baseline autograd backward (v1.2) approximates gradients using finite differences through repeated forward calls. This is correct but expensive, as documented in \path{docs/autodiff_audits/V1_3_TRUE_IMPLICIT_BACKWARD_DESIGN.md}.
+
+\subsection{v1.3 Implicit VJP}
+The v1.3 step (\path{python/crm_diffsims/dynamics/step_v1_3.py}) uses an implicit VJP in the extension:
+\begin{align}
+(\partial G/\partial \eta)^\top \lambda &= (\partial H/\partial \eta)^\top v, \\
+v^\top \frac{\partial x_{t+1}}{\partial u_t} &= (\partial H/\partial u_t)^\top v - (\partial G/\partial u_t)^\top \lambda, \\
+v^\top \frac{\partial x_{t+1}}{\partial x_t} &= (\partial H/\partial x_t)^\top v - (\partial G/\partial x_t)^\top \lambda.
+\end{align}
+No differentiation through solver iterations is performed. Any non-convergence raises an error and aborts the backward pass.
+
+\subsection{Linearization}
+For iLQR, v1.3 provides JVP/VJP-based linearization via \path{python/crm_diffsims/dynamics/linearize_v1_3.py}. Dense $A_t,B_t$ are constructed from operator JVPs (only for small trust-region perturbations).
+
+\begin{algorithm}[t]
+\caption{CRM Step with Implicit VJP (v1.3)}
+\begin{algorithmic}[1]
+\Require $x_t, u_t, L_i, v$
+\State Solve $G(\eta, x_t, u_t, L_i)=0$ to get $\eta^\*$ and $x_{t+1}=H(\eta^\*,x_t,u_t,L_i)$
+\If{solver\_exit $\neq 0$ or residual $> $ threshold}
+    \State abort backward (non-convergence)
+\EndIf
+\State Solve $(\partial G/\partial \eta)^\top \lambda = (\partial H/\partial \eta)^\top v$
+\State Return $v^\top \partial x_{t+1}/\partial x_t$ and $v^\top \partial x_{t+1}/\partial u_t$
+\end{algorithmic}
+\end{algorithm}
+
+\section{Safety and Stability Analysis}
+Forward-only stability sweeps are performed using \path{examples/sweep_forward_stability.py}, producing \path{output_data/forward_stability_sweep_captured.csv}. Safe bounds are derived by \path{scripts/derive_safe_bounds.py} and stored in \path{docs/control/safe_bounds.json} with:
+\begin{itemize}
+  \item $u_{\max} = 0.10$
+  \item $\Delta u_{\max} = 0.01$
+\end{itemize}
+
+\begin{table}[t]
+\caption{Forward stability sweep classification (from \path{docs/control/SAFE_OPERATING_REGIME.md}).}
+\centering
+\begin{tabular}{ccc}
+\toprule
+$u_{\max}$ & $\Delta u_{\max}$ & Status \\
+\midrule
+0.05 & 0.01 & SAFE \\
+0.05 & 0.02 & SAFE \\
+0.10 & 0.01 & SAFE \\
+0.10 & 0.02 & WARNING \\
+0.20 & 0.01 & WARNING \\
+0.20 & 0.02 & SAFE \\
+0.30 & 0.01 & WARNING \\
+0.30 & 0.02 & WARNING \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Control Methods}
+\subsection{Replay Baseline}
+Replay reuses dataset currents in open loop and clamps them to safe bounds. This is the primary expert oracle for BC datasets and the scoreboard baseline (\path{docs/control/SCOREBOARD.md}).
+
+\subsection{CEM MPC}
+CEM performs Jacobian-free shooting with samples drawn around a mean and clamped to safe bounds (\path{python/crm_diffsims/control/cem_mpc.py}).
+
+\begin{algorithm}[t]
+\caption{CEM MPC (Jacobian-Free)}
+\begin{algorithmic}[1]
+\Require $x_0$, targets, $u_{\max}$, $\Delta u_{\max}$
+\State Initialize mean $\mu$ and std $\sigma$
+\For{MPC step $k=1..K$}
+    \For{CEM iter $i=1..I$}
+        \State Sample $N$ sequences $u_{1:H}^{(n)} \sim \mathcal{N}(\mu,\sigma)$
+        \State Clamp each sequence to $u_{\max},\Delta u_{\max}$
+        \State Roll out and score cost
+        \State Refit $\mu,\sigma$ to elite set
+    \EndFor
+    \State Apply $u_1$ from $\mu$ and shift $\mu$
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{iLQR MPC}
+iLQR uses a quadratic approximation of the running and terminal costs:
+\begin{align}
+\ell_t &= w_{\text{tip}}\lVert p_t - p_t^{\text{ref}} \rVert^2 + w_u \lVert u_t \rVert^2 + w_{\Delta u}\lVert u_t-u_{t-1} \rVert^2,\\
+\ell_T &= w_{\text{tip},T}\lVert p_T - p_T^{\text{ref}} \rVert^2.
+\end{align}
+Clamps enforce $|u_t| \le u_{\max}$, $|u_t-u_{t-1}| \le \Delta u_{\max}$, and a sign-flip cap (\path{docs/control/PHASE_A_ILQR.md}). Linearization uses v1.3 when selected.
+
+\begin{algorithm}[t]
+\caption{iLQR MPC with Safe Clamps}
+\begin{algorithmic}[1]
+\Require $x_0$, targets, $A_t,B_t$, initial $u_{1:H}$
+\State Roll out, compute cost, check non-convergence
+\For{iter $=1..N$}
+    \State Backward pass: compute feedback gains $K_t$ and feedforward $k_t$
+    \State Forward line search with safe clamps
+    \State Accept improved rollout or increase regularization
+\EndFor
+\State Apply $u_1$ and shift horizon
+\end{algorithmic}
+\end{algorithm}
+
+\section{Learning Methods}
+\subsection{Behavior Cloning (BC)}
+BC datasets are generated with \path{examples/generate_bc_dataset.py} using replay or CEM as experts. Each NPZ includes $(x_t, \text{target\_xyz}, u_t)$ and telemetry (solver\_exit, residual\_norm, unbounded flags), with keep/drop masks and reasons.
+
+A policy is trained with \path{examples/train_bc_policy.py} as a small MLP. The default Phase C1 and C2 runs use \texttt{--include-tip} (tip-only state plus target).
+
+\subsection{Policy Warm-Start MPC}
+Policy warm-start runs \path{examples/eval_policy_warmstart_mpc.py}, which evaluates:
+\begin{itemize}
+  \item policy\_only: closed-loop BC policy
+  \item mpc\_only: iLQR without policy
+  \item policy\_plus\_mpc: iLQR seeded by policy warm-start
+\end{itemize}
+Reported outputs include kept steps, runtime, and failure diagnostics (see \path{docs/control/run_reports/phase_c2_warmstart_*}).
+
+\section{Evaluation Framework}
+\subsection{Run Reports}
+All evaluation scripts call \path{python/crm_diffsims/control/run_report.py}, generating a markdown report with command, dataset, bounds, mean/max errors, and artifact path.
+
+\subsection{Scoreboard}
+The scoreboard (\path{examples/scoreboard_eval.py}) evaluates multiple modes on a fixed window and writes NPZ arrays with:
+\path{tip\_xyz}, \path{target\_xyz}, \path{u\_t}, \path{u\_raw}, \path{keep\_mask}, and solver telemetry (see \path{docs/control/SCOREBOARD.md}).
+
+\section{Experiments and Results}
+\subsection{Safety Sweep Artifacts}
+Safe bounds are derived from \path{output_data/forward_stability_sweep_captured.csv} and persisted in \path{docs/control/safe_bounds.json}. This bound is used across all controller modes unless explicitly overridden.
+
+\subsection{Scoreboard (Circle Window)}
+The 50-step scoreboard on \path{data/dyn_fk_ramp_circle1_hold1.npz} yields:
+
+\begin{table}[t]
+\caption{Scoreboard results (run reports \path{docs/control/run_reports/scoreboard_20260102_225133_*.md}).}
+\centering
+\begin{tabular}{lccc}
+\toprule
+Mode & Mean err (mm) & Max err (mm) & Kept / Attempted \\
+\midrule
+Replay only & 5.134 & 39.296 & 50 / 50 \\
+Policy only & 16.736 & 39.296 & 14 / 15 \\
+Policy + MPC & 38.233 & 39.296 & 2 / 2 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Artifacts: \path{output_data/scoreboard_20260102_225133_replay_only.npz}, \path{output_data/scoreboard_20260102_225133_policy_only.npz}, \path{output_data/scoreboard_20260102_225133_policy_plus_mpc.npz}.
+
+\subsection{Behavior Cloning Results}
+Phase C1 training and evaluation:
+\begin{itemize}
+  \item Dataset: \path{output_data/phase_c1_dataset.npz} (run report \path{docs/control/run_reports/phase_c1_dataset.md})
+  \item Training metrics: \path{output_data/phase_c1_train_metrics.npz} (mean error 1.659, max 2.687)
+  \item Rollout eval (circle): mean 12.818 vs baseline 10.850, \path{output_data/phase_c1_eval_circle.npz}
+  \item Rollout eval (lemniscate): mean 13.380 vs baseline 11.571, \path{output_data/phase_c1_eval_lemniscate.npz}
+\end{itemize}
+
+Additional BC eval runs:
+\begin{itemize}
+  \item Circle: \path{output_data/bc_eval_circle_20260102_031311.npz} mean 10.411, baseline 7.028 (run report \path{docs/control/run_reports/eval_bc_policy_circle_20260102_031311.md})
+  \item Lemniscate: \path{output_data/bc_eval_lemniscate_20260102_031311.npz} mean 13.089, baseline 5.987 (run report \path{docs/control/run_reports/eval_bc_policy_lemniscate_20260102_031311.md})
+  \item Sweep summaries: \path{output_data/summary_20260102_035011.npz} and \path{output_data/summary_20260102_035205.npz} (run reports in \path{docs/control/run_reports/summary_*.md})
+\end{itemize}
+
+These results show BC underperforming the replay expert on both circle and lemniscate windows.
+
+\subsection{Policy Warm-Start MPC}
+In \path{docs/control/run_reports/phase_c2_warmstart_mpc_only_test.md}:
+\begin{itemize}
+  \item policy\_only mean 7.508 mm, kept 5
+  \item mpc\_only mean 10.006 mm, kept 3
+  \item policy\_plus\_mpc mean 7.195 mm, kept 9
+\end{itemize}
+The same report logs an IndexError during mpc\_only, confirming sensitivity and the importance of the MPC-only fix (\path{docs/control/PHASE_C2_MPC_ONLY_FIX.md}).
+
+\subsection{CEM MPC Dataset Generation}
+A CEM dataset smoke run yields mean error 9.829 mm with 20/20 steps kept (\path{output_data/test_bc_dataset_cem_smoke.npz}, report \path{docs/control/run_reports/test_bc_dataset_cem_smoke.md}). This serves as a proof-of-function expert oracle but is not a full benchmark.
+
+\subsection{iLQR Baselines}
+Full-dataset replay\_dataset\_mode runs with v1.3 report:
+\begin{itemize}
+  \item Circle: mean 0.646 mm, max\_wall\_hit True (\path{docs/control/run_reports/run_ilqr_circle_20260101_235032.md})
+  \item Lemniscate: mean 13.011 mm, max\_wall\_hit True (\path{docs/control/run_reports/run_ilqr_lemniscate_20260101_235607.md})
+\end{itemize}
+These runs use relaxed bounds (e.g., $u_{\max}=0.35$, $\Delta u_{\max}=0.05$) and are limited by wall time.
+
+\subsection{Figure Placeholders}
+\begin{figure}[t]
+\centering
+\fbox{\parbox{0.9\columnwidth}{\centering Placeholder: Tip tracking error (circle).}}
+\caption{Circle tracking error (see \path{output_data/ilqr_circle_error_20260101_193602.pdf}).}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\fbox{\parbox{0.9\columnwidth}{\centering Placeholder: BC evaluation error (circle).}}
+\caption{BC rollout error (circle) from \path{output_data/bc_eval_circle_20260102_031311_error.pdf}.}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\fbox{\parbox{0.9\columnwidth}{\centering Placeholder: BC sweep summary.}}
+\caption{Mean error summary from \path{output_data/summary_mean_error_20260102_035011.pdf}.}
+\end{figure}
+
+\section{Discussion}
+The replay baseline consistently outperforms learned and MPC-based controllers in the measured scoreboard window. Policy-only control degrades performance relative to replay, and policy+MPC performs worst in the scoreboard due to timeouts and limited kept steps. BC achieves low supervised error on the training dataset but degrades in rollout, indicating distribution shift and limited dataset diversity. CEM MPC is functional and safe but lacks full benchmark runs in the current artifacts. iLQR with v1.3 linearization remains informative but sensitive, with wall-time limits and failure modes appearing in run reports.
+
+\section{Limitations}
+\begin{itemize}
+  \item Scoreboard evaluation is limited to a 50-step circle window; CEM is not benchmarked there.
+  \item BC datasets are small (e.g., 60 steps for Phase C1) and not sufficient to match replay performance.
+  \item iLQR performance is bounded by runtime and nonconvergence checks; some runs hit max wall time.
+  \item MPC-only failure modes (IndexError) are documented even after the fix; robust handling is still required.
+\end{itemize}
+
+\section{Conclusion and Future Work}
+This repository implements a rigorous, differentiable CRM catheter pipeline with safe operating bounds and multiple controllers. Results show replay is the strongest available expert, BC does not yet surpass it, and MPC methods are sensitive but informative. Future work should expand datasets, add more stable warm-start strategies, and further reduce linearization cost while maintaining the strict safety regime.
+
+\appendices
+\section{Artifact Index}
+Key artifacts referenced in this paper:
+\begin{itemize}
+  \item Safe bounds: \path{docs/control/safe_bounds.json}, \path{output_data/forward_stability_sweep_captured.csv}
+  \item Scoreboard: \path{output_data/scoreboard_20260102_225133_replay_only.npz}, \path{output_data/scoreboard_20260102_225133_policy_only.npz}, \path{output_data/scoreboard_20260102_225133_policy_plus_mpc.npz}
+  \item Scoreboard reports: \path{docs/control/run_reports/scoreboard_20260102_225133_*.md}
+  \item BC datasets: \path{output_data/phase_c1_dataset.npz}, \path{output_data/phase_c2_dataset.npz}
+  \item BC training: \path{output_data/phase_c1_train_metrics.npz}, \path{output_data/phase_c2_train_metrics.npz}
+  \item BC eval: \path{output_data/phase_c1_eval_circle.npz}, \path{output_data/phase_c1_eval_lemniscate.npz}
+  \item BC eval (extended): \path{output_data/bc_eval_circle_20260102_031311.npz}, \path{output_data/bc_eval_lemniscate_20260102_031311.npz}
+  \item BC sweep summaries: \path{output_data/summary_20260102_035011.npz}, \path{output_data/summary_20260102_035205.npz}
+  \item Policy warm-start: \path{output_data/phase_c2_warmstart_mpc_only_test.npz}
+  \item CEM dataset smoke: \path{output_data/test_bc_dataset_cem_smoke.npz}
+\end{itemize}
+
+\section{Additional Algorithmic Details}
+The iLQR clamp and sign-flip prevention details are implemented in \path{python/crm_diffsims/control/ilqr.py} and described in \path{docs/control/PHASE_A_ILQR.md}. These guardrails are essential for stability in the safe regime.
+
+\end{document}
