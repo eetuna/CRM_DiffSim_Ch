@@ -1,0 +1,21 @@
+# Run Report (2026-01-02 00:01:11)
+
+- git_commit: 39a37b1
+- command: /usr/bin/python3 examples/run_ilqr_lemniscate.py --backend v1_3 --full-dataset --mode replay_only_full --start-idx 0 --end-idx 150 --max-wall-sec 300; /usr/bin/python3 examples/run_ilqr_lemniscate.py --backend v1_3 --full-dataset --mode replay_dataset_mode_full --start-idx 0 --end-idx 150 --init-from-ramp --ramp-len 50 --max-iter 1 --max-wall-sec 300
+- dataset: data/dyn_fk_lem1_y40_a10_L94_hold1.npz
+- start_idx: 0
+- end_idx: 150
+- N_total: 150
+- Li_mm: 94.3
+- dt: 0.05
+- umax: 0.35
+- d_umax: 0.05
+- init_from_ramp: True
+- ramp_len: 50
+- max_wall_hit: False
+- mean_error: 13.011035595590462
+- max_error: 13.84480981396203
+- baseline_mean_error: 10.974014583923232
+- baseline_max_error: 32.32672735092452
+- artifact_npz: output_data/replay_mode_lemniscate_20260101_235607.npz
+- plot_prefix: none

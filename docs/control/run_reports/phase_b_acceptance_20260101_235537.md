@@ -1,0 +1,21 @@
+# Run Report (2026-01-01 23:55:37)
+
+- git_commit: 39a37b1
+- command: /usr/bin/python3 examples/run_ilqr_circle.py --backend v1_3 --full-dataset --mode replay_only_full --start-idx 0 --end-idx 150 --max-wall-sec 300; /usr/bin/python3 examples/run_ilqr_circle.py --backend v1_3 --full-dataset --mode replay_dataset_mode_full --start-idx 0 --end-idx 150 --init-from-ramp --ramp-len 50 --max-iter 1 --max-wall-sec 300
+- dataset: data/dyn_fk_ramp_circle1_hold1.npz
+- start_idx: 0
+- end_idx: 150
+- N_total: 150
+- Li_mm: 94.3
+- dt: 0.05
+- umax: 0.35
+- d_umax: 0.05
+- init_from_ramp: True
+- ramp_len: 50
+- max_wall_hit: False
+- mean_error: 0.6459678630725093
+- max_error: 0.6952069754678449
+- baseline_mean_error: 2.0817597159677534
+- baseline_max_error: 39.29581301916437
+- artifact_npz: output_data/replay_mode_circle_20260101_235032.npz
+- plot_prefix: none

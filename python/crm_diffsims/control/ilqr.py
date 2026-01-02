@@ -35,6 +35,7 @@ class ILQRConfig:
     line_search_alphas: Tuple[float, ...] = (1.0, 0.5, 0.25, 0.1)
     linearization_backend: str = "autograd"
     linearization_dense: bool = True
+    use_safe_bounds: bool = True
 
 
 @dataclass
@@ -58,6 +59,8 @@ def tip_position(x_t: torch.Tensor) -> torch.Tensor:
 
 
 def _maybe_apply_safe_bounds(cfg: ILQRConfig) -> None:
+    if not cfg.use_safe_bounds:
+        return
     path = "docs/control/safe_bounds.json"
     if not os.path.exists(path):
         return

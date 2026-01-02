@@ -16,11 +16,18 @@ def _ensure_parent(path: str | Path) -> Path:
 
 def _save_both(fig, out_path: str | Path) -> None:
     out_path = _ensure_parent(out_path)
-    fig.savefig(out_path.with_suffix(".png"), dpi=200)
+    fig.savefig(out_path.with_suffix(".png"), dpi=300)
     fig.savefig(out_path.with_suffix(".pdf"))
 
 
-def save_tip_trajectory_plot(tip_xyz: np.ndarray, target_xyz: np.ndarray, *, title: str, out_path: str | Path) -> None:
+def save_tip_trajectory_plot(
+    tip_xyz: np.ndarray,
+    target_xyz: np.ndarray,
+    *,
+    title: str,
+    out_path: str | Path,
+    planned_xyz: np.ndarray | None = None,
+) -> None:
     try:
         import matplotlib.pyplot as plt
         from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
@@ -30,7 +37,15 @@ def save_tip_trajectory_plot(tip_xyz: np.ndarray, target_xyz: np.ndarray, *, tit
     fig = plt.figure(figsize=(8, 6))
     ax = fig.add_subplot(111, projection="3d")
     ax.plot(target_xyz[:, 0], target_xyz[:, 1], target_xyz[:, 2], label="target")
-    ax.plot(tip_xyz[:, 0], tip_xyz[:, 1], tip_xyz[:, 2], label="cem")
+    ax.plot(tip_xyz[:, 0], tip_xyz[:, 1], tip_xyz[:, 2], label="executed")
+    if planned_xyz is not None and planned_xyz.size:
+        ax.plot(
+            planned_xyz[:, 0],
+            planned_xyz[:, 1],
+            planned_xyz[:, 2],
+            "--",
+            label="planned",
+        )
     ax.set_title(title)
     ax.set_xlabel("x")
     ax.set_ylabel("y")
