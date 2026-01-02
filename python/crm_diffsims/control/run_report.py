@@ -37,6 +37,7 @@ def write_run_report(
     max_wall_hit=False,
     baseline_mean=None,
     baseline_max=None,
+    extra_entries=None,
 ):
     os.makedirs(os.path.dirname(report_path), exist_ok=True)
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -65,5 +66,9 @@ def write_run_report(
         f"- plot_prefix: {plot_prefix if plot_prefix is not None else 'none'}",
         "",
     ]
+    if extra_entries:
+        for key, value in extra_entries.items():
+            lines.append(f"- {key}: {value}")
+        lines.append("")
     with open(report_path, "w", encoding="ascii") as f:
         f.write("\n".join(lines))

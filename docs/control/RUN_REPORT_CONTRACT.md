@@ -15,3 +15,7 @@ The run report must include:
 - Mean/max error
 - Max-wall hit status
 - Artifact path and plot prefix
+- Optional diagnostics (when available):
+  - `requested_start_idx`, `requested_end_idx`
+  - `ext_load_sec`, `dataset_load_sec`, `model_load_sec`, `rollout_elapsed_sec`, `total_elapsed_sec`
+  - `mpc_only_exception_type`, `mpc_only_exception_msg`, `mpc_only_exception_tb`

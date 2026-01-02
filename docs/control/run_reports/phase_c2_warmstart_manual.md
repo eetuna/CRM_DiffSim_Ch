@@ -1,0 +1,60 @@
+# Run Report (2026-01-02 19:18:57)
+
+- git_commit: 31ca475
+- command: examples/eval_policy_warmstart_mpc.py --model output_data/models/phase_c2_policy.pt --dataset data/dyn_fk_ramp_circle1_hold1.npz --start-idx 0 --window-len 50 --init-mode dataset_x0 --preroll-steps 5 --horizon 5 --mpc-steps 3 --max-wall-sec 300 --heartbeat-every 1 --seed 0 --output-prefix phase_c2_warmstart_manual --report-path docs/control/run_reports/phase_c2_warmstart_manual.md
+- dataset: dyn_fk_ramp_circle1_hold1.npz
+- start_idx: 5
+- end_idx: 55
+- N_total: 320
+- Li_mm: 94.3
+- dt: 0.05
+- umax: 0.1
+- d_umax: 0.01
+- init_from_ramp: False
+- ramp_len: 0
+- max_wall_hit: False
+- mean_error: 7.195470516469247
+- max_error: 15.34742372299618
+- baseline_mean_error: n/a
+- baseline_max_error: n/a
+- artifact_npz: output_data/phase_c2_warmstart_manual.npz
+- plot_prefix: none
+
+- requested_start_idx: 0
+- requested_end_idx: 50
+- init_mode: dataset_x0
+- prev_u_source: preroll_u_last
+- base_start_idx: 0
+- preroll_steps: 5
+- preroll_start_idx: 0
+- preroll_end_idx: 5
+- max_wall_sec: 300.0
+- mpc_steps: 3
+- ext_load_sec: 0.8579349517822266
+- dataset_load_sec: 0.0026159286499023438
+- model_load_sec: 0.007463216781616211
+- rollout_elapsed_sec: 37.905078172683716
+- total_elapsed_sec: 38.97781300544739
+- effective_config: {'preset': 'none', 'start_idx': 5, 'end_idx': 55, 'window_len': 50, 'horizon': 5, 'mpc_steps': 3, 'max_iter': 1, 'max_wall_sec': 300.0, 'preroll_steps': 5, 'init_mode': 'dataset_x0', 'plot': False, 'seed': 0, 'heartbeat_steps': 1}
+- policy_only_mean: 7.508401838944771
+- policy_only_max: 15.34742372299618
+- mpc_only_mean: nan
+- mpc_only_max: nan
+- policy_plus_mpc_mean: 7.195470516469247
+- policy_plus_mpc_max: 15.34742372299618
+- policy_only_kept: 5
+- mpc_only_kept: 0
+- policy_plus_mpc_kept: 9
+- policy_only_runtime_sec: 0.05227351188659668
+- mpc_only_runtime_sec: 0.03899526596069336
+- policy_plus_mpc_runtime_sec: 37.8446102142334
+- policy_only_timeout: False
+- mpc_only_timeout: False
+- policy_plus_mpc_timeout: False
+- policy_only_timeout_step: None
+- mpc_only_timeout_step: None
+- policy_plus_mpc_timeout_step: None
+- policy_only_timeout_reason: none
+- mpc_only_timeout_reason: none
+- policy_plus_mpc_timeout_reason: none
+- eval_go: True

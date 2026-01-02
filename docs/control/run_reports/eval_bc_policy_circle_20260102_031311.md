@@ -1,0 +1,36 @@
+# Run Report (2026-01-02 03:13:16)
+
+- git_commit: 31ca475
+- command: examples/eval_bc_policy_rollout.py --preset circle_easy --init-mode dataset_x0 --plot --debug-first-step
+- dataset: dyn_fk_ramp_circle1_hold1.npz
+- start_idx: 0
+- end_idx: 200
+- N_total: 320
+- Li_mm: 94.3
+- dt: 0.05
+- umax: 0.1
+- d_umax: 0.01
+- init_from_ramp: False
+- ramp_len: 0
+- max_wall_hit: False
+- mean_error: 10.411077854957098
+- max_error: 39.29581301916437
+- baseline_mean_error: 7.027838485082753
+- baseline_max_error: 39.29581301916437
+- artifact_npz: output_data/bc_eval_circle_20260102_031311.npz
+- plot_prefix: output_data/bc_eval_circle_20260102_031311
+
+- policy_unbounded_frac: 0.0
+- expert_unbounded_frac: 0.0
+- policy_steps_total: 21
+- policy_steps_kept: 20
+- policy_steps_dropped: 1
+- expert_steps_total: 151
+- expert_steps_kept: 150
+- expert_steps_dropped: 1
+- attempted_steps: 200
+- prev_u_source: dataset_u0
+- init_mode: dataset_x0
+- debug_first_step: {'x0_finite': True, 'x0_tip': array([-0.45841414, 34.41124198, 70.45756115]), 'target0': array([-0.82736102,  3.12559653, 94.23219444]), 'u_pred_raw': array([-0.8338784, -2.9591548,  0.6453282], dtype=float32), 'u_pred_clamped': array([-0.01, -0.01,  0.02]), 'u_norm': 3.1414008140563965, 'du_norm': 0.017320508075688773, 'solver_exit': 0, 'residual_norm': 3.624953319708751e-05, 'unbounded': False}
+- eval_go: True
+- model_path: output_data/models/test_eval_subset_policy.pt

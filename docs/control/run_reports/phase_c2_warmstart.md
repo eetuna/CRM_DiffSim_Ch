@@ -1,0 +1,32 @@
+# Run Report (2026-01-02 17:02:46)
+
+- git_commit: 31ca475
+- command: examples/eval_policy_warmstart_mpc.py --model output_data/models/phase_c2_policy.pt --dataset data/dyn_fk_ramp_circle1_hold1.npz --start-idx 0 --window-len 50 --init-mode dataset_x0 --preroll-steps 5 --horizon 5 --mpc-steps 3 --max-wall-sec 300 --seed 0 --output-prefix phase_c2_warmstart --report-path docs/control/run_reports/phase_c2_warmstart.md
+- dataset: dyn_fk_ramp_circle1_hold1.npz
+- start_idx: 5
+- end_idx: 55
+- N_total: 320
+- Li_mm: 94.3
+- dt: 0.05
+- umax: 0.1
+- d_umax: 0.01
+- init_from_ramp: False
+- ramp_len: 0
+- max_wall_hit: True
+- mean_error: nan
+- max_error: nan
+- baseline_mean_error: n/a
+- baseline_max_error: n/a
+- artifact_npz: output_data/phase_c2_warmstart.npz
+- plot_prefix: none
+
+- timeout_reason: exception
+- timeout_mode: global
+- timeout_step: None
+- ext_load_sec: 0.8037302494049072
+- dataset_load_sec: 0.002758502960205078
+- model_load_sec: 0.006346940994262695
+- rollout_elapsed_sec: 0.0
+- total_elapsed_sec: 1.0213472843170166
+- effective_config: {'preset': 'none', 'start_idx': 5, 'end_idx': 55, 'window_len': 50, 'horizon': 5, 'mpc_steps': 3, 'max_iter': 1, 'max_wall_sec': 300.0, 'preroll_steps': 5, 'init_mode': 'dataset_x0', 'plot': False, 'seed': 0, 'heartbeat_steps': 10}
+- eval_go: False

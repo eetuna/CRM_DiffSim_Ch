@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -28,8 +28,8 @@ class CEMConfig:
     w_tip_terminal: float = 10.0
     w_u: float = 1e-2
     w_du: float = 1e-1
-    umax_safe: float = 0.1
-    d_umax_safe: float = 0.01
+    umax_safe: Optional[float] = None
+    d_umax_safe: Optional[float] = None
     max_sign_flip: float = 0.005
     seed: int = 0
 
@@ -127,9 +127,10 @@ def cem_mpc(
     torch.manual_seed(cfg.seed)
     np.random.seed(cfg.seed)
 
-    umax_safe, d_umax_safe = _load_safe_bounds()
-    cfg.umax_safe = umax_safe
-    cfg.d_umax_safe = d_umax_safe
+    if cfg.umax_safe is None or cfg.d_umax_safe is None:
+        umax_safe, d_umax_safe = _load_safe_bounds()
+        cfg.umax_safe = umax_safe
+        cfg.d_umax_safe = d_umax_safe
 
     mean = torch.zeros((cfg.horizon, 1, 3), dtype=x0.dtype)
     std = torch.full_like(mean, cfg.u_std_init)

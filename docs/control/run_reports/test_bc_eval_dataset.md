@@ -1,0 +1,21 @@
+# Run Report (2026-01-02 01:44:22)
+
+- git_commit: 31ca475
+- command: examples/generate_bc_dataset.py --controller replay_only_full --episodes 1 --episode-len 8 --start-idx 0 --end-idx 16 --seed 0 --output-npz output_data/test_bc_eval_dataset.npz --report-path docs/control/run_reports/test_bc_eval_dataset.md
+- dataset: dyn_fk_ramp_circle1_hold1.npz
+- start_idx: 0
+- end_idx: 16
+- N_total: 320
+- Li_mm: 94.3
+- dt: 0.05
+- umax: 0.1
+- d_umax: 0.01
+- init_from_ramp: False
+- ramp_len: 0
+- max_wall_hit: False
+- mean_error: 23.868788549113113
+- max_error: 39.29581301916437
+- baseline_mean_error: n/a
+- baseline_max_error: n/a
+- artifact_npz: output_data/test_bc_eval_dataset.npz
+- plot_prefix: none

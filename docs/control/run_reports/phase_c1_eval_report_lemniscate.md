@@ -1,0 +1,34 @@
+# Run Report (2026-01-02 02:38:07)
+
+- git_commit: 31ca475
+- command: examples/eval_bc_policy_rollout.py --model output_data/models/phase_c1_policy.pt --start-idx 0 --subset-len 20 --output-prefix phase_c1_eval --report-prefix phase_c1_eval_report --bc-dataset output_data/phase_c1_dataset.npz
+- dataset: dyn_fk_lem1_y40_a10_L94_hold1.npz
+- start_idx: 0
+- end_idx: 20
+- N_total: 320
+- Li_mm: 94.3
+- dt: 0.05
+- umax: 0.1
+- d_umax: 0.01
+- init_from_ramp: False
+- ramp_len: 0
+- max_wall_hit: False
+- mean_error: 13.379680936606112
+- max_error: 39.29581301916437
+- baseline_mean_error: 11.571041262487327
+- baseline_max_error: 39.29581301916437
+- artifact_npz: output_data/phase_c1_eval_lemniscate.npz
+- plot_prefix: none
+
+- policy_unbounded_frac: 0.0
+- expert_unbounded_frac: 0.0
+- policy_steps_total: 20
+- policy_steps_kept: 20
+- policy_steps_dropped: 0
+- expert_steps_total: 20
+- expert_steps_kept: 20
+- expert_steps_dropped: 0
+- n_steps_total: 60
+- n_steps_kept: 60
+- n_steps_dropped: 0
+- drop_reasons_counts: {"unbounded": 0, "solver_exit": 0, "residual": 0, "nonfinite": 0, "target_nonfinite": 0, "policy_drop": 0, "prefix_fail": 0}

@@ -1,0 +1,35 @@
+# Run Report (2026-01-02 03:12:37)
+
+- git_commit: 31ca475
+- command: examples/eval_bc_policy_rollout.py --model output_data/models/test_eval_subset_policy.pt --init-mode dataset_x0 --start-idx 0 --subset-len 20 --output-prefix test_eval_subset --report-prefix test_eval_subset_report
+- dataset: dyn_fk_ramp_circle1_hold1.npz
+- start_idx: 0
+- end_idx: 20
+- N_total: 320
+- Li_mm: 94.3
+- dt: 0.05
+- umax: 0.1
+- d_umax: 0.01
+- init_from_ramp: False
+- ramp_len: 0
+- max_wall_hit: False
+- mean_error: 10.411077854957098
+- max_error: 39.29581301916437
+- baseline_mean_error: 10.850068940349367
+- baseline_max_error: 39.29581301916437
+- artifact_npz: output_data/test_eval_subset_circle.npz
+- plot_prefix: none
+
+- policy_unbounded_frac: 0.0
+- expert_unbounded_frac: 0.0
+- policy_steps_total: 20
+- policy_steps_kept: 20
+- policy_steps_dropped: 0
+- expert_steps_total: 20
+- expert_steps_kept: 20
+- expert_steps_dropped: 0
+- attempted_steps: 20
+- prev_u_source: dataset_u0
+- init_mode: dataset_x0
+- debug_first_step: n/a
+- eval_go: True

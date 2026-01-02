@@ -1,0 +1,37 @@
+# Run Report (2026-01-02 03:48:41)
+
+- git_commit: 31ca475
+- command: examples/eval_bc_policy_rollout.py --model output_data/models/c1_bc_policy_20260102_025255.pt --init-mode dataset_x0 --circle-dataset data/dyn_fk_ramp_circle1_hold1.npz --start-idx 100 --subset-len 200 --plot --output-prefix c1_eval_sweep_20260102_034737_circle_100 --report-prefix c1_eval_sweep_circle_100
+- dataset: dyn_fk_lem1_y40_a10_L94_hold1.npz
+- start_idx: 100
+- end_idx: 300
+- N_total: 320
+- Li_mm: 94.3
+- dt: 0.05
+- umax: 0.1
+- d_umax: 0.01
+- init_from_ramp: False
+- ramp_len: 0
+- max_wall_hit: False
+- mean_error: 38.44795726946916
+- max_error: 56.072103234347914
+- baseline_mean_error: 9.410554620081362
+- baseline_max_error: 11.863047170169247
+- artifact_npz: output_data/c1_eval_sweep_20260102_034737_circle_100_lemniscate.npz
+- plot_prefix: output_data/c1_eval_sweep_20260102_034737_circle_100_lemniscate
+
+- policy_unbounded_frac: 0.0
+- expert_unbounded_frac: 0.0
+- policy_steps_total: 43
+- policy_steps_kept: 42
+- policy_steps_dropped: 1
+- expert_steps_total: 42
+- expert_steps_kept: 41
+- expert_steps_dropped: 1
+- attempted_steps: 200
+- prev_u_source: dataset_u0
+- init_mode: dataset_x0
+- debug_first_step: n/a
+- eval_go: True
+- model_path: output_data/models/c1_bc_policy_20260102_025255.pt
+- prefix_failed: 

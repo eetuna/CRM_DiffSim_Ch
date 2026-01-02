@@ -1,0 +1,21 @@
+# Run Report (2026-01-02 01:44:31)
+
+- git_commit: 31ca475
+- command: examples/train_bc_policy.py --dataset output_data/test_bc_eval_dataset.npz --epochs 1 --batch-size 4 --hidden 16 --include-tip --seed 0 --output-model output_data/models/test_bc_eval_policy.pt --output-npz output_data/test_bc_eval_train_metrics.npz --report-path docs/control/run_reports/test_bc_eval_train_report.md
+- dataset: dyn_fk_ramp_circle1_hold1.npz
+- start_idx: 0
+- end_idx: 16
+- N_total: 320
+- Li_mm: 94.3
+- dt: 0.05
+- umax: 0.1
+- d_umax: 0.01
+- init_from_ramp: False
+- ramp_len: 0
+- max_wall_hit: False
+- mean_error: 9.131917953491211
+- max_error: 10.529448509216309
+- baseline_mean_error: n/a
+- baseline_max_error: n/a
+- artifact_npz: output_data/test_bc_eval_train_metrics.npz
+- plot_prefix: none

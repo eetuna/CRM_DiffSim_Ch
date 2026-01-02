@@ -275,7 +275,11 @@ def ilqr_solve(
     reg = cfg.reg
 
     x_seq, tip_seq, rollout_ok = rollout(x0, u_seq, li, cfg_dyn, cfg.linearization_backend)
-    cost = total_cost(tip_seq, u_seq, targets, cfg)
+    if tip_seq.shape[0] < u_seq.shape[0] + 1:
+        new_len = max(tip_seq.shape[0] - 1, 1)
+        u_seq = u_seq[:new_len]
+    targets_local = targets[: u_seq.shape[0] + 1]
+    cost = total_cost(tip_seq, u_seq, targets_local, cfg)
     clamp_hits = 0
     sign_flip_hits = 0
     nan_detected = not torch.isfinite(cost).item() or not rollout_ok
@@ -301,7 +305,7 @@ def ilqr_solve(
         k_seq: List[torch.Tensor] = []
         kff_seq: List[torch.Tensor] = []
 
-        v_x, v_xx = _terminal_derivatives(x_seq[-1], targets[-1], cfg)
+        v_x, v_xx = _terminal_derivatives(x_seq[-1], targets_local[-1], cfg)
 
         for t in reversed(range(u_seq.shape[0])):
             if _check_timeout():
@@ -319,7 +323,7 @@ def ilqr_solve(
             l_x, l_u, l_xx, l_uu = _cost_derivatives(
                 x_seq[t],
                 u_seq[t, 0],
-                targets[t],
+                targets_local[t],
                 u_prev,
                 u_next,
                 cfg,
@@ -381,7 +385,8 @@ def ilqr_solve(
                     continue
 
                 x_cand, tip_cand, cand_ok = rollout(x0, u_new, li, cfg_dyn, cfg.linearization_backend)
-                cost_cand = total_cost(tip_cand, u_new, targets, cfg)
+                targets_cand = targets_local[: u_new.shape[0] + 1]
+                cost_cand = total_cost(tip_cand, u_new, targets_cand, cfg)
                 if not cand_ok or not torch.isfinite(cost_cand).item():
                     nan_detected = True
                     continue

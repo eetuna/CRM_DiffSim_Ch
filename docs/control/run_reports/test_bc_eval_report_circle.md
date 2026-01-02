@@ -1,0 +1,21 @@
+# Run Report (2026-01-02 01:44:44)
+
+- git_commit: 31ca475
+- command: examples/eval_bc_policy_rollout.py --model output_data/models/test_bc_eval_policy.pt --start-idx 0 --subset-len 6 --output-prefix test_bc_eval --report-prefix test_bc_eval_report
+- dataset: dyn_fk_ramp_circle1_hold1.npz
+- start_idx: 0
+- end_idx: 6
+- N_total: 320
+- Li_mm: 94.3
+- dt: 0.05
+- umax: 0.1
+- d_umax: 0.01
+- init_from_ramp: False
+- ramp_len: 0
+- max_wall_hit: False
+- mean_error: 39.29581301916437
+- max_error: 39.29581301916437
+- baseline_mean_error: 28.829871073960064
+- baseline_max_error: 39.29581301916437
+- artifact_npz: output_data/test_bc_eval_circle.npz
+- plot_prefix: none
